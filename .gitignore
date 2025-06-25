@@ -113,3 +113,34 @@ documents/
 # AI service keys (extra safety)
 *api_key*
 *secret*
+*API_KEY*
+*SECRET*
+
+# Environment files with sensitive data
+.env
+.env.local
+.env.production
+.env.development
+.env.*.local
+
+# API configuration files
+api-keys.json
+secrets.json
+config/keys.js
+config/secrets.js
+
+# Service account files
+service-account*.json
+credentials*.json
+
+# Database connection strings
+*connection_string*
+*database_url*
+
+# Third-party API keys
+*openai*
+*qdrant*
+*anthropic*
+*google*
+*aws*
+*azure*
