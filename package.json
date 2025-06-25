@@ -7,15 +7,20 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mcp:start": "node dist/mcp/server.js",
+    "mcp:dev": "tsc && node dist/mcp/server.js",
+    "mcp:build": "tsc"
   },
   "dependencies": {
+    "@langchain/mcp-adapters": "^0.5.2",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
     "axios": "^1.10.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.19.1",
     "lucide-react": "^0.522.0",
+    "mcp-framework": "^0.2.15",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-dropzone": "^14.3.8",
