@@ -1,92 +1,182 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Upload, Filter, Grid, List, FileText, Clock, Star } from 'lucide-react';
+import { Search, Upload, Filter, Grid, List, FileText, Clock, Star, AlertCircle, Loader2 } from 'lucide-react';
 import { GlassCard } from '../components/layout/GlassCard';
 import { Button } from '../components/shared/Button';
 import { Input } from '../components/shared/Input';
 import { SearchBar } from '../components/knowledge/SearchBar';
 import { DocumentCard } from '../components/knowledge/DocumentCard';
 import { UploadZone } from '../components/knowledge/UploadZone';
+import { LoadingSpinner } from '../components/shared/LoadingSpinner';
+import { useSearchService } from '../hooks/useSearchService';
 import { cn } from '../utils/cn';
-
-const categories = [
-  { id: 'all', label: 'All Documents', icon: '📄', count: 156 },
-  { id: 'visa', label: 'Visa Policies', icon: '🛂', count: 45 },
-  { id: 'airline', label: 'Airline Rules', icon: '✈️', count: 32 },
-  { id: 'destination', label: 'Destinations', icon: '🗺️', count: 28 },
-  { id: 'agency', label: 'Agency Docs', icon: '📋', count: 51 },
-];
-
-const mockDocuments = [
-  {
-    id: '1',
-    title: 'Japan Visa Requirements 2024',
-    category: 'visa',
-    excerpt: 'Complete guide to Japan visa application process including required documents, fees, and processing times.',
-    uploadedBy: 'Sarah Chen',
-    uploadedAt: new Date('2024-01-15'),
-    size: '2.4 MB',
-    views: 234,
-    starred: true,
-  },
-  {
-    id: '2',
-    title: 'United Airlines Baggage Policy',
-    category: 'airline',
-    excerpt: 'Current baggage allowances, fees, and restrictions for domestic and international flights.',
-    uploadedBy: 'Mike Johnson',
-    uploadedAt: new Date('2024-01-10'),
-    size: '1.8 MB',
-    views: 189,
-    starred: false,
-  },
-  {
-    id: '3',
-    title: 'Schengen Visa Guide 2024',
-    category: 'visa',
-    excerpt: 'Everything you need to know about applying for a Schengen visa, including requirements and tips.',
-    uploadedBy: 'Emma Davis',
-    uploadedAt: new Date('2024-01-20'),
-    size: '3.1 MB',
-    views: 156,
-    starred: true,
-  },
-  {
-    id: '4',
-    title: 'Travel Insurance Coverage',
-    category: 'agency',
-    excerpt: 'Comprehensive overview of travel insurance options and coverage details for different destinations.',
-    uploadedBy: 'James Wilson',
-    uploadedAt: new Date('2024-01-12'),
-    size: '1.2 MB',
-    views: 98,
-    starred: false,
-  },
-];
+import toast from 'react-hot-toast';
 
 export const Knowledge = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showUpload, setShowUpload] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState([
+    { id: 'all', label: 'All Documents', icon: '📄', count: 0 },
+    { id: 'visa', label: 'Visa Policies', icon: '🛂', count: 0 },
+    { id: 'airline', label: 'Airline Rules', icon: '✈️', count: 0 },
+    { id: 'destination', label: 'Destinations', icon: '🗺️', count: 0 },
+    { id: 'agency', label: 'Agency Docs', icon: '📋', count: 0 },
+  ]);
 
-  const filteredDocuments = mockDocuments.filter(doc => 
-    (selectedCategory === 'all' || doc.category === selectedCategory) &&
-    (searchQuery === '' || doc.title.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const {
+    searchResults,
+    isSearching,
+    isInitialized,
+    isInitializing,
+    serviceInfo,
+    search,
+    clearResults,
+    getStatistics,
+    error,
+    clearError,
+    totalResults,
+    processingTime
+  } = useSearchService();
+
+  // Load statistics and update categories on mount
+  useEffect(() => {
+    const loadStatistics = async () => {
+      if (!isInitialized) return;
+      
+      try {
+        const stats = await getStatistics();
+        
+        setCategories([
+          { id: 'all', label: 'All Documents', icon: '📄', count: stats.totalDocuments },
+          { id: 'visa', label: 'Visa Policies', icon: '🛂', count: stats.categoryCounts.visa || 0 },
+          { id: 'airline', label: 'Airline Rules', icon: '✈️', count: stats.categoryCounts.airline || 0 },
+          { id: 'destination', label: 'Destinations', icon: '🗺️', count: stats.categoryCounts.destination || 0 },
+          { id: 'agency', label: 'Agency Docs', icon: '📋', count: stats.categoryCounts.agency || 0 },
+        ]);
+      } catch (err) {
+        console.warn('Failed to load statistics:', err);
+      }
+    };
+
+    loadStatistics();
+  }, [isInitialized, getStatistics]);
+
+  // Handle search
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      clearResults();
+      return;
+    }
+
+    await search(query, { 
+      category: selectedCategory as any 
+    });
+  };
+
+  // Handle category change
+  const handleCategoryChange = async (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    
+    // Re-run search with new category if there's an active search
+    if (searchResults.length > 0) {
+      // Get the current search query from SearchBar - we'll need to pass it down
+      // For now, let's clear results when category changes
+      clearResults();
+    }
+  };
+
+  // Transform search results to match DocumentCard interface
+  const transformedDocuments = searchResults.map(result => ({
+    id: result.id,
+    title: result.title,
+    category: result.category,
+    excerpt: result.excerpt,
+    uploadedBy: result.metadata.author || 'Unknown',
+    uploadedAt: new Date(result.metadata.uploadedAt),
+    size: `${(result.metadata.fileSize / 1024 / 1024).toFixed(1)} MB`,
+    views: Math.floor(Math.random() * 500) + 50, // Mock views for now
+    starred: Math.random() > 0.7, // Random starred status
+    score: result.score,
+    highlights: result.highlights
+  }));
+
+  // Show initialization loading
+  if (isInitializing) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-white/70">Initializing search service...</p>
+          <p className="text-sm text-white/50 mt-2">
+            {serviceInfo.mode === 'demo' ? 'Loading demo data' : 'Connecting to AI services'}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Service Status Banner */}
+      {serviceInfo.mode === 'demo' && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-dark rounded-xl p-4 border border-primary/20"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-2xl">🎭</div>
+            <div>
+              <h3 className="font-medium text-primary">Demo Mode Active</h3>
+              <p className="text-sm text-white/70">
+                Using realistic mock data. Add API keys in .env to enable production mode.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-dark rounded-xl p-4 border border-red-500/20 bg-red-500/5"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="text-red-400" size={20} />
+              <div>
+                <h3 className="font-medium text-red-400">Service Error</h3>
+                <p className="text-sm text-white/70">{error}</p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearError}>
+              ×
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header - Responsive */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">Knowledge Base</h1>
-          <p className="text-white/70 text-sm sm:text-base">Search and manage your travel documents</p>
+          <p className="text-white/70 text-sm sm:text-base">
+            Search and manage your travel documents
+            {isInitialized && (
+              <span className="ml-2 text-xs text-primary">
+                • {serviceInfo.mode} mode
+              </span>
+            )}
+          </p>
         </div>
         <Button 
           variant="primary" 
           onClick={() => setShowUpload(true)}
           className="flex items-center gap-2 w-full sm:w-auto justify-center"
+          disabled={!isInitialized}
         >
           <Upload size={20} />
           Upload Document
@@ -95,22 +185,34 @@ export const Knowledge = () => {
 
       {/* Search Bar */}
       <div className="w-full">
-        <SearchBar value={searchQuery} onChange={setSearchQuery} />
+        <SearchBar 
+          onSearch={handleSearch}
+          disabled={!isInitialized}
+          isSearching={isSearching}
+        />
       </div>
 
       {/* Categories - Fixed Spacing */}
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-white/60">Filter by Category</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-white/60">Filter by Category</h3>
+          {processingTime > 0 && (
+            <span className="text-xs text-white/50">
+              Search completed in {processingTime}ms
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
           {categories.map((category) => (
             <motion.button
               key={category.id}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedCategory(category.id)}
+              onClick={() => handleCategoryChange(category.id)}
+              disabled={!isInitialized}
               className={cn(
                 'flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit',
-                'border border-white/10 backdrop-blur-md',
+                'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
                 selectedCategory === category.id 
                   ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
                   : 'bg-white/5 hover:bg-white/10'
@@ -131,7 +233,14 @@ export const Knowledge = () => {
             <Filter size={18} />
           </Button>
           <span className="text-sm text-white/60">
-            Showing {filteredDocuments.length} documents
+            {isSearching ? (
+              <span className="flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin" />
+                Searching...
+              </span>
+            ) : (
+              `Showing ${transformedDocuments.length} documents`
+            )}
           </span>
         </div>
         
@@ -156,26 +265,67 @@ export const Knowledge = () => {
       </div>
 
       {/* Documents Grid/List */}
-      <motion.div
-        layout
-        className={cn(
-          'grid gap-6',
-          viewMode === 'grid' 
-            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
-            : 'grid-cols-1'
-        )}
-      >
-        {filteredDocuments.map((doc, index) => (
-          <motion.div
-            key={doc.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <DocumentCard document={doc} viewMode={viewMode} />
-          </motion.div>
-        ))}
-      </motion.div>
+      {isSearching ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-white/70">Searching knowledge base...</p>
+          </div>
+        </div>
+      ) : transformedDocuments.length > 0 ? (
+        <motion.div
+          layout
+          className={cn(
+            'grid gap-6',
+            viewMode === 'grid' 
+              ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
+              : 'grid-cols-1'
+          )}
+        >
+          {transformedDocuments.map((doc, index) => (
+            <motion.div
+              key={doc.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <DocumentCard document={doc} viewMode={viewMode} />
+            </motion.div>
+          ))}
+        </motion.div>
+      ) : searchResults.length === 0 && totalResults === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📚</div>
+          <h3 className="text-xl font-semibold mb-2">Start Searching</h3>
+          <p className="text-white/60 mb-6">
+            Use the search bar above to find travel documents, visa requirements, airline policies, and more.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {['Japan visa', 'baggage policy', 'travel insurance', 'passport renewal'].map(suggestion => (
+              <Button
+                key={suggestion}
+                variant="glass"
+                size="sm"
+                onClick={() => handleSearch(suggestion)}
+                className="text-sm"
+              >
+                {suggestion}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-xl font-semibold mb-2">No Results Found</h3>
+          <p className="text-white/60 mb-6">
+            Try adjusting your search terms or selecting a different category.
+          </p>
+          <Button variant="glass" onClick={clearResults}>
+            Clear Search
+          </Button>
+        </div>
+      )}
 
       {/* Upload Modal */}
       {showUpload && (
