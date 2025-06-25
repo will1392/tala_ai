@@ -13,14 +13,21 @@
     "mcp:build": "tsc"
   },
   "dependencies": {
+    "@langchain/community": "^0.3.47",
     "@langchain/mcp-adapters": "^0.5.2",
+    "@langchain/qdrant": "^0.1.2",
+    "@qdrant/qdrant-js": "^1.14.1",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
     "axios": "^1.10.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.19.1",
+    "langchain": "^0.3.29",
     "lucide-react": "^0.522.0",
+    "mammoth": "^1.9.1",
     "mcp-framework": "^0.2.15",
+    "openai": "^5.7.0",
+    "pdf-parse": "^1.1.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-dropzone": "^14.3.8",
@@ -29,6 +36,7 @@
     "react-router-dom": "^7.6.2",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.4.17",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
