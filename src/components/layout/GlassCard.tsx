@@ -1,4 +1,4 @@
-import { ReactNode, HTMLAttributes } from 'react';
+import { type ReactNode, type HTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
 
 interface GlassCardProps extends HTMLAttributes<HTMLDivElement> {

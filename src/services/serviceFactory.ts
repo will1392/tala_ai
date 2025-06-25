@@ -1,5 +1,6 @@
 import { SearchService } from './searchService';
 import { MockSearchService } from './mockSearchService';
+import { ApiSearchService } from './apiSearchService';
 
 /**
  * Service Factory for Tala AI
@@ -45,8 +46,8 @@ class ServiceFactory {
       console.log('🎭 Using Mock Search Service (Demo Mode)');
       this.searchService = new MockSearchService();
     } else {
-      console.log('🚀 Using Real Search Service (Production Mode)');
-      this.searchService = new SearchService();
+      console.log('🚀 Using API Search Service (Backend Mode)');
+      this.searchService = new ApiSearchService();
     }
 
     return this.searchService;
@@ -57,8 +58,8 @@ class ServiceFactory {
    */
   private shouldUseDemoMode(): boolean {
     // Check if explicitly set to demo mode
-    const demoMode = import.meta.env.VITE_DEMO_MODE;
-    if (demoMode === 'true') {
+    const useMockServices = import.meta.env.VITE_USE_MOCK_SERVICES;
+    if (useMockServices === 'true') {
       return true;
     }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSearchService, getServiceInfo, type ISearchService } from '../services/serviceFactory';
 import type { SearchResult, SearchResponse, SearchFilters } from '../services/searchService';
+import { useAuthStore } from '../store/authStore';
 import toast from 'react-hot-toast';
 
 /**
@@ -41,6 +42,9 @@ export interface UseSearchServiceReturn {
 }
 
 export const useSearchService = (): UseSearchServiceReturn => {
+  // Auth context
+  const { user } = useAuthStore();
+  
   // Service state
   const [searchService, setSearchService] = useState<ISearchService | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -121,7 +125,13 @@ export const useSearchService = (): UseSearchServiceReturn => {
     setSearchQuery(query);
 
     try {
-      const response: SearchResponse = await searchService.search(query, filters, limit);
+      const response: SearchResponse = await searchService.search(
+        query, 
+        filters, 
+        limit, 
+        user?.id, 
+        user?.role === 'admin'
+      );
       
       setSearchResults(response.results);
       setTotalResults(response.totalResults);
@@ -137,7 +147,7 @@ export const useSearchService = (): UseSearchServiceReturn => {
     } finally {
       setIsSearching(false);
     }
-  }, [searchService]);
+  }, [searchService, user]);
 
   // Upload document function
   const uploadDocument = useCallback(async (file: File) => {
@@ -155,7 +165,7 @@ export const useSearchService = (): UseSearchServiceReturn => {
         setUploadProgress(prev => Math.min(prev + Math.random() * 15, 85));
       }, 200);
 
-      const result = await searchService.uploadDocument(file);
+      const result = await searchService.uploadDocument(file, user?.id, user?.role === 'admin');
       
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -180,7 +190,7 @@ export const useSearchService = (): UseSearchServiceReturn => {
     } finally {
       setIsUploading(false);
     }
-  }, [searchService]);
+  }, [searchService, user]);
 
   // Delete document function
   const deleteDocument = useCallback(async (documentId: string) => {

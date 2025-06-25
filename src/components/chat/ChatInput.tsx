@@ -1,5 +1,5 @@
-import { useState, useRef, KeyboardEvent } from 'react';
-import { Send, Paperclip, Mic, Smile, Sparkles } from 'lucide-react';
+import { useState, useRef, type KeyboardEvent } from 'react';
+import { Send, Paperclip, Mic, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../shared/Button';
 import { cn } from '../../utils/cn';

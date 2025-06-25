@@ -206,21 +206,21 @@ const NotificationSettings = ({ settings, setSettings }: any) => {
             label="Email Notifications"
             description="Receive updates and alerts via email"
             checked={settings.emailNotifications}
-            onChange={(checked) => setSettings({ ...settings, emailNotifications: checked })}
+            onChange={(checked: boolean) => setSettings({ ...settings, emailNotifications: checked })}
           />
           
           <ToggleOption
             label="Push Notifications"
             description="Get instant notifications in your browser"
             checked={settings.pushNotifications}
-            onChange={(checked) => setSettings({ ...settings, pushNotifications: checked })}
+            onChange={(checked: boolean) => setSettings({ ...settings, pushNotifications: checked })}
           />
           
           <ToggleOption
             label="SMS Notifications"
             description="Receive critical alerts via text message"
             checked={settings.smsNotifications}
-            onChange={(checked) => setSettings({ ...settings, smsNotifications: checked })}
+            onChange={(checked: boolean) => setSettings({ ...settings, smsNotifications: checked })}
           />
         </div>
       </GlassCard>

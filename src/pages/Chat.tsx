@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Paperclip, Mic, MoreVertical } from 'lucide-react';
+import { MoreVertical } from 'lucide-react';
 import { GlassCard } from '../components/layout/GlassCard';
 import { Button } from '../components/shared/Button';
 import { ChatMessage } from '../components/chat/ChatMessage';
@@ -26,8 +26,8 @@ export const Chat = () => {
       sender: 'tala' as const,
       timestamp: new Date(),
       sources: [
-        { title: 'Japan Visa Requirements 2024', type: 'document' },
-        { title: 'Embassy of Japan Guidelines', type: 'website' }
+        { title: 'Japan Visa Requirements 2024', type: 'document' as const },
+        { title: 'Embassy of Japan Guidelines', type: 'website' as const }
       ]
     }
   ]);
@@ -69,7 +69,7 @@ export const Chat = () => {
             setMessages([...messages, {
               id: Date.now().toString(),
               content,
-              sender: 'user',
+              sender: 'user' as const,
               timestamp: new Date(),
             }]);
           }} />

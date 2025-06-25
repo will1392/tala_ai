@@ -33,6 +33,8 @@ const item = {
 };
 
 export const Dashboard = () => {
+  console.log('Dashboard component rendering...');
+  
   return (
     <div className="space-y-6">
       {/* Header */}

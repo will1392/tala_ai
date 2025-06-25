@@ -17,7 +17,7 @@ interface ChatStore {
   setError: (error: string | null) => void;
 }
 
-export const useChatStore = create<ChatStore>((set, get) => ({
+export const useChatStore = create<ChatStore>((set) => ({
   messages: [],
   isLoading: false,
   error: null,

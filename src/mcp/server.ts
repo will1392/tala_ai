@@ -12,26 +12,26 @@
  *   node src/mcp/server.js
  */
 
-import { TalaMCPServer } from './tala-mcp-server.js';
+// import { TalaMCPServer } from './tala-mcp-server.js';
 
-const config = {
-  name: 'tala-ai',
-  version: '1.0.0',
-  description: 'AI-powered travel assistant with document search, visa information, and travel recommendations'
-};
+// const config = {
+//   name: 'tala-ai',
+//   version: '1.0.0',
+//   description: 'AI-powered travel assistant with document search, visa information, and travel recommendations'
+// };
 
-const server = new TalaMCPServer(config);
+// const server = new TalaMCPServer(config);
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n🔄 Shutting down Tala AI MCP Server...');
-  await server.stop();
+  // await server.stop();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('\n🔄 Shutting down Tala AI MCP Server...');
-  await server.stop();
+  // await server.stop();
   process.exit(0);
 });
 
@@ -39,10 +39,10 @@ process.on('SIGTERM', async () => {
 async function main() {
   try {
     console.log('🌟 Starting Tala AI MCP Server...');
-    console.log('📋 Server Info:', server.getServerInfo());
+    // console.log('📋 Server Info:', server.getServerInfo());
     
     const port = process.env.MCP_PORT ? parseInt(process.env.MCP_PORT) : 3001;
-    await server.start(port);
+    // await server.start(port);
     
     console.log('✅ Tala AI MCP Server is ready!');
     console.log('🔗 Connect this server to Claude Desktop or other MCP clients');

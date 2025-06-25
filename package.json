@@ -27,7 +27,6 @@
     "mammoth": "^1.9.1",
     "mcp-framework": "^0.2.15",
     "openai": "^5.7.0",
-    "pdf-parse": "^1.1.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-dropzone": "^14.3.8",

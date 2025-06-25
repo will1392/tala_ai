@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Upload, Filter, Grid, List, FileText, Clock, Star, AlertCircle, Loader2 } from 'lucide-react';
-import { GlassCard } from '../components/layout/GlassCard';
+import { Upload, Filter, Grid, List, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '../components/shared/Button';
-import { Input } from '../components/shared/Input';
 import { SearchBar } from '../components/knowledge/SearchBar';
 import { DocumentCard } from '../components/knowledge/DocumentCard';
 import { UploadZone } from '../components/knowledge/UploadZone';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { useSearchService } from '../hooks/useSearchService';
 import { cn } from '../utils/cn';
-import toast from 'react-hot-toast';
 
 export const Knowledge = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');

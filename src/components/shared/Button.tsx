@@ -1,4 +1,4 @@
-import { ButtonHTMLAttributes, forwardRef } from 'react';
+import { type ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { Loader2 } from 'lucide-react';
 

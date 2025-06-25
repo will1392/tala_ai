@@ -1,14 +1,23 @@
 import { useState } from 'react';
-import { MessageCircle, X, Send, Paperclip } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 
+interface Message {
+  id: string;
+  content: string;
+  sender: 'user' | 'tala';
+  timestamp: Date;
+  sources?: Array<{ title: string; type: 'document' | 'website' }>;
+  attachments?: Array<{ name: string; size: string; type: string }>;
+}
+
 export const ChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       content: 'Hello! I\'m Tala, your AI travel assistant. How can I help you today?',
@@ -75,7 +84,7 @@ export const ChatWidget = () => {
                 setMessages([...messages, {
                   id: Date.now().toString(),
                   content,
-                  sender: 'user',
+                  sender: 'user' as const,
                   timestamp: new Date(),
                 }]);
               }} />

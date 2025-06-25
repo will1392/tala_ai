@@ -24,7 +24,7 @@ interface KnowledgeStore {
   setError: (error: string | null) => void;
 }
 
-export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
+export const useKnowledgeStore = create<KnowledgeStore>((set) => ({
   documents: [],
   searchResults: [],
   isLoading: false,

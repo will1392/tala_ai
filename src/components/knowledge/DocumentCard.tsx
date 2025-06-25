@@ -1,5 +1,4 @@
 import { FileText, Clock, Eye, Star, Download, Share2 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { cn } from '../../utils/cn';

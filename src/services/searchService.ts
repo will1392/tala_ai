@@ -79,7 +79,7 @@ export class SearchService {
       console.log('✅ Search Service initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize Search Service:', error);
-      throw new Error(`Search Service initialization failed: ${error.message}`);
+      throw new Error(`Search Service initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -111,7 +111,7 @@ export class SearchService {
       };
     } catch (error) {
       console.error('❌ Document upload failed:', error);
-      throw new Error(`Document upload failed: ${error.message}`);
+      throw new Error(`Document upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -158,7 +158,7 @@ export class SearchService {
       return response;
     } catch (error) {
       console.error('❌ Search failed:', error);
-      throw new Error(`Search failed: ${error.message}`);
+      throw new Error(`Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -224,7 +224,7 @@ export class SearchService {
       console.log(`✅ Document deleted: ${documentId}`);
     } catch (error) {
       console.error('❌ Failed to delete document:', error);
-      throw new Error(`Document deletion failed: ${error.message}`);
+      throw new Error(`Document deletion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -247,7 +247,7 @@ export class SearchService {
     } catch (error) {
       return {
         status: 'unhealthy',
-        details: { error: error.message }
+        details: { error: error instanceof Error ? error.message : 'Unknown error' }
       };
     }
   }

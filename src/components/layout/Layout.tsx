@@ -4,6 +4,8 @@ import { Navbar } from './Navbar';
 import { motion } from 'framer-motion';
 
 export const Layout = () => {
+  console.log('Layout component rendering...');
+  
   return (
     <div className="min-h-screen flex">
       <Sidebar />

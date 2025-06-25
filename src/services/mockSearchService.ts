@@ -1,5 +1,5 @@
 import type { SearchResult, SearchFilters, SearchResponse } from './searchService';
-import { mockTravelDocuments, mockCategories, searchMockDocuments, type MockDocument } from '../data/mockTravelDocuments';
+import { mockTravelDocuments, searchMockDocuments, type MockDocument } from '../data/mockTravelDocuments';
 
 /**
  * Mock Search Service for Tala AI Demo Mode
@@ -136,7 +136,7 @@ export class MockSearchService {
       return response;
     } catch (error) {
       console.error('❌ [DEMO] Search failed:', error);
-      throw new Error(`Mock search failed: ${error.message}`);
+      throw new Error(`Mock search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -418,7 +418,7 @@ For the most current information, please contact our office directly.`
     const suggestions: string[] = [];
     
     // Extract terms from results
-    const terms = results.flatMap(result => 
+    results.flatMap(result => 
       result.highlights.concat(result.metadata.headings)
     );
     
