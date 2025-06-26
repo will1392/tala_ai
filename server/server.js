@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import { QdrantClient } from '@qdrant/qdrant-js';
 import OpenAI from 'openai';
 import { createRequire } from 'module';
+import fs from 'fs';
+import path from 'path';
 const require = createRequire(import.meta.url);
 const PDFParse = require('pdf-parse');
 import mammoth from 'mammoth';
@@ -27,12 +29,21 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true
 }));
 app.use(express.json());
+
+// Serve uploaded files
+app.use('/api/files', express.static(uploadsDir));
 
 // Add request timing middleware
 app.use((req, res, next) => {
@@ -73,9 +84,14 @@ function getCollectionName(userId, isAdmin = false) {
 }
 
 async function generateEmbedding(text) {
+  // Truncate text to ensure it fits within token limits
+  // Approximate 1 token = 4 characters for English text
+  const maxChars = 30000; // ~7500 tokens, well under 8192 limit
+  const truncatedText = text.length > maxChars ? text.substring(0, maxChars) : text;
+  
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-small',
-    input: text,
+    input: truncatedText,
     encoding_format: 'float'
   });
   return response.data[0].embedding;
@@ -116,7 +132,7 @@ async function extractTextFromFile(buffer, mimetype, filename) {
   }
 }
 
-function createChunks(text, chunkSize = 300, overlap = 50) {
+function createChunks(text, chunkSize = 150, overlap = 25) {
   const words = text.split(/\\s+/).filter(word => word.length > 0);
   const chunks = [];
   
@@ -182,11 +198,164 @@ async function ensureCollectionExists(collectionName) {
   }
 }
 
+// Persistent folder storage using JSON file
+const foldersFilePath = path.join(process.cwd(), 'folders.json');
+
+// Load folders from file
+function loadFolders() {
+  try {
+    if (fs.existsSync(foldersFilePath)) {
+      const data = fs.readFileSync(foldersFilePath, 'utf8');
+      const foldersArray = JSON.parse(data);
+      const foldersMap = new Map();
+      foldersArray.forEach(folder => foldersMap.set(folder.id, folder));
+      console.log(`📁 Loaded ${foldersArray.length} folders from storage`);
+      return foldersMap;
+    }
+  } catch (error) {
+    console.warn('Failed to load folders:', error);
+  }
+  return new Map();
+}
+
+// Save folders to file
+function saveFolders(foldersMap) {
+  try {
+    const foldersArray = Array.from(foldersMap.values());
+    fs.writeFileSync(foldersFilePath, JSON.stringify(foldersArray, null, 2));
+    console.log(`📁 Saved ${foldersArray.length} folders to storage`);
+  } catch (error) {
+    console.error('Failed to save folders:', error);
+  }
+}
+
+// Initialize folders from persistent storage
+const folders = loadFolders();
+
 // API Routes
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Folder Management Routes
+
+// Create folder
+app.post('/api/folders', async (req, res) => {
+  try {
+    const { name, description, userId, isAdmin = false } = req.body;
+    
+    if (!name || !userId) {
+      return res.status(400).json({ error: 'Name and userId are required' });
+    }
+
+    const folderId = uuidv4();
+    const folder = {
+      id: folderId,
+      name: name.trim(),
+      description: description?.trim(),
+      createdAt: new Date().toISOString(),
+      documentCount: 0,
+      userId,
+      isAdmin
+    };
+
+    folders.set(folderId, folder);
+    saveFolders(folders);
+    
+    console.log(`📁 Created folder: ${name} (ID: ${folderId})`);
+    res.json(folder);
+  } catch (error) {
+    console.error('📁 Folder creation error:', error);
+    res.status(500).json({ error: 'Failed to create folder' });
+  }
+});
+
+// Get folders
+app.get('/api/folders', async (req, res) => {
+  try {
+    const { userId, isAdmin = 'false' } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const userFolders = Array.from(folders.values()).filter(folder => {
+      if (isAdmin === 'true') {
+        return folder.isAdmin || folder.userId === userId;
+      }
+      return folder.userId === userId;
+    });
+
+    res.json(userFolders);
+  } catch (error) {
+    console.error('📁 Folder fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch folders' });
+  }
+});
+
+// Update folder
+app.put('/api/folders/:folderId', async (req, res) => {
+  try {
+    const { folderId } = req.params;
+    const { name, description, userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const folder = folders.get(folderId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    if (folder.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (name) folder.name = name.trim();
+    if (description !== undefined) folder.description = description?.trim();
+    
+    folders.set(folderId, folder);
+    saveFolders(folders);
+    
+    console.log(`📁 Updated folder: ${folder.name} (ID: ${folderId})`);
+    res.json(folder);
+  } catch (error) {
+    console.error('📁 Folder update error:', error);
+    res.status(500).json({ error: 'Failed to update folder' });
+  }
+});
+
+// Delete folder
+app.delete('/api/folders/:folderId', async (req, res) => {
+  try {
+    const { folderId } = req.params;
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const folder = folders.get(folderId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    if (folder.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    folders.delete(folderId);
+    saveFolders(folders);
+    
+    console.log(`📁 Deleted folder: ${folder.name} (ID: ${folderId})`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('📁 Folder deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete folder' });
+  }
 });
 
 // Upload document
@@ -196,13 +365,13 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { userId, isAdmin = 'false' } = req.body;
+    const { userId, isAdmin = 'false', folderId } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    console.log(`📄 Processing upload for user ${userId} (admin: ${isAdmin})`);
+    console.log(`📄 Processing upload for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}`);
     
     const file = req.file;
     const documentId = uuidv4();
@@ -211,6 +380,15 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
     // Ensure collection exists
     await ensureCollectionExists(collectionName);
     
+    // Save original file for PDFs
+    let fileUrl = null;
+    if (file.mimetype === 'application/pdf') {
+      const filename = `${documentId}-${file.originalname}`;
+      const filepath = path.join(uploadsDir, filename);
+      fs.writeFileSync(filepath, file.buffer);
+      fileUrl = `/api/files/${filename}`;
+    }
+
     // Extract text from file
     const text = await extractTextFromFile(file.buffer, file.mimetype, file.originalname);
     
@@ -239,7 +417,7 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       // Create vector points
       batch.forEach((chunk, batchIndex) => {
         points.push({
-          id: `${documentId}_${chunk.id}`,
+          id: uuidv4(), // Use a fresh UUID for each point
           vector: embeddings[batchIndex],
           payload: {
             documentId,
@@ -250,7 +428,9 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
               category: 'general', // Could be enhanced with classification
               chunkIndex: chunk.metadata.chunkIndex,
               wordCount: chunk.metadata.wordCount,
-              headings: [] // Could be enhanced with heading extraction
+              headings: [], // Could be enhanced with heading extraction
+              folderId: folderId || null,
+              folderName: folderId ? folders.get(folderId)?.name : null
             },
             document: {
               originalName: file.originalname,
@@ -258,7 +438,8 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
               uploadedAt: new Date().toISOString(),
               fileSize: file.size,
               userId: userId,
-              isAdminDocument: isAdmin === 'true'
+              isAdminDocument: isAdmin === 'true',
+              fileUrl: fileUrl
             }
           }
         });
@@ -271,6 +452,14 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       points: points
     });
     
+    // Update folder document count
+    if (folderId && folders.has(folderId)) {
+      const folder = folders.get(folderId);
+      folder.documentCount += 1;
+      folders.set(folderId, folder);
+      saveFolders(folders);
+    }
+
     console.log(`✅ Stored ${points.length} vectors for document: ${file.originalname}`);
     
     res.json({
@@ -278,7 +467,8 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       chunksStored: points.length,
       filename: file.originalname,
       collectionName,
-      isAdminDocument: isAdmin === 'true'
+      isAdminDocument: isAdmin === 'true',
+      folderId: folderId || null
     });
     
   } catch (error) {
@@ -294,7 +484,7 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
 // Search documents
 app.post('/api/documents/search', async (req, res) => {
   try {
-    const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.7 } = req.body;
+    const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.2, folderId } = req.body;
     
     if (!query || !userId) {
       return res.status(400).json({ error: 'Query and userId are required' });
@@ -326,11 +516,23 @@ app.post('/api/documents/search', async (req, res) => {
           continue;
         }
         
+        // Build search filters for folder
+        const searchFilter = {};
+        if (folderId && folderId !== 'all') {
+          searchFilter.must = [
+            {
+              key: 'metadata.folderId',
+              match: { value: folderId }
+            }
+          ];
+        }
+
         const searchResult = await qdrant.search(collectionName, {
           vector: queryVector,
           limit: Math.ceil(limit / collectionsToSearch.length) + 5,
           with_payload: true,
-          with_vector: false
+          with_vector: false,
+          filter: Object.keys(searchFilter).length > 0 ? searchFilter : undefined
         });
         
         const collectionResults = searchResult

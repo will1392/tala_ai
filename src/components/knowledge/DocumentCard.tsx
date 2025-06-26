@@ -18,9 +18,10 @@ interface Document {
 interface DocumentCardProps {
   document: Document;
   viewMode: 'grid' | 'list';
+  onClick?: (document: Document) => void;
 }
 
-export const DocumentCard = ({ document, viewMode }: DocumentCardProps) => {
+export const DocumentCard = ({ document, viewMode, onClick }: DocumentCardProps) => {
   const categoryIcons: Record<string, string> = {
     visa: '🛂',
     airline: '✈️',
@@ -28,9 +29,24 @@ export const DocumentCard = ({ document, viewMode }: DocumentCardProps) => {
     agency: '📋',
   };
 
+  const handleViewDocument = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log('Document clicked:', document.title);
+    if (onClick) {
+      onClick(document);
+    }
+  };
+
   if (viewMode === 'list') {
     return (
-      <GlassCard className="hover:scale-[1.02] transition-all cursor-pointer">
+      <GlassCard 
+        className="hover:scale-[1.02] hover:bg-primary/10 transition-all cursor-pointer" 
+        onClick={handleViewDocument}
+        style={{ cursor: 'pointer' }}
+      >
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center flex-shrink-0">
             <span className="text-2xl">{categoryIcons[document.category] || '📄'}</span>
@@ -75,7 +91,7 @@ export const DocumentCard = ({ document, viewMode }: DocumentCardProps) => {
   }
 
   return (
-    <GlassCard className="hover:scale-[1.05] transition-all cursor-pointer h-full">
+    <GlassCard className="hover:scale-[1.05] transition-all cursor-pointer h-full" onClick={handleViewDocument}>
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between">
@@ -109,7 +125,15 @@ export const DocumentCard = ({ document, viewMode }: DocumentCardProps) => {
           </div>
           
           <div className="flex items-center gap-2 pt-3">
-            <Button variant="glass" size="sm" className="flex-1 min-h-[36px]">
+            <Button 
+              variant="glass" 
+              size="sm" 
+              className="flex-1 min-h-[36px]"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewDocument();
+              }}
+            >
               <FileText size={16} className="mr-2" />
               View
             </Button>

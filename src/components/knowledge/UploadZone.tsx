@@ -1,15 +1,17 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle, AlertCircle, Loader2, Folder } from 'lucide-react';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { useSearchService } from '../../hooks/useSearchService';
+import { type Folder as FolderType } from '../../services/folderService';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
 interface UploadZoneProps {
   onClose: () => void;
+  folders: FolderType[];
 }
 
 interface FileUploadStatus {
@@ -19,9 +21,10 @@ interface FileUploadStatus {
   error?: string;
 }
 
-export const UploadZone = ({ onClose }: UploadZoneProps) => {
+export const UploadZone = ({ onClose, folders }: UploadZoneProps) => {
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<string>('');
   
   const { uploadDocument, isInitialized } = useSearchService();
 
@@ -70,7 +73,7 @@ export const UploadZone = ({ onClose }: UploadZoneProps) => {
         );
 
         try {
-          const result = await uploadDocument(fileStatus.file);
+          const result = await uploadDocument(fileStatus.file, selectedFolder || undefined);
           
           // Update status to success
           setFileStatuses(prev => 
@@ -91,13 +94,22 @@ export const UploadZone = ({ onClose }: UploadZoneProps) => {
       }
 
       // Check if all uploads completed successfully
-      const hasErrors = fileStatuses.some(status => status.status === 'error');
-      const successCount = fileStatuses.filter(status => status.status === 'success').length;
+      const updatedStatuses = await new Promise<typeof fileStatuses>((resolve) => {
+        setTimeout(() => {
+          setFileStatuses(prev => {
+            resolve(prev);
+            return prev;
+          });
+        }, 100);
+      });
       
-      if (!hasErrors) {
+      const hasErrors = updatedStatuses.some(status => status.status === 'error');
+      const successCount = updatedStatuses.filter(status => status.status === 'success').length;
+      
+      if (!hasErrors && successCount > 0) {
         toast.success(`🎉 All ${successCount} documents uploaded successfully!`);
         setTimeout(onClose, 2000); // Auto-close after success
-      } else {
+      } else if (hasErrors) {
         toast.error('Some uploads failed. Please check the file list.');
       }
     } catch (error) {
@@ -131,6 +143,34 @@ export const UploadZone = ({ onClose }: UploadZoneProps) => {
               <Button variant="ghost" size="sm" onClick={onClose} className="p-2">
                 <X size={20} />
               </Button>
+            </div>
+
+            {/* Folder Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-3">
+                <Folder size={16} className="inline mr-2" />
+                Select Folder
+              </label>
+              <select
+                value={selectedFolder}
+                onChange={(e) => setSelectedFolder(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 
+                         focus:border-primary focus:ring-2 focus:ring-primary/20 
+                         text-white transition-all appearance-none"
+                disabled={isUploading}
+              >
+                <option value="">No Folder (General)</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id} className="bg-gray-800">
+                    {folder.name}
+                  </option>
+                ))}
+              </select>
+              {selectedFolder && (
+                <p className="text-xs text-white/50 mt-2">
+                  Documents will be uploaded to: {folders.find(f => f.id === selectedFolder)?.name}
+                </p>
+              )}
             </div>
 
             {/* Dropzone */}

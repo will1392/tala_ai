@@ -1,25 +1,26 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Filter, Grid, List, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, Filter, Grid, List, AlertCircle, Loader2, FolderPlus, Folder } from 'lucide-react';
 import { Button } from '../components/shared/Button';
 import { SearchBar } from '../components/knowledge/SearchBar';
 import { DocumentCard } from '../components/knowledge/DocumentCard';
 import { UploadZone } from '../components/knowledge/UploadZone';
+import { DocumentViewer } from '../components/knowledge/DocumentViewer';
+import { CreateFolderModal } from '../components/knowledge/CreateFolderModal';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { useSearchService } from '../hooks/useSearchService';
+import { folderService, type Folder as FolderType } from '../services/folderService';
 import { cn } from '../utils/cn';
 
 export const Knowledge = () => {
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showUpload, setShowUpload] = useState(false);
-  const [categories, setCategories] = useState([
-    { id: 'all', label: 'All Documents', icon: '📄', count: 0 },
-    { id: 'visa', label: 'Visa Policies', icon: '🛂', count: 0 },
-    { id: 'airline', label: 'Airline Rules', icon: '✈️', count: 0 },
-    { id: 'destination', label: 'Destinations', icon: '🗺️', count: 0 },
-    { id: 'agency', label: 'Agency Docs', icon: '📋', count: 0 },
-  ]);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [folders, setFolders] = useState<FolderType[]>([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
 
   const {
     searchResults,
@@ -36,28 +37,24 @@ export const Knowledge = () => {
     processingTime
   } = useSearchService();
 
-  // Load statistics and update categories on mount
+  // Load folders on mount
   useEffect(() => {
-    const loadStatistics = async () => {
+    const loadFolders = async () => {
       if (!isInitialized) return;
       
+      setLoadingFolders(true);
       try {
-        const stats = await getStatistics();
-        
-        setCategories([
-          { id: 'all', label: 'All Documents', icon: '📄', count: stats.totalDocuments },
-          { id: 'visa', label: 'Visa Policies', icon: '🛂', count: stats.categoryCounts.visa || 0 },
-          { id: 'airline', label: 'Airline Rules', icon: '✈️', count: stats.categoryCounts.airline || 0 },
-          { id: 'destination', label: 'Destinations', icon: '🗺️', count: stats.categoryCounts.destination || 0 },
-          { id: 'agency', label: 'Agency Docs', icon: '📋', count: stats.categoryCounts.agency || 0 },
-        ]);
+        const userFolders = await folderService.getFolders('admin-1', true);
+        setFolders(userFolders);
       } catch (err) {
-        console.warn('Failed to load statistics:', err);
+        console.warn('Failed to load folders:', err);
+      } finally {
+        setLoadingFolders(false);
       }
     };
 
-    loadStatistics();
-  }, [isInitialized, getStatistics]);
+    loadFolders();
+  }, [isInitialized]);
 
   // Handle search
   const handleSearch = async (query: string) => {
@@ -67,35 +64,47 @@ export const Knowledge = () => {
     }
 
     await search(query, { 
-      category: selectedCategory as any 
+      folderId: selectedFolder === 'all' ? undefined : selectedFolder
     });
   };
 
-  // Handle category change
-  const handleCategoryChange = async (categoryId: string) => {
-    setSelectedCategory(categoryId);
+  // Handle folder change
+  const handleFolderChange = async (folderId: string) => {
+    setSelectedFolder(folderId);
     
-    // Re-run search with new category if there's an active search
+    // Re-run search with new folder if there's an active search
     if (searchResults.length > 0) {
-      // Get the current search query from SearchBar - we'll need to pass it down
-      // For now, let's clear results when category changes
       clearResults();
     }
+  };
+
+  // Handle folder creation
+  const handleCreateFolder = async (name: string, description?: string) => {
+    await folderService.createFolder({
+      name,
+      description,
+      userId: 'admin-1',
+      isAdmin: true,
+    });
+    
+    // Reload folders
+    const userFolders = await folderService.getFolders('admin-1', true);
+    setFolders(userFolders);
   };
 
   // Transform search results to match DocumentCard interface
   const transformedDocuments = searchResults.map(result => ({
     id: result.id,
-    title: result.title,
-    category: result.category,
-    excerpt: result.excerpt,
-    uploadedBy: result.metadata.author || 'Unknown',
-    uploadedAt: new Date(result.metadata.uploadedAt),
-    size: `${(result.metadata.fileSize / 1024 / 1024).toFixed(1)} MB`,
+    title: result.metadata?.title || result.document?.originalName || 'Untitled',
+    category: result.metadata?.category || 'general',
+    excerpt: result.content ? result.content.substring(0, 200) + '...' : 'No preview available',
+    uploadedBy: result.document?.userId || 'Unknown',
+    uploadedAt: new Date(result.document?.uploadedAt || Date.now()),
+    size: result.document?.fileSize ? `${(result.document.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown',
     views: Math.floor(Math.random() * 500) + 50, // Mock views for now
     starred: Math.random() > 0.7, // Random starred status
     score: result.score,
-    highlights: result.highlights
+    highlights: [] // Backend doesn't provide highlights yet
   }));
 
   // Show initialization loading
@@ -169,15 +178,26 @@ export const Knowledge = () => {
             )}
           </p>
         </div>
-        <Button 
-          variant="primary" 
-          onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 w-full sm:w-auto justify-center"
-          disabled={!isInitialized}
-        >
-          <Upload size={20} />
-          Upload Document
-        </Button>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <Button 
+            variant="ghost" 
+            onClick={() => setShowCreateFolder(true)}
+            className="flex items-center gap-2 flex-1 sm:flex-none justify-center"
+            disabled={!isInitialized}
+          >
+            <FolderPlus size={20} />
+            Create Folder
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={() => setShowUpload(true)}
+            className="flex items-center gap-2 flex-1 sm:flex-none justify-center"
+            disabled={!isInitialized}
+          >
+            <Upload size={20} />
+            Upload Document
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -189,10 +209,10 @@ export const Knowledge = () => {
         />
       </div>
 
-      {/* Categories - Fixed Spacing */}
+      {/* Folders - Fixed Spacing */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-white/60">Filter by Category</h3>
+          <h3 className="text-sm font-medium text-white/60">Folders</h3>
           {processingTime > 0 && (
             <span className="text-xs text-white/50">
               Search completed in {processingTime}ms
@@ -200,26 +220,53 @@ export const Knowledge = () => {
           )}
         </div>
         <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {categories.map((category) => (
-            <motion.button
-              key={category.id}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => handleCategoryChange(category.id)}
-              disabled={!isInitialized}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit',
-                'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
-                selectedCategory === category.id 
-                  ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
-                  : 'bg-white/5 hover:bg-white/10'
-              )}
-            >
-              <span className="text-lg">{category.icon}</span>
-              <span className="font-medium text-sm">{category.label}</span>
-              <span className="text-xs text-white/60">({category.count})</span>
-            </motion.button>
-          ))}
+          {/* All Documents */}
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => handleFolderChange('all')}
+            disabled={!isInitialized}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit',
+              'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
+              selectedFolder === 'all' 
+                ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
+                : 'bg-white/5 hover:bg-white/10'
+            )}
+          >
+            <span className="text-lg">📄</span>
+            <span className="font-medium text-sm">All Documents</span>
+            <span className="text-xs text-white/60">({transformedDocuments.length})</span>
+          </motion.button>
+
+          {/* User Folders */}
+          {loadingFolders ? (
+            <div className="flex items-center gap-2 px-4 py-2.5 text-white/50">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-sm">Loading folders...</span>
+            </div>
+          ) : (
+            folders.map((folder) => (
+              <motion.button
+                key={folder.id}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleFolderChange(folder.id)}
+                disabled={!isInitialized}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit',
+                  'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
+                  selectedFolder === folder.id 
+                    ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
+                    : 'bg-white/5 hover:bg-white/10'
+                )}
+              >
+                <Folder size={18} className="text-primary" />
+                <span className="font-medium text-sm">{folder.name}</span>
+                <span className="text-xs text-white/60">({folder.documentCount})</span>
+              </motion.button>
+            ))
+          )}
         </div>
       </div>
 
@@ -286,7 +333,29 @@ export const Knowledge = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <DocumentCard document={doc} viewMode={viewMode} />
+              <DocumentCard 
+                document={doc} 
+                viewMode={viewMode} 
+                onClick={(document) => {
+                  // Need to get the full content from the search result
+                  const fullResult = searchResults.find(r => r.id === document.id);
+                  
+                  console.log('Knowledge.tsx Debug:', {
+                    document: document,
+                    fullResult: fullResult,
+                    fileUrl: fullResult?.document?.fileUrl,
+                    fileType: fullResult?.document?.fileType
+                  });
+                  
+                  setSelectedDocument({
+                    ...document,
+                    content: fullResult?.content || document.excerpt,
+                    fileUrl: fullResult?.document?.fileUrl,
+                    fileType: fullResult?.document?.fileType
+                  });
+                  setShowDocumentViewer(true);
+                }}
+              />
             </motion.div>
           ))}
         </motion.div>
@@ -326,8 +395,25 @@ export const Knowledge = () => {
 
       {/* Upload Modal */}
       {showUpload && (
-        <UploadZone onClose={() => setShowUpload(false)} />
+        <UploadZone onClose={() => setShowUpload(false)} folders={folders} />
       )}
+
+      {/* Create Folder Modal */}
+      <CreateFolderModal
+        isOpen={showCreateFolder}
+        onClose={() => setShowCreateFolder(false)}
+        onCreateFolder={handleCreateFolder}
+      />
+
+      {/* Document Viewer Modal */}
+      <DocumentViewer
+        isOpen={showDocumentViewer}
+        onClose={() => {
+          setShowDocumentViewer(false);
+          setSelectedDocument(null);
+        }}
+        document={selectedDocument}
+      />
     </div>
   );
 };

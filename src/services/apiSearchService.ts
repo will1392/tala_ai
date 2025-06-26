@@ -39,7 +39,7 @@ export class ApiSearchService implements ISearchService {
   /**
    * Upload and process a document
    */
-  async uploadDocument(file: File, userId?: string, isAdmin: boolean = false): Promise<{ documentId: string; chunksStored: number }> {
+  async uploadDocument(file: File, userId?: string, isAdmin: boolean = false, folderId?: string): Promise<{ documentId: string; chunksStored: number }> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -49,8 +49,11 @@ export class ApiSearchService implements ISearchService {
       formData.append('document', file);
       formData.append('userId', userId || 'default-user');
       formData.append('isAdmin', isAdmin.toString());
+      if (folderId) {
+        formData.append('folderId', folderId);
+      }
 
-      console.log(`📄 Uploading document: ${file.name} for user ${userId} (admin: ${isAdmin})`);
+      console.log(`📄 Uploading document: ${file.name} for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}`);
 
       const response = await fetch(`${this.baseUrl}/documents/upload`, {
         method: 'POST',
@@ -96,8 +99,8 @@ export class ApiSearchService implements ISearchService {
           userId: userId || 'default-user',
           isAdmin,
           limit,
-          filters,
-          scoreThreshold: 0.7
+          folderId: filters?.folderId,
+          scoreThreshold: 0.2
         }),
       });
 

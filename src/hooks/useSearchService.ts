@@ -30,7 +30,7 @@ export interface UseSearchServiceReturn {
   
   // Actions
   search: (query: string, filters?: SearchFilters, limit?: number) => Promise<void>;
-  uploadDocument: (file: File) => Promise<{ documentId: string; chunksStored: number }>;
+  uploadDocument: (file: File, folderId?: string) => Promise<{ documentId: string; chunksStored: number }>;
   deleteDocument: (documentId: string) => Promise<void>;
   getSuggestions: (partialQuery: string) => Promise<string[]>;
   getStatistics: () => Promise<any>;
@@ -150,7 +150,7 @@ export const useSearchService = (): UseSearchServiceReturn => {
   }, [searchService, user]);
 
   // Upload document function
-  const uploadDocument = useCallback(async (file: File) => {
+  const uploadDocument = useCallback(async (file: File, folderId?: string) => {
     if (!searchService) {
       throw new Error('Search service not initialized');
     }
@@ -165,7 +165,7 @@ export const useSearchService = (): UseSearchServiceReturn => {
         setUploadProgress(prev => Math.min(prev + Math.random() * 15, 85));
       }, 200);
 
-      const result = await searchService.uploadDocument(file, user?.id, user?.role === 'admin');
+      const result = await searchService.uploadDocument(file, user?.id, user?.role === 'admin', folderId);
       
       clearInterval(progressInterval);
       setUploadProgress(100);

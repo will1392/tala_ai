@@ -11,7 +11,7 @@ import { ApiSearchService } from './apiSearchService';
 
 export interface ISearchService {
   initialize(): Promise<void>;
-  uploadDocument(file: File): Promise<{ documentId: string; chunksStored: number }>;
+  uploadDocument(file: File, userId?: string, isAdmin?: boolean, folderId?: string): Promise<{ documentId: string; chunksStored: number }>;
   search(query: string, filters?: any, limit?: number): Promise<any>;
   getSuggestions(partialQuery: string): Promise<string[]>;
   getStatistics(): Promise<any>;
