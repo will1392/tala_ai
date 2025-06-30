@@ -42,8 +42,19 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Serve uploaded files
-app.use('/api/files', express.static(uploadsDir));
+// Serve uploaded files with proper headers
+app.use('/api/files', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || 'http://localhost:5173');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+}, express.static(uploadsDir));
 
 // Add request timing middleware
 app.use((req, res, next) => {
@@ -373,6 +384,11 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
 
     console.log(`📄 Processing upload for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}`);
     
+    if (folderId) {
+      const folder = folders.get(folderId);
+      console.log(`📁 Folder details:`, folder ? { id: folder.id, name: folder.name } : 'Folder not found');
+    }
+    
     const file = req.file;
     const documentId = uuidv4();
     const collectionName = getCollectionName(userId, isAdmin === 'true');
@@ -572,6 +588,388 @@ app.post('/api/documents/search', async (req, res) => {
     console.error('Search error:', error);
     res.status(500).json({
       error: 'Search failed',
+      details: error.message
+    });
+  }
+});
+
+// Get all documents
+app.get('/api/documents', async (req, res) => {
+  try {
+    const { userId, isAdmin = 'false', folderId, limit = 50, offset = 0 } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    console.log(`📄 Getting documents for user ${userId} (admin: ${isAdmin}), folder: ${folderId || 'all'}, limit: ${limit}`);
+    
+    // Determine collections to search
+    const collectionsToSearch = [];
+    
+    if (isAdmin === 'true') {
+      // Admin can see all documents
+      collectionsToSearch.push('tala_admin_knowledge');
+      
+      // Get all user collections
+      const collections = await qdrant.getCollections();
+      collections.collections.forEach(c => {
+        if (c.name.startsWith('tala_user_') && c.name.endsWith('_knowledge')) {
+          collectionsToSearch.push(c.name);
+        }
+      });
+    } else {
+      // Regular user sees their own + admin documents
+      collectionsToSearch.push('tala_admin_knowledge');
+      collectionsToSearch.push(getCollectionName(userId, false));
+    }
+    
+    // Get documents from each collection
+    const allDocuments = new Map(); // Use Map to deduplicate by documentId
+    
+    for (const collectionName of collectionsToSearch) {
+      try {
+        const collectionInfo = await qdrant.getCollection(collectionName);
+        if (!collectionInfo) continue;
+        
+        // Scroll through all points in the collection
+        let nextPageOffset = null;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const scrollRequest = {
+            limit: 100,
+            offset: nextPageOffset,
+            with_payload: true,
+            with_vector: false
+          };
+          
+          // Add filter only if we're filtering by folder
+          if (folderId && folderId !== 'all') {
+            // Try without nested path first
+            scrollRequest.filter = {
+              must: [{
+                key: 'folderId',
+                match: { value: folderId }
+              }]
+            };
+            console.log(`📄 Filtering by folder: ${folderId}`);
+          }
+          
+          let scrollResult;
+          try {
+            scrollResult = await qdrant.scroll(collectionName, scrollRequest);
+            console.log(`📄 Found ${scrollResult.points.length} points in ${collectionName}`);
+          } catch (scrollError) {
+            console.error(`📄 Scroll error details:`, scrollError.message);
+            // Try without filter to at least get all documents
+            scrollResult = await qdrant.scroll(collectionName, {
+              limit: 100,
+              offset: nextPageOffset,
+              with_payload: true,
+              with_vector: false
+            });
+            console.log(`📄 Got ${scrollResult.points.length} points without filter`);
+          }
+          
+          // Group points by documentId
+          scrollResult.points.forEach(point => {
+            const docId = point.payload.documentId;
+            const pointFolderId = point.payload.metadata?.folderId;
+            
+            console.log(`📄 Point folder info:`, {
+              docId: docId.substring(0, 8),
+              pointFolderId,
+              requestedFolderId: folderId,
+              title: point.payload.metadata?.title || point.payload.document?.originalName
+            });
+            
+            // Filter out documents that don't match the folder when folder is specified
+            if (folderId && folderId !== 'all' && pointFolderId !== folderId) {
+              console.log(`📄 Skipping document - folder mismatch`);
+              return;
+            }
+            
+            if (!allDocuments.has(docId)) {
+              // First chunk of this document
+              allDocuments.set(docId, {
+                id: docId,
+                title: point.payload.metadata?.title || point.payload.document?.originalName || 'Untitled',
+                category: point.payload.metadata?.category || 'general',
+                uploadedBy: point.payload.document?.userId || 'Unknown',
+                uploadedAt: point.payload.document?.uploadedAt || new Date().toISOString(),
+                fileSize: point.payload.document?.fileSize || 0,
+                fileType: point.payload.document?.fileType || 'unknown',
+                fileUrl: point.payload.document?.fileUrl || null,
+                folderId: point.payload.metadata?.folderId || null,
+                folderName: point.payload.metadata?.folderName || null,
+                collectionName,
+                chunkCount: 1,
+                excerpt: point.payload.content ? point.payload.content.substring(0, 200) + '...' : ''
+              });
+            } else {
+              // Additional chunk of existing document
+              allDocuments.get(docId).chunkCount += 1;
+            }
+          });
+          
+          nextPageOffset = scrollResult.next_page_offset;
+          hasMore = nextPageOffset !== null && nextPageOffset !== undefined;
+        }
+      } catch (error) {
+        console.warn(`Failed to get documents from collection ${collectionName}:`, error.message);
+      }
+    }
+    
+    // Convert to array and apply pagination
+    const documents = Array.from(allDocuments.values())
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+      .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+    
+    res.json({
+      documents,
+      totalDocuments: allDocuments.size,
+      offset: parseInt(offset),
+      limit: parseInt(limit),
+      hasMore: allDocuments.size > parseInt(offset) + parseInt(limit)
+    });
+    
+  } catch (error) {
+    console.error('📄 Get documents error:', error);
+    res.status(500).json({
+      error: 'Failed to get documents',
+      details: error.message
+    });
+  }
+});
+
+// Delete document
+app.delete('/api/documents/:documentId', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { userId, isAdmin = 'false' } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    console.log(`🗑️ Deleting document: ${documentId} for user ${userId} (admin: ${isAdmin})`);
+    
+    // Determine collections to search
+    const collectionsToSearch = [];
+    
+    if (isAdmin === 'true') {
+      collectionsToSearch.push('tala_admin_knowledge');
+      
+      // Get all user collections
+      const collections = await qdrant.getCollections();
+      collections.collections.forEach(c => {
+        if (c.name.startsWith('tala_user_') && c.name.endsWith('_knowledge')) {
+          collectionsToSearch.push(c.name);
+        }
+      });
+    } else {
+      collectionsToSearch.push('tala_admin_knowledge');
+      collectionsToSearch.push(getCollectionName(userId, false));
+    }
+    
+    let deletedCount = 0;
+    let documentInfo = null;
+    
+    // Delete from each collection
+    for (const collectionName of collectionsToSearch) {
+      try {
+        const collections = await qdrant.getCollections();
+        const exists = collections.collections.some(c => c.name === collectionName);
+        
+        if (!exists) continue;
+        
+        // Find all points for this document
+        const scrollResult = await qdrant.scroll(collectionName, {
+          filter: {
+            must: [{
+              key: 'documentId',
+              match: { value: documentId }
+            }]
+          },
+          limit: 1000,
+          with_payload: true,
+          with_vector: false
+        });
+        
+        if (scrollResult.points.length > 0) {
+          // Store document info for folder count update
+          const firstPoint = scrollResult.points[0];
+          documentInfo = {
+            folderId: firstPoint.payload?.metadata?.folderId,
+            folderName: firstPoint.payload?.metadata?.folderName,
+            title: firstPoint.payload?.metadata?.title || firstPoint.payload?.document?.originalName
+          };
+          
+          // Delete all points for this document
+          const pointIds = scrollResult.points.map(point => point.id);
+          await qdrant.delete(collectionName, {
+            points: pointIds
+          });
+          
+          deletedCount += pointIds.length;
+          console.log(`🗑️ Deleted ${pointIds.length} chunks from ${collectionName}`);
+        }
+      } catch (error) {
+        console.warn(`Failed to delete from collection ${collectionName}:`, error.message);
+      }
+    }
+    
+    // Update folder document count if document was in a folder
+    if (documentInfo?.folderId && folders.has(documentInfo.folderId)) {
+      const folder = folders.get(documentInfo.folderId);
+      folder.documentCount = Math.max(0, folder.documentCount - 1);
+      folders.set(documentInfo.folderId, folder);
+      saveFolders(folders);
+      console.log(`📁 Updated folder count for: ${documentInfo.folderName}`);
+    }
+    
+    if (deletedCount === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    console.log(`✅ Successfully deleted document: ${documentInfo?.title} (${deletedCount} chunks)`);
+    
+    res.json({
+      success: true,
+      deletedChunks: deletedCount,
+      documentInfo
+    });
+    
+  } catch (error) {
+    console.error('🗑️ Document deletion error:', error);
+    res.status(500).json({
+      error: 'Failed to delete document',
+      details: error.message
+    });
+  }
+});
+
+// Move document to different folder
+app.put('/api/documents/:documentId/move', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { userId, isAdmin = 'false', folderId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    console.log(`📁 Moving document: ${documentId} to folder: ${folderId || 'root'} for user ${userId}`);
+    
+    // Determine collections to search
+    const collectionsToSearch = [];
+    
+    if (isAdmin === 'true') {
+      collectionsToSearch.push('tala_admin_knowledge');
+      
+      // Get all user collections
+      const collections = await qdrant.getCollections();
+      collections.collections.forEach(c => {
+        if (c.name.startsWith('tala_user_') && c.name.endsWith('_knowledge')) {
+          collectionsToSearch.push(c.name);
+        }
+      });
+    } else {
+      collectionsToSearch.push('tala_admin_knowledge');
+      collectionsToSearch.push(getCollectionName(userId, false));
+    }
+    
+    let updatedCount = 0;
+    let documentInfo = null;
+    let oldFolderId = null;
+    
+    // Update folder info in each collection
+    for (const collectionName of collectionsToSearch) {
+      try {
+        const collections = await qdrant.getCollections();
+        const exists = collections.collections.some(c => c.name === collectionName);
+        
+        if (!exists) continue;
+        
+        // Find all points for this document
+        const scrollResult = await qdrant.scroll(collectionName, {
+          filter: {
+            must: [{
+              key: 'documentId',
+              match: { value: documentId }
+            }]
+          },
+          limit: 1000,
+          with_payload: true,
+          with_vector: false
+        });
+        
+        if (scrollResult.points.length > 0) {
+          // Store document info
+          const firstPoint = scrollResult.points[0];
+          oldFolderId = firstPoint.payload?.metadata?.folderId;
+          documentInfo = {
+            title: firstPoint.payload?.metadata?.title || firstPoint.payload?.document?.originalName
+          };
+          
+          // Update all points with new folder info
+          const pointIds = scrollResult.points.map(point => point.id);
+          const newPayload = {
+            metadata: {
+              ...scrollResult.points[0].payload.metadata,
+              folderId: folderId || null,
+              folderName: folderId ? folders.get(folderId)?.name : null
+            }
+          };
+          
+          await qdrant.setPayload(collectionName, {
+            payload: newPayload,
+            points: pointIds
+          });
+          
+          updatedCount += pointIds.length;
+        }
+      } catch (error) {
+        console.warn(`Failed to update collection ${collectionName}:`, error.message);
+      }
+    }
+    
+    // Update folder document counts
+    if (oldFolderId && folders.has(oldFolderId)) {
+      const oldFolder = folders.get(oldFolderId);
+      oldFolder.documentCount = Math.max(0, oldFolder.documentCount - 1);
+      folders.set(oldFolderId, oldFolder);
+    }
+    
+    if (folderId && folders.has(folderId)) {
+      const newFolder = folders.get(folderId);
+      newFolder.documentCount += 1;
+      folders.set(folderId, newFolder);
+    }
+    
+    if (oldFolderId || folderId) {
+      saveFolders(folders);
+    }
+    
+    if (updatedCount === 0) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    console.log(`✅ Successfully moved document: ${documentInfo?.title} (${updatedCount} chunks)`);
+    
+    res.json({
+      success: true,
+      updatedChunks: updatedCount,
+      documentInfo,
+      oldFolderId,
+      newFolderId: folderId
+    });
+    
+  } catch (error) {
+    console.error('📁 Document move error:', error);
+    res.status(500).json({
+      error: 'Failed to move document',
       details: error.message
     });
   }

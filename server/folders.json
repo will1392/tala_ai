@@ -1,0 +1,18 @@
+[
+  {
+    "id": "76cb0d0a-adac-46da-8eda-4b679726f101",
+    "name": "Destinations",
+    "createdAt": "2025-06-30T13:38:07.247Z",
+    "documentCount": 2,
+    "userId": "admin-1",
+    "isAdmin": true
+  },
+  {
+    "id": "4e2732a2-adda-4799-afaf-24cd6aa22fc9",
+    "name": "Test",
+    "createdAt": "2025-06-30T15:26:29.231Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true
+  }
+]

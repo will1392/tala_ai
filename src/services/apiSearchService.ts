@@ -187,6 +187,50 @@ export class ApiSearchService implements ISearchService {
   }
 
   /**
+   * Get all documents with optional folder filtering
+   */
+  async getDocuments(userId?: string, isAdmin: boolean = false, folderId?: string, limit: number = 50, offset: number = 0): Promise<any> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    try {
+      console.log(`📄 Getting documents for user ${userId} (admin: ${isAdmin}), folder: ${folderId || 'all'}`);
+
+      const params = new URLSearchParams({
+        userId: userId || 'default-user',
+        isAdmin: isAdmin.toString(),
+        limit: limit.toString(),
+        offset: offset.toString()
+      });
+
+      if (folderId && folderId !== 'all') {
+        params.append('folderId', folderId);
+      }
+
+      const response = await fetch(`${this.baseUrl}/documents?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Get documents failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Retrieved ${result.documents.length} documents (total: ${result.totalDocuments})`);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Get documents failed:', error);
+      throw new Error(`Get documents failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Delete a document
    */
   async deleteDocument(documentId: string): Promise<void> {

@@ -7,9 +7,15 @@ import { DocumentCard } from '../components/knowledge/DocumentCard';
 import { UploadZone } from '../components/knowledge/UploadZone';
 import { DocumentViewer } from '../components/knowledge/DocumentViewer';
 import { CreateFolderModal } from '../components/knowledge/CreateFolderModal';
+import { EditFolderModal } from '../components/knowledge/EditFolderModal';
+import { DeleteFolderModal } from '../components/knowledge/DeleteFolderModal';
+import { FolderMenu } from '../components/knowledge/FolderMenu';
+import { DeleteDocumentModal } from '../components/knowledge/DeleteDocumentModal';
+import { MoveDocumentModal } from '../components/knowledge/MoveDocumentModal';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { useSearchService } from '../hooks/useSearchService';
 import { folderService, type Folder as FolderType } from '../services/folderService';
+import { ApiSearchService } from '../services/apiSearchService';
 import { cn } from '../utils/cn';
 
 export const Knowledge = () => {
@@ -21,6 +27,13 @@ export const Knowledge = () => {
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
+  const [allDocuments, setAllDocuments] = useState<any[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingFolder, setEditingFolder] = useState<FolderType | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<FolderType | null>(null);
+  const [deletingDocument, setDeletingDocument] = useState<{id: string, title: string} | null>(null);
+  const [movingDocument, setMovingDocument] = useState<{id: string, title: string, folderId?: string} | null>(null);
 
   const {
     searchResults,
@@ -36,6 +49,9 @@ export const Knowledge = () => {
     totalResults,
     processingTime
   } = useSearchService();
+
+  // Create API service instance
+  const apiService = new ApiSearchService();
 
   // Load folders on mount
   useEffect(() => {
@@ -56,10 +72,38 @@ export const Knowledge = () => {
     loadFolders();
   }, [isInitialized]);
 
+  // Load all documents when folder changes
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!isInitialized || searchQuery) return; // Don't load if there's an active search
+      
+      setLoadingDocuments(true);
+      try {
+        const result = await apiService.getDocuments(
+          'admin-1',
+          true,
+          selectedFolder === 'all' ? undefined : selectedFolder,
+          10 // Limit to 10 most recent documents
+        );
+        setAllDocuments(result.documents);
+      } catch (err) {
+        console.warn('Failed to load documents:', err);
+        setAllDocuments([]);
+      } finally {
+        setLoadingDocuments(false);
+      }
+    };
+
+    loadDocuments();
+  }, [isInitialized, selectedFolder, searchQuery]);
+
   // Handle search
   const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    
     if (!query.trim()) {
       clearResults();
+      setSearchQuery('');
       return;
     }
 
@@ -72,9 +116,10 @@ export const Knowledge = () => {
   const handleFolderChange = async (folderId: string) => {
     setSelectedFolder(folderId);
     
-    // Re-run search with new folder if there's an active search
-    if (searchResults.length > 0) {
+    // Clear search when changing folders
+    if (searchQuery) {
       clearResults();
+      setSearchQuery('');
     }
   };
 
@@ -92,20 +137,169 @@ export const Knowledge = () => {
     setFolders(userFolders);
   };
 
-  // Transform search results to match DocumentCard interface
-  const transformedDocuments = searchResults.map(result => ({
-    id: result.id,
-    title: result.metadata?.title || result.document?.originalName || 'Untitled',
-    category: result.metadata?.category || 'general',
-    excerpt: result.content ? result.content.substring(0, 200) + '...' : 'No preview available',
-    uploadedBy: result.document?.userId || 'Unknown',
-    uploadedAt: new Date(result.document?.uploadedAt || Date.now()),
-    size: result.document?.fileSize ? `${(result.document.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown',
-    views: Math.floor(Math.random() * 500) + 50, // Mock views for now
-    starred: Math.random() > 0.7, // Random starred status
-    score: result.score,
-    highlights: [] // Backend doesn't provide highlights yet
-  }));
+  // Handle folder edit
+  const handleEditFolder = async (name: string, description?: string) => {
+    if (!editingFolder) return;
+    
+    await folderService.updateFolder(editingFolder.id, {
+      name,
+      description,
+    }, 'admin-1');
+    
+    // Reload folders
+    const userFolders = await folderService.getFolders('admin-1', true);
+    setFolders(userFolders);
+    setEditingFolder(null);
+  };
+
+  // Handle folder delete
+  const handleDeleteFolder = async () => {
+    if (!deletingFolder) return;
+    
+    await folderService.deleteFolder(deletingFolder.id, 'admin-1');
+    
+    // If we're viewing the deleted folder, switch to all documents
+    if (selectedFolder === deletingFolder.id) {
+      setSelectedFolder('all');
+    }
+    
+    // Reload folders
+    const userFolders = await folderService.getFolders('admin-1', true);
+    setFolders(userFolders);
+    setDeletingFolder(null);
+  };
+
+  // Handle document delete
+  const handleDeleteDocument = async () => {
+    if (!deletingDocument) return;
+    
+    try {
+      const response = await fetch(`http://localhost:3001/api/documents/${deletingDocument.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: 'admin-1',
+          isAdmin: 'true'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete document');
+      }
+
+      // Reload documents
+      if (searchQuery) {
+        // If in search mode, re-run search
+        search(searchQuery, selectedFolder !== 'all' ? selectedFolder : undefined);
+      } else {
+        // If browsing, reload all documents
+        const result = await apiService.getDocuments(
+          'admin-1',
+          true,
+          selectedFolder === 'all' ? undefined : selectedFolder,
+          10
+        );
+        setAllDocuments(result.documents);
+      }
+
+      // Reload folders to update document counts
+      const userFolders = await folderService.getFolders('admin-1', true);
+      setFolders(userFolders);
+      
+      setDeletingDocument(null);
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+      alert('Failed to delete document. Please try again.');
+    }
+  };
+
+  // Handle document move
+  const handleMoveDocument = async (folderId: string | null) => {
+    if (!movingDocument) return;
+    
+    try {
+      const response = await fetch(`http://localhost:3001/api/documents/${movingDocument.id}/move`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: 'admin-1',
+          isAdmin: 'true',
+          folderId: folderId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to move document');
+      }
+
+      // Reload documents
+      if (searchQuery) {
+        // If in search mode, re-run search
+        search(searchQuery, selectedFolder !== 'all' ? selectedFolder : undefined);
+      } else {
+        // If browsing, reload all documents
+        const result = await apiService.getDocuments(
+          'admin-1',
+          true,
+          selectedFolder === 'all' ? undefined : selectedFolder,
+          10
+        );
+        setAllDocuments(result.documents);
+      }
+
+      // Reload folders to update document counts
+      const userFolders = await folderService.getFolders('admin-1', true);
+      setFolders(userFolders);
+      
+      setMovingDocument(null);
+    } catch (error) {
+      console.error('Failed to move document:', error);
+      alert('Failed to move document. Please try again.');
+    }
+  };
+
+  // Transform documents based on search or browse mode
+  const transformedDocuments = searchQuery ? 
+    // Transform search results
+    searchResults.map(result => ({
+      id: result.id,
+      title: result.metadata?.title || result.document?.originalName || 'Untitled',
+      category: result.metadata?.category || 'general',
+      excerpt: result.content ? result.content.substring(0, 200) + '...' : 'No preview available',
+      uploadedBy: result.document?.userId || 'Unknown',
+      uploadedAt: new Date(result.document?.uploadedAt || Date.now()),
+      size: result.document?.fileSize ? `${(result.document.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown',
+      views: Math.floor(Math.random() * 500) + 50, // Mock views for now
+      starred: Math.random() > 0.7, // Random starred status
+      score: result.score,
+      highlights: [], // Backend doesn't provide highlights yet
+      fileUrl: result.document?.fileUrl,
+      fileType: result.document?.fileType,
+      folderId: result.metadata?.folderId,
+      folderName: result.metadata?.folderName
+    })) :
+    // Transform all documents
+    allDocuments.map(doc => ({
+      id: doc.id,
+      title: doc.title,
+      category: doc.category,
+      excerpt: doc.excerpt,
+      uploadedBy: doc.uploadedBy,
+      uploadedAt: new Date(doc.uploadedAt),
+      size: doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown',
+      views: Math.floor(Math.random() * 500) + 50, // Mock views for now
+      starred: Math.random() > 0.7, // Random starred status
+      score: 1.0,
+      highlights: [],
+      fileUrl: doc.fileUrl,
+      fileType: doc.fileType,
+      folderId: doc.folderId,
+      folderName: doc.folderName
+    }));
 
   // Show initialization loading
   if (isInitializing) {
@@ -219,7 +413,7 @@ export const Knowledge = () => {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="flex items-center gap-3 overflow-x-auto overflow-y-visible pb-2 scrollbar-hide">
           {/* All Documents */}
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -236,7 +430,9 @@ export const Knowledge = () => {
           >
             <span className="text-lg">📄</span>
             <span className="font-medium text-sm">All Documents</span>
-            <span className="text-xs text-white/60">({transformedDocuments.length})</span>
+            <span className="text-xs text-white/60">
+              ({searchQuery ? `${transformedDocuments.length}` : selectedFolder === 'all' ? `${allDocuments.length}+` : allDocuments.length})
+            </span>
           </motion.button>
 
           {/* User Folders */}
@@ -247,24 +443,36 @@ export const Knowledge = () => {
             </div>
           ) : (
             folders.map((folder) => (
-              <motion.button
+              <motion.div
                 key={folder.id}
+                className="relative"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => handleFolderChange(folder.id)}
-                disabled={!isInitialized}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit',
-                  'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
-                  selectedFolder === folder.id 
-                    ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
-                    : 'bg-white/5 hover:bg-white/10'
-                )}
               >
-                <Folder size={18} className="text-primary" />
-                <span className="font-medium text-sm">{folder.name}</span>
-                <span className="text-xs text-white/60">({folder.documentCount})</span>
-              </motion.button>
+                <button
+                  onClick={() => handleFolderChange(folder.id)}
+                  disabled={!isInitialized}
+                  className={cn(
+                    'flex items-center gap-2 px-4 pr-10 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit w-full',
+                    'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
+                    selectedFolder === folder.id 
+                      ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
+                      : 'bg-white/5 hover:bg-white/10'
+                  )}
+                >
+                  <Folder size={18} className="text-primary" />
+                  <span className="font-medium text-sm">{folder.name}</span>
+                  <span className="text-xs text-white/60">({folder.documentCount})</span>
+                </button>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 z-50">
+                  <FolderMenu
+                    folderId={folder.id}
+                    folderName={folder.name}
+                    onEdit={() => setEditingFolder(folder)}
+                    onDelete={() => setDeletingFolder(folder)}
+                  />
+                </div>
+              </motion.div>
             ))
           )}
         </div>
@@ -277,11 +485,13 @@ export const Knowledge = () => {
             <Filter size={18} />
           </Button>
           <span className="text-sm text-white/60">
-            {isSearching ? (
+            {isSearching || loadingDocuments ? (
               <span className="flex items-center gap-2">
                 <Loader2 size={14} className="animate-spin" />
-                Searching...
+                {isSearching ? 'Searching...' : 'Loading...'}
               </span>
+            ) : searchQuery ? (
+              `Found ${transformedDocuments.length} results for "${searchQuery}"`
             ) : (
               `Showing ${transformedDocuments.length} documents`
             )}
@@ -309,11 +519,13 @@ export const Knowledge = () => {
       </div>
 
       {/* Documents Grid/List */}
-      {isSearching ? (
+      {isSearching || loadingDocuments ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <LoadingSpinner size="lg" />
-            <p className="mt-4 text-white/70">Searching knowledge base...</p>
+            <p className="mt-4 text-white/70">
+              {isSearching ? 'Searching knowledge base...' : 'Loading documents...'}
+            </p>
           </div>
         </div>
       ) : transformedDocuments.length > 0 ? (
@@ -337,29 +549,82 @@ export const Knowledge = () => {
                 document={doc} 
                 viewMode={viewMode} 
                 onClick={(document) => {
-                  // Need to get the full content from the search result
-                  const fullResult = searchResults.find(r => r.id === document.id);
-                  
-                  console.log('Knowledge.tsx Debug:', {
-                    document: document,
-                    fullResult: fullResult,
-                    fileUrl: fullResult?.document?.fileUrl,
-                    fileType: fullResult?.document?.fileType
-                  });
-                  
-                  setSelectedDocument({
-                    ...document,
-                    content: fullResult?.content || document.excerpt,
-                    fileUrl: fullResult?.document?.fileUrl,
-                    fileType: fullResult?.document?.fileType
-                  });
+                  if (searchQuery) {
+                    // For search results, get the full content
+                    const fullResult = searchResults.find(r => r.id === document.id);
+                    
+                    console.log('Knowledge.tsx Debug:', {
+                      document: document,
+                      fullResult: fullResult,
+                      fileUrl: fullResult?.document?.fileUrl,
+                      fileType: fullResult?.document?.fileType
+                    });
+                    
+                    setSelectedDocument({
+                      ...document,
+                      content: fullResult?.content || document.excerpt,
+                      fileUrl: fullResult?.document?.fileUrl,
+                      fileType: fullResult?.document?.fileType
+                    });
+                  } else {
+                    // For browsing mode, use document directly
+                    setSelectedDocument({
+                      ...document,
+                      content: document.excerpt,
+                      fileUrl: document.fileUrl,
+                      fileType: document.fileType
+                    });
+                  }
                   setShowDocumentViewer(true);
+                }}
+                onDelete={(documentId) => {
+                  const document = transformedDocuments.find(d => d.id === documentId);
+                  if (document) {
+                    setDeletingDocument({ id: documentId, title: document.title });
+                  }
+                }}
+                onMove={(documentId) => {
+                  const document = transformedDocuments.find(d => d.id === documentId);
+                  if (document) {
+                    setMovingDocument({ 
+                      id: documentId, 
+                      title: document.title, 
+                      folderId: document.folderId 
+                    });
+                  }
                 }}
               />
             </motion.div>
           ))}
         </motion.div>
-      ) : searchResults.length === 0 && totalResults === 0 ? (
+      ) : !searchQuery && transformedDocuments.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📁</div>
+          <h3 className="text-xl font-semibold mb-2">
+            {selectedFolder === 'all' ? 'No Documents Yet' : 'Empty Folder'}
+          </h3>
+          <p className="text-white/60 mb-6">
+            {selectedFolder === 'all' 
+              ? 'Upload your first document to get started'
+              : 'This folder doesn\'t contain any documents yet'}
+          </p>
+          <Button variant="primary" onClick={() => setShowUpload(true)}>
+            <Upload size={20} className="mr-2" />
+            Upload Document
+          </Button>
+        </div>
+      ) : searchQuery && searchResults.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🔍</div>
+          <h3 className="text-xl font-semibold mb-2">No Results Found</h3>
+          <p className="text-white/60 mb-6">
+            Try adjusting your search terms or selecting a different category.
+          </p>
+          <Button variant="glass" onClick={clearResults}>
+            Clear Search
+          </Button>
+        </div>
+      ) : (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📚</div>
           <h3 className="text-xl font-semibold mb-2">Start Searching</h3>
@@ -380,22 +645,30 @@ export const Knowledge = () => {
             ))}
           </div>
         </div>
-      ) : (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">🔍</div>
-          <h3 className="text-xl font-semibold mb-2">No Results Found</h3>
-          <p className="text-white/60 mb-6">
-            Try adjusting your search terms or selecting a different category.
-          </p>
-          <Button variant="glass" onClick={clearResults}>
-            Clear Search
-          </Button>
-        </div>
       )}
 
       {/* Upload Modal */}
       {showUpload && (
-        <UploadZone onClose={() => setShowUpload(false)} folders={folders} />
+        <UploadZone 
+          onClose={() => {
+            setShowUpload(false);
+            // Reload documents and folders after upload
+            if (isInitialized) {
+              apiService.getDocuments(
+                'admin-1',
+                true,
+                selectedFolder === 'all' ? undefined : selectedFolder
+              ).then(result => {
+                setAllDocuments(result.documents);
+              }).catch(console.warn);
+              
+              folderService.getFolders('admin-1', true)
+                .then(setFolders)
+                .catch(console.warn);
+            }
+          }} 
+          folders={folders} 
+        />
       )}
 
       {/* Create Folder Modal */}
@@ -414,6 +687,50 @@ export const Knowledge = () => {
         }}
         document={selectedDocument}
       />
+
+      {/* Edit Folder Modal */}
+      {editingFolder && (
+        <EditFolderModal
+          isOpen={!!editingFolder}
+          onClose={() => setEditingFolder(null)}
+          onEditFolder={handleEditFolder}
+          currentName={editingFolder.name}
+          currentDescription={editingFolder.description}
+        />
+      )}
+
+      {/* Delete Folder Modal */}
+      {deletingFolder && (
+        <DeleteFolderModal
+          isOpen={!!deletingFolder}
+          onClose={() => setDeletingFolder(null)}
+          onDeleteFolder={handleDeleteFolder}
+          folderName={deletingFolder.name}
+          documentCount={deletingFolder.documentCount}
+        />
+      )}
+
+      {/* Delete Document Modal */}
+      {deletingDocument && (
+        <DeleteDocumentModal
+          isOpen={!!deletingDocument}
+          onClose={() => setDeletingDocument(null)}
+          onDeleteDocument={handleDeleteDocument}
+          documentTitle={deletingDocument.title}
+        />
+      )}
+
+      {/* Move Document Modal */}
+      {movingDocument && (
+        <MoveDocumentModal
+          isOpen={!!movingDocument}
+          onClose={() => setMovingDocument(null)}
+          onMoveDocument={handleMoveDocument}
+          documentTitle={movingDocument.title}
+          currentFolderId={movingDocument.folderId}
+          folders={folders}
+        />
+      )}
     </div>
   );
 };
