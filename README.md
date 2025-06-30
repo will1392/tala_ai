@@ -44,6 +44,13 @@ tala-ui/
 │   ├── components/          # Reusable UI components
 │   │   ├── chat/           # Chat-related components
 │   │   ├── knowledge/      # Knowledge base components
+│   │   │   ├── DocumentCard.tsx
+│   │   │   ├── DocumentMenu.tsx
+│   │   │   ├── DocumentViewer.tsx
+│   │   │   ├── DeleteDocumentModal.tsx
+│   │   │   ├── MoveDocumentModal.tsx
+│   │   │   ├── FolderMenu.tsx
+│   │   │   └── DeleteFolderModal.tsx
 │   │   ├── layout/         # Layout and navigation
 │   │   └── shared/         # Shared utility components
 │   ├── pages/              # Main application pages
@@ -55,6 +62,10 @@ tala-ui/
 │   ├── store/              # Zustand state management
 │   ├── styles/             # Global styles and themes
 │   └── utils/              # Helper functions
+├── server/                 # Backend API server
+│   ├── server.js          # Express.js server with RAG endpoints
+│   ├── package.json       # Backend dependencies
+│   └── folders.json       # Persistent folder storage
 ├── public/                 # Static assets
 └── docs/                   # Documentation
 ```
@@ -71,24 +82,77 @@ tala-ui/
 - ✅ All main pages (Dashboard, Knowledge, Chat, Settings)
 - ✅ Beautiful glassmorphic animations
 
+### 🎯 Phase 1: Knowledge Base & RAG Implementation (COMPLETED ✅)
+- ✅ Backend server with Express.js and document processing
+- ✅ Qdrant vector database integration with OpenAI embeddings
+- ✅ Document upload and processing (PDF, Word, Excel, Text)
+- ✅ Semantic search with vector similarity
+- ✅ Document viewer with PDF support
+- ✅ Folder organization system with CRUD operations
+- ✅ **Document Management System (Latest Update - Dec 30, 2025)**
+  - ✅ Delete documents with confirmation dialogs
+  - ✅ Move documents between folders
+  - ✅ Three-dots action menu on all document cards
+  - ✅ Real-time UI updates and folder count synchronization
+  - ✅ Enhanced PDF viewing with iframe fallback
+  - ✅ Fixed document search and filtering within folders
+
+## 🎉 Recent Updates (December 30, 2025)
+
+### ✨ Major Features Completed Today
+- **Complete Document Management System**: Users can now fully manage their documents with delete and move functionality
+- **Advanced UI Components**: Added comprehensive modal system with confirmation dialogs
+- **Enhanced PDF Viewing**: Fixed PDF loading issues with reliable iframe implementation
+- **Folder Organization**: Complete CRUD operations for folders with real-time count updates
+- **Three-Dots Action Menus**: Professional dropdown menus on every document and folder
+- **Bug Fixes**: Resolved Qdrant vector update operations and search filtering issues
+
+### 🔧 Technical Improvements
+- **Backend API Endpoints**: Added DELETE and PUT endpoints for document management
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+- **State Management**: Improved React state management for real-time UI updates
+- **Vector Database**: Fixed Qdrant operations using proper `setPayload()` method
+- **Component Architecture**: Created reusable modal and menu components
+
+### 📊 Components Added Today
+- `DocumentMenu.tsx` - Action dropdown for documents
+- `DeleteDocumentModal.tsx` - Confirmation dialog for deletions
+- `MoveDocumentModal.tsx` - Folder selection for moving documents
+- `DeleteFolderModal.tsx` - Folder deletion confirmation
+- `EditFolderModal.tsx` - Folder editing interface
+- `FolderMenu.tsx` - Action dropdown for folders
+
 ## 🗓️ Development Roadmap
 
-### 🏆 Phase 1: Knowledge Base & RAG Implementation (PRIORITY 1)
+### 🏆 Phase 1: Knowledge Base & RAG Implementation (COMPLETED ✅)
 **Goal**: Create a working document search system with vector database
 
-#### Tasks:
-- [ ] Install RAG dependencies (`@qdrant/js-client`, `openai`, `langchain`)
-- [ ] Create document processing service (PDF, Word, Excel)
-- [ ] Set up Qdrant vector database integration
-- [ ] Implement vector search with OpenAI embeddings
-- [ ] Connect Knowledge Base UI to real search
-- [ ] Add document preview and source attribution
+#### Completed Tasks:
+- ✅ Install RAG dependencies (`@qdrant/js-client`, `openai`, `langchain`)
+- ✅ Create document processing service (PDF, Word, Excel)
+- ✅ Set up Qdrant vector database integration
+- ✅ Implement vector search with OpenAI embeddings
+- ✅ Connect Knowledge Base UI to real search
+- ✅ Add document preview and source attribution
+- ✅ Complete folder organization system
+- ✅ Document management (delete, move between folders)
+- ✅ Enhanced user interface with action menus
 
-#### Success Metrics:
+#### Success Metrics Achieved:
 - ✅ Upload and process PDF, Word, Excel files
 - ✅ Search returns relevant results with highlights
 - ✅ Response time < 500ms for search
 - ✅ Source attribution working
+- ✅ Full document lifecycle management
+
+### 🎯 Phase 1.5: Knowledge Base Enhancements (CURRENT PRIORITY)
+**Goal**: Improve user experience and add advanced document management features
+
+#### Current Tasks (In Progress):
+- [ ] **Enhanced search functionality** - Better search UI, search within folders
+- [ ] **Bulk operations** - Select multiple docs, bulk delete/move
+- [ ] **Improved upload experience** - Drag & drop, progress indicators
+- [ ] **Document preview improvements** - Better text extraction display
 
 ### 🤖 Phase 2: Intelligent Chat with RAG Context (PRIORITY 2)
 **Goal**: Chat that can answer questions using the knowledge base
@@ -150,17 +214,34 @@ tala-ui/
    
    Add your API keys:
    ```env
+   # Frontend variables
    VITE_QDRANT_URL=your-qdrant-url
    VITE_QDRANT_API_KEY=your-qdrant-key
    VITE_OPENAI_API_KEY=your-openai-key
+   
+   # Backend variables (same values, without VITE_ prefix)
+   QDRANT_URL=your-qdrant-url
+   QDRANT_API_KEY=your-qdrant-key
+   OPENAI_API_KEY=your-openai-key
+   CORS_ORIGIN=http://localhost:5173
+   PORT=3001
    ```
 
-4. **Start development server**
+4. **Start the backend server**
    ```bash
+   cd server
+   node server.js
+   ```
+   The backend will run on `http://localhost:3001`
+
+5. **Start the frontend development server**
+   ```bash
+   # In a new terminal, from the root directory
    npm run dev
    ```
+   The frontend will run on `http://localhost:5173`
 
-5. **Open in browser**
+6. **Open in browser**
    Navigate to `http://localhost:5173`
 
 ### For RAG Implementation (Phase 1)
@@ -191,16 +272,24 @@ npm install @qdrant/js-client openai langchain @langchain/community pdf-parse ma
 ### ✅ Currently Available
 - **Beautiful UI**: Glassmorphic design with smooth animations
 - **Dashboard**: Travel agency metrics and activity overview
-- **Knowledge Base**: Document management interface (UI only)
+- **Knowledge Base**: Full document management system
+  - Document upload and processing (PDF, Word, Excel, Text)
+  - Vector-based semantic search with OpenAI embeddings
+  - Folder organization with create, edit, delete operations
+  - Document viewer with PDF support
+  - Document management (delete, move between folders)
+  - Three-dots action menus and confirmation dialogs
+  - Real-time UI updates and folder synchronization
 - **Chat Interface**: Beautiful chat UI with message formatting
 - **Settings**: Comprehensive user and system preferences
 - **Responsive Design**: Works on desktop, tablet, and mobile
+- **Backend API**: Complete Express.js server with Qdrant integration
 
-### 🚧 In Development (Phase 1)
-- **Document Search**: Vector-based semantic search
-- **File Upload**: Process PDF, Word, Excel documents
-- **AI Chat**: Context-aware responses using knowledge base
-- **Source Attribution**: Track and cite information sources
+### 🚧 In Development (Phase 1.5)
+- **Enhanced Search UI**: Better search interface and folder-specific search
+- **Bulk Operations**: Multi-select for documents with bulk actions
+- **Improved Upload**: Drag & drop interface with progress indicators
+- **Document Previews**: Enhanced text extraction and display
 
 ### 🔮 Planned Features
 - **Video Processing**: Extract and search video content
