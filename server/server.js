@@ -30,7 +30,11 @@ const openai = new OpenAI({
 });
 
 // Create uploads directory if it doesn't exist
-const uploadsDir = path.join(process.cwd(), 'uploads');
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -85,6 +89,47 @@ const upload = multer({
     }
   }
 });
+
+// In-memory conversation storage (in production, use a proper database)
+const conversations = new Map();
+const conversationMessages = new Map();
+
+// Save conversations to file (simple persistence)
+function saveConversations() {
+  try {
+    const conversationsData = {
+      conversations: Array.from(conversations.entries()),
+      messages: Array.from(conversationMessages.entries())
+    };
+    fs.writeFileSync(path.join(__dirname, 'conversations.json'), JSON.stringify(conversationsData, null, 2));
+  } catch (error) {
+    console.error('Failed to save conversations:', error);
+  }
+}
+
+// Load conversations from file
+function loadConversations() {
+  try {
+    const filePath = path.join(__dirname, 'conversations.json');
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      if (data.conversations) {
+        conversations.clear();
+        data.conversations.forEach(([key, value]) => conversations.set(key, value));
+      }
+      if (data.messages) {
+        conversationMessages.clear();
+        data.messages.forEach(([key, value]) => conversationMessages.set(key, value));
+      }
+      console.log(`📚 Loaded ${conversations.size} conversations with ${conversationMessages.size} message threads`);
+    }
+  } catch (error) {
+    console.error('Failed to load conversations:', error);
+  }
+}
+
+// Initialize conversations on startup
+loadConversations();
 
 // Utility functions
 function getCollectionName(userId, isAdmin = false) {
@@ -210,7 +255,7 @@ async function ensureCollectionExists(collectionName) {
 }
 
 // Persistent folder storage using JSON file
-const foldersFilePath = path.join(process.cwd(), 'folders.json');
+const foldersFilePath = path.join(__dirname, 'folders.json');
 
 // Load folders from file
 function loadFolders() {
@@ -393,16 +438,45 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
     const documentId = uuidv4();
     const collectionName = getCollectionName(userId, isAdmin === 'true');
     
+    // Debug file details
+    console.log(`📎 File details:`, {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      documentId: documentId
+    });
+    
     // Ensure collection exists
     await ensureCollectionExists(collectionName);
     
     // Save original file for PDFs
     let fileUrl = null;
+    console.log(`📁 Uploads directory: ${uploadsDir}`);
+    console.log(`📁 Checking mimetype: "${file.mimetype}" === "application/pdf"? ${file.mimetype === 'application/pdf'}`);
+    
     if (file.mimetype === 'application/pdf') {
       const filename = `${documentId}-${file.originalname}`;
       const filepath = path.join(uploadsDir, filename);
-      fs.writeFileSync(filepath, file.buffer);
-      fileUrl = `/api/files/${filename}`;
+      console.log(`📁 Saving PDF to: ${filepath}`);
+      console.log(`📁 File buffer size: ${file.buffer.length} bytes`);
+      
+      try {
+        fs.writeFileSync(filepath, file.buffer);
+        console.log(`✅ PDF saved successfully: ${filename}`);
+        fileUrl = `/api/files/${filename}`;
+        
+        // Verify file was saved
+        if (fs.existsSync(filepath)) {
+          const stats = fs.statSync(filepath);
+          console.log(`✅ File verified - size: ${stats.size} bytes`);
+        } else {
+          console.error(`❌ File not found after save: ${filepath}`);
+        }
+      } catch (saveError) {
+        console.error(`❌ Failed to save PDF:`, saveError);
+      }
+    } else {
+      console.log(`⚠️ File is not a PDF, mimetype: ${file.mimetype}`);
     }
 
     // Extract text from file
@@ -497,14 +571,266 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
   }
 });
 
+// Tala AI Chat endpoint
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, userId, isAdmin = false, conversationId, maxResults = 5 } = req.body;
+    
+    if (!message || !userId) {
+      return res.status(400).json({ error: 'Message and userId are required' });
+    }
+
+    console.log(`💬 Chat request from user ${userId}: "${message.substring(0, 100)}..."`); 
+    
+    const collectionName = getCollectionName(userId, isAdmin);
+    
+    // Step 1: Search relevant documents using Tala AI
+    console.log('🔍 Searching knowledge base for relevant context...');
+    const queryEmbedding = await generateEmbedding(message);
+    
+    const searchResults = await qdrant.search(collectionName, {
+      vector: queryEmbedding,
+      limit: maxResults,
+      score_threshold: 0.3
+    });
+    
+    console.log(`📊 Found ${searchResults.length} relevant documents`);
+    
+    // Step 2: Prepare context from search results
+    const contextChunks = searchResults.map(result => ({
+      content: result.payload.content,
+      title: result.payload.metadata?.title || 'Unknown Document',
+      score: result.score,
+      documentId: result.payload.documentId
+    }));
+    
+    const context = contextChunks
+      .map(chunk => `Document: ${chunk.title}\nContent: ${chunk.content}`)
+      .join('\n\n---\n\n');
+    
+    // Step 3: Generate AI response using Tala AI
+    const systemPrompt = `You are Tala, an AI travel assistant with access to a comprehensive knowledge base of travel documents, visa requirements, airline policies, and destination information.
+
+Your role:
+- Provide helpful, accurate travel advice based on the provided context
+- If the context doesn't contain relevant information, acknowledge this and provide general guidance
+- Always be friendly, professional, and travel-focused
+- Cite specific documents when possible
+- Use markdown formatting for better readability
+
+Context from knowledge base:
+${context || 'No relevant documents found in the knowledge base.'}`;
+    
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message }
+      ],
+      max_tokens: 1000,
+      temperature: 0.7
+    });
+    
+    const aiResponse = completion.choices[0].message.content;
+    
+    // Step 4: Prepare sources for the response
+    const sources = contextChunks.map(chunk => ({
+      title: chunk.title,
+      type: 'document',
+      score: chunk.score,
+      documentId: chunk.documentId
+    }));
+    
+    console.log(`✅ Generated AI response (${aiResponse?.length} chars) with ${sources.length} sources`);
+    
+    // Step 5: Handle conversation storage
+    const finalConversationId = conversationId || `conv_${Date.now()}_${userId}`;
+    
+    // Store/update conversation metadata
+    const conversation = conversations.get(finalConversationId) || {
+      id: finalConversationId,
+      userId: userId,
+      title: message.length > 50 ? message.substring(0, 50) + '...' : message,
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString(),
+      messageCount: 0
+    };
+    
+    // Update conversation metadata
+    conversation.lastActivity = new Date().toISOString();
+    conversation.lastMessage = aiResponse.length > 100 ? aiResponse.substring(0, 100) + '...' : aiResponse;
+    conversation.messageCount += 2; // User message + AI response
+    conversations.set(finalConversationId, conversation);
+    
+    // Store messages
+    const messages = conversationMessages.get(finalConversationId) || [];
+    
+    // Add user message
+    messages.push({
+      id: `user_${Date.now()}`,
+      content: message,
+      sender: 'user',
+      timestamp: new Date().toISOString(),
+      conversationId: finalConversationId
+    });
+    
+    // Add AI response
+    messages.push({
+      id: `ai_${Date.now()}`,
+      content: aiResponse,
+      sender: 'tala',
+      timestamp: new Date().toISOString(),
+      sources: sources,
+      conversationId: finalConversationId,
+      tokensUsed: completion.usage?.total_tokens || 0
+    });
+    
+    conversationMessages.set(finalConversationId, messages);
+    
+    // Save to file
+    saveConversations();
+    
+    console.log(`💾 Saved conversation ${finalConversationId} with ${messages.length} messages`);
+    
+    // Step 6: Return response with metadata
+    res.json({
+      response: aiResponse,
+      sources: sources,
+      contextUsed: contextChunks.length > 0,
+      conversationId: finalConversationId,
+      timestamp: new Date().toISOString(),
+      tokensUsed: completion.usage?.total_tokens || 0
+    });
+    
+  } catch (error) {
+    console.error('💬 Chat error:', error);
+    res.status(500).json({
+      error: 'Failed to process chat message',
+      details: error.message
+    });
+  }
+});
+
+// Get chat history
+app.get('/api/chat/history/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Get conversation metadata
+    const conversation = conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Get messages for this conversation
+    const messages = conversationMessages.get(conversationId) || [];
+    
+    console.log(`📜 Retrieved ${messages.length} messages for conversation ${conversationId}`);
+    
+    res.json({
+      conversationId,
+      conversation,
+      messages,
+      lastActivity: conversation.lastActivity
+    });
+    
+  } catch (error) {
+    console.error('📝 Chat history error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve chat history',
+      details: error.message
+    });
+  }
+});
+
+// List user conversations
+app.get('/api/chat/conversations', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Get user's conversations, sorted by last activity (most recent first)
+    const userConversations = Array.from(conversations.values())
+      .filter(conv => conv.userId === userId)
+      .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
+      .slice(0, 15); // Limit to last 15 conversations
+    
+    console.log(`📋 Retrieved ${userConversations.length} conversations for user ${userId}`);
+    
+    res.json({
+      conversations: userConversations
+    });
+    
+  } catch (error) {
+    console.error('📋 Conversations list error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve conversations',
+      details: error.message
+    });
+  }
+});
+
+// Delete a conversation
+app.delete('/api/chat/conversations/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Check if conversation exists and belongs to user
+    const conversation = conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Delete conversation and its messages
+    conversations.delete(conversationId);
+    conversationMessages.delete(conversationId);
+    
+    // Save changes
+    saveConversations();
+    
+    console.log(`🗑️ Deleted conversation ${conversationId}`);
+    
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error('🗑️ Delete conversation error:', error);
+    res.status(500).json({
+      error: 'Failed to delete conversation',
+      details: error.message
+    });
+  }
+});
+
 // Search documents
 app.post('/api/documents/search', async (req, res) => {
   try {
-    const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.2, folderId } = req.body;
+    const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.2, folderId, category, fileType } = req.body;
     
     if (!query || !userId) {
       return res.status(400).json({ error: 'Query and userId are required' });
     }
+    
+    console.log(`🔍 Enhanced search request:`, {
+      query: query.substring(0, 50),
+      userId: userId.substring(0, 8),
+      folderId,
+      category,
+      fileType,
+      limit
+    });
     
     // Generate query embedding
     const queryVector = await generateEmbedding(query);
@@ -532,15 +858,31 @@ app.post('/api/documents/search', async (req, res) => {
           continue;
         }
         
-        // Build search filters for folder
-        const searchFilter = {};
+        // Build search filters
+        const searchFilter = { must: [] };
+        
+        // Filter by folder
         if (folderId && folderId !== 'all') {
-          searchFilter.must = [
-            {
-              key: 'metadata.folderId',
-              match: { value: folderId }
-            }
-          ];
+          searchFilter.must.push({
+            key: 'metadata.folderId',
+            match: { value: folderId }
+          });
+        }
+        
+        // Filter by category
+        if (category) {
+          searchFilter.must.push({
+            key: 'metadata.category',
+            match: { value: category }
+          });
+        }
+        
+        // Filter by file type
+        if (fileType) {
+          searchFilter.must.push({
+            key: 'document.fileType',
+            match: { value: fileType }
+          });
         }
 
         const searchResult = await qdrant.search(collectionName, {
@@ -548,7 +890,7 @@ app.post('/api/documents/search', async (req, res) => {
           limit: Math.ceil(limit / collectionsToSearch.length) + 5,
           with_payload: true,
           with_vector: false,
-          filter: Object.keys(searchFilter).length > 0 ? searchFilter : undefined
+          filter: searchFilter.must.length > 0 ? searchFilter : undefined
         });
         
         const collectionResults = searchResult

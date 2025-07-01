@@ -2,9 +2,16 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, Filter, Grid, List, AlertCircle, Loader2, FolderPlus, Folder } from 'lucide-react';
 import { Button } from '../components/shared/Button';
-import { SearchBar } from '../components/knowledge/SearchBar';
+import { EnhancedSearchBar } from '../components/knowledge/EnhancedSearchBar';
+import { SearchResultsSummary } from '../components/knowledge/SearchResultsSummary';
 import { DocumentCard } from '../components/knowledge/DocumentCard';
+import { SelectableDocumentCard } from '../components/knowledge/SelectableDocumentCard';
+import { BulkActionsToolbar } from '../components/knowledge/BulkActionsToolbar';
+import { BulkMoveModal } from '../components/knowledge/BulkMoveModal';
 import { UploadZone } from '../components/knowledge/UploadZone';
+import { EnhancedUploadZone } from '../components/knowledge/EnhancedUploadZone';
+import { GlobalDragDropOverlay } from '../components/knowledge/GlobalDragDropOverlay';
+import { FloatingUploadProgress } from '../components/knowledge/FloatingUploadProgress';
 import { DocumentViewer } from '../components/knowledge/DocumentViewer';
 import { CreateFolderModal } from '../components/knowledge/CreateFolderModal';
 import { EditFolderModal } from '../components/knowledge/EditFolderModal';
@@ -34,6 +41,22 @@ export const Knowledge = () => {
   const [deletingFolder, setDeletingFolder] = useState<FolderType | null>(null);
   const [deletingDocument, setDeletingDocument] = useState<{id: string, title: string} | null>(null);
   const [movingDocument, setMovingDocument] = useState<{id: string, title: string, folderId?: string} | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  
+  // Bulk operations state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
+  const [showBulkMoveModal, setShowBulkMoveModal] = useState(false);
+  
+  // Enhanced upload state
+  const [backgroundUploads, setBackgroundUploads] = useState<Array<{
+    id: string;
+    fileName: string;
+    progress: number;
+    status: 'uploading' | 'completed' | 'error' | 'paused';
+    error?: string;
+  }>>([]);
+  const [isBackgroundUploading, setIsBackgroundUploading] = useState(false);
 
   const {
     searchResults,
@@ -97,8 +120,32 @@ export const Knowledge = () => {
     loadDocuments();
   }, [isInitialized, selectedFolder, searchQuery]);
 
+  // Keyboard shortcuts for bulk operations
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + A to select all
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isSelectionMode) {
+        e.preventDefault();
+        handleSelectAll();
+      }
+      
+      // Escape to exit selection mode
+      if (e.key === 'Escape' && isSelectionMode) {
+        handleExitSelectionMode();
+      }
+      
+      // Delete key to delete selected
+      if (e.key === 'Delete' && isSelectionMode && selectedDocuments.size > 0) {
+        handleBulkDelete();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSelectionMode, selectedDocuments.size]);
+
   // Handle search
-  const handleSearch = async (query: string) => {
+  const handleSearch = async (query: string, searchFilters?: any) => {
     setSearchQuery(query);
     
     if (!query.trim()) {
@@ -107,9 +154,18 @@ export const Knowledge = () => {
       return;
     }
 
-    await search(query, { 
+    // Add to recent searches
+    if (!recentSearches.includes(query)) {
+      setRecentSearches(prev => [query, ...prev.slice(0, 4)]); // Keep last 5 searches
+    }
+
+    // Combine folder filter with search filters
+    const filters = {
+      ...searchFilters,
       folderId: selectedFolder === 'all' ? undefined : selectedFolder
-    });
+    };
+
+    await search(query, filters);
   };
 
   // Handle folder change
@@ -262,6 +318,145 @@ export const Knowledge = () => {
     }
   };
 
+  // Bulk operations handlers
+  const handleSelectDocument = (documentId: string, selected: boolean) => {
+    setSelectedDocuments(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(documentId);
+      } else {
+        newSet.delete(documentId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const allDocIds = transformedDocuments.map(doc => doc.id);
+    setSelectedDocuments(new Set(allDocIds));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedDocuments(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    const selectedIds = Array.from(selectedDocuments);
+    
+    try {
+      // Delete each document
+      for (const documentId of selectedIds) {
+        const response = await fetch(`http://localhost:3001/api/documents/${documentId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: 'admin-1',
+            isAdmin: 'true'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to delete document ${documentId}`);
+        }
+      }
+
+      // Refresh documents and folders
+      const apiSearchService = new ApiSearchService();
+      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder);
+      setAllDocuments(result.documents);
+      
+      const userFolders = await folderService.getFolders('admin-1', true);
+      setFolders(userFolders);
+      
+      // Clear selection and exit selection mode
+      setSelectedDocuments(new Set());
+      setIsSelectionMode(false);
+      
+      console.log(`✅ Successfully deleted ${selectedIds.length} documents`);
+    } catch (error) {
+      console.error('Failed to delete documents:', error);
+      alert('Failed to delete some documents. Please try again.');
+    }
+  };
+
+  const handleBulkMove = (folderId: string | null) => {
+    setShowBulkMoveModal(true);
+  };
+
+  const executeBulkMove = async (folderId: string | null) => {
+    const selectedIds = Array.from(selectedDocuments);
+    
+    try {
+      // Move each document
+      for (const documentId of selectedIds) {
+        const response = await fetch(`http://localhost:3001/api/documents/${documentId}/move`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: 'admin-1',
+            isAdmin: 'true',
+            folderId: folderId
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to move document ${documentId}`);
+        }
+      }
+
+      // Refresh documents and folders
+      const apiSearchService = new ApiSearchService();
+      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder);
+      setAllDocuments(result.documents);
+      
+      const userFolders = await folderService.getFolders('admin-1', true);
+      setFolders(userFolders);
+      
+      // Clear selection and exit selection mode
+      setSelectedDocuments(new Set());
+      setIsSelectionMode(false);
+      setShowBulkMoveModal(false);
+      
+      console.log(`✅ Successfully moved ${selectedIds.length} documents`);
+    } catch (error) {
+      console.error('Failed to move documents:', error);
+      alert('Failed to move some documents. Please try again.');
+    }
+  };
+
+  const handleExitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedDocuments(new Set());
+  };
+
+  // Enhanced upload handlers
+  const handleGlobalFileDrop = (files: File[]) => {
+    setShowUpload(true);
+    // Files will be handled by the EnhancedUploadZone
+  };
+
+  const handleUploadComplete = async () => {
+    // Refresh documents and folders after upload
+    try {
+      const apiSearchService = new ApiSearchService();
+      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder);
+      setAllDocuments(result.documents);
+      
+      const userFolders = await folderService.getFolders('admin-1', true);
+      setFolders(userFolders);
+    } catch (error) {
+      console.error('Failed to refresh after upload:', error);
+    }
+  };
+
+  const dismissBackgroundUpload = (id: string) => {
+    setBackgroundUploads(prev => prev.filter(upload => upload.id !== id));
+  };
+
   // Transform documents based on search or browse mode
   const transformedDocuments = searchQuery ? 
     // Transform search results
@@ -394,14 +589,31 @@ export const Knowledge = () => {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Enhanced Search Bar */}
       <div className="w-full">
-        <SearchBar 
+        <EnhancedSearchBar 
           onSearch={handleSearch}
           disabled={!isInitialized}
           isSearching={isSearching}
+          currentFolder={selectedFolder === 'all' ? null : folders.find(f => f.id === selectedFolder)}
+          recentSearches={recentSearches}
+          folders={folders}
         />
       </div>
+
+      {/* Search Results Summary */}
+      {searchQuery && (
+        <SearchResultsSummary
+          query={searchQuery}
+          totalResults={totalResults}
+          processingTime={processingTime}
+          currentFolder={selectedFolder === 'all' ? null : folders.find(f => f.id === selectedFolder)}
+          onClearSearch={() => {
+            setSearchQuery('');
+            clearResults();
+          }}
+        />
+      )}
 
       {/* Folders - Fixed Spacing */}
       <div className="space-y-4">
@@ -499,6 +711,18 @@ export const Knowledge = () => {
         </div>
         
         <div className="flex items-center gap-2">
+          {/* Selection Mode Toggle */}
+          {transformedDocuments.length > 0 && !isSelectionMode && (
+            <Button
+              variant="glass"
+              size="sm"
+              className="px-3 py-2"
+              onClick={() => setIsSelectionMode(true)}
+            >
+              Select
+            </Button>
+          )}
+          
           <Button
             variant={viewMode === 'grid' ? 'primary' : 'glass'}
             size="sm"
@@ -517,6 +741,19 @@ export const Knowledge = () => {
           </Button>
         </div>
       </div>
+
+      {/* Bulk Actions Toolbar */}
+      {isSelectionMode && (
+        <BulkActionsToolbar
+          selectedCount={selectedDocuments.size}
+          totalCount={transformedDocuments.length}
+          onSelectAll={handleSelectAll}
+          onClearSelection={handleClearSelection}
+          onBulkDelete={handleBulkDelete}
+          onBulkMove={handleBulkMove}
+          onExitSelectionMode={handleExitSelectionMode}
+        />
+      )}
 
       {/* Documents Grid/List */}
       {isSearching || loadingDocuments ? (
@@ -545,9 +782,12 @@ export const Knowledge = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <DocumentCard 
+              <SelectableDocumentCard 
                 document={doc} 
-                viewMode={viewMode} 
+                viewMode={viewMode}
+                isSelected={selectedDocuments.has(doc.id)}
+                isSelectionMode={isSelectionMode}
+                onSelect={handleSelectDocument} 
                 onClick={(document) => {
                   if (searchQuery) {
                     // For search results, get the full content
@@ -647,27 +887,12 @@ export const Knowledge = () => {
         </div>
       )}
 
-      {/* Upload Modal */}
+      {/* Enhanced Upload Modal */}
       {showUpload && (
-        <UploadZone 
-          onClose={() => {
-            setShowUpload(false);
-            // Reload documents and folders after upload
-            if (isInitialized) {
-              apiService.getDocuments(
-                'admin-1',
-                true,
-                selectedFolder === 'all' ? undefined : selectedFolder
-              ).then(result => {
-                setAllDocuments(result.documents);
-              }).catch(console.warn);
-              
-              folderService.getFolders('admin-1', true)
-                .then(setFolders)
-                .catch(console.warn);
-            }
-          }} 
-          folders={folders} 
+        <EnhancedUploadZone 
+          onClose={() => setShowUpload(false)}
+          onUploadComplete={handleUploadComplete}
+          folders={folders}
         />
       )}
 
@@ -731,6 +956,35 @@ export const Knowledge = () => {
           folders={folders}
         />
       )}
+
+      {/* Bulk Move Modal */}
+      <BulkMoveModal
+        isOpen={showBulkMoveModal}
+        onClose={() => setShowBulkMoveModal(false)}
+        folders={folders}
+        selectedDocuments={Array.from(selectedDocuments).map(id => {
+          const doc = transformedDocuments.find(d => d.id === id);
+          return {
+            id,
+            title: doc?.title || 'Unknown',
+            folderId: doc?.folderId
+          };
+        })}
+        onMove={executeBulkMove}
+      />
+
+      {/* Global Drag & Drop Overlay */}
+      <GlobalDragDropOverlay
+        onFilesDropped={handleGlobalFileDrop}
+        isEnabled={isInitialized && !showUpload}
+      />
+
+      {/* Floating Upload Progress */}
+      <FloatingUploadProgress
+        uploads={backgroundUploads}
+        isVisible={backgroundUploads.length > 0}
+        onDismiss={dismissBackgroundUpload}
+      />
     </div>
   );
 };

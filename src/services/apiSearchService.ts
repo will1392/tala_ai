@@ -100,6 +100,8 @@ export class ApiSearchService implements ISearchService {
           isAdmin,
           limit,
           folderId: filters?.folderId,
+          category: filters?.category,
+          fileType: filters?.fileType,
           scoreThreshold: 0.2
         }),
       });

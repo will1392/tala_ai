@@ -1,4 +1,4 @@
-import { X, Download, Share2, FileText, Clock, User } from 'lucide-react';
+import { X, Download, Share2, FileText, Clock, User, Search, Type, Hash, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../shared/Button';
 import { GlassCard } from '../layout/GlassCard';
@@ -25,10 +25,20 @@ interface DocumentViewerProps {
   } | null;
 }
 
+interface TextStructure {
+  type: 'heading' | 'paragraph' | 'list' | 'table' | 'code' | 'quote';
+  content: string;
+  level?: number;
+  items?: string[];
+}
+
 export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProps) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [pdfLoadFailed, setPdfLoadFailed] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showFormatted, setShowFormatted] = useState(true);
+  const [showCopySuccess, setShowCopySuccess] = useState(false);
   
   if (!document) return null;
 
@@ -66,6 +76,78 @@ export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProp
     });
     setPdfLoadFailed(true);
   };
+
+  // Enhanced text processing for better structure and readability
+  const processTextContent = (content: string): TextStructure[] => {
+    if (!content) return [];
+    
+    const lines = content.split('\n').filter(line => line.trim());
+    const structures: TextStructure[] = [];
+    let currentParagraph = '';
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Detect headings (lines with fewer than 100 chars, all caps, or specific patterns)
+      if (trimmed.length < 100 && (
+        trimmed === trimmed.toUpperCase() || 
+        /^[A-Z][A-Z\s]{2,}$/.test(trimmed) ||
+        /^\d+\.\s/.test(trimmed) ||
+        /^[IVX]+\.\s/.test(trimmed)
+      )) {
+        if (currentParagraph) {
+          structures.push({ type: 'paragraph', content: currentParagraph.trim() });
+          currentParagraph = '';
+        }
+        structures.push({ type: 'heading', content: trimmed, level: 2 });
+        continue;
+      }
+      
+      // Detect list items
+      if (/^[-•·]\s/.test(trimmed) || /^\d+\.\s/.test(trimmed) || /^[a-z]\)\s/.test(trimmed)) {
+        if (currentParagraph) {
+          structures.push({ type: 'paragraph', content: currentParagraph.trim() });
+          currentParagraph = '';
+        }
+        structures.push({ type: 'list', content: trimmed });
+        continue;
+      }
+      
+      // Detect code or technical content (contains special chars, brackets, etc.)
+      if (/[{}\[\]<>]/.test(trimmed) || /^\s{4,}/.test(line)) {
+        if (currentParagraph) {
+          structures.push({ type: 'paragraph', content: currentParagraph.trim() });
+          currentParagraph = '';
+        }
+        structures.push({ type: 'code', content: trimmed });
+        continue;
+      }
+      
+      // Regular paragraph content
+      currentParagraph += (currentParagraph ? ' ' : '') + trimmed;
+    }
+    
+    if (currentParagraph) {
+      structures.push({ type: 'paragraph', content: currentParagraph.trim() });
+    }
+    
+    return structures;
+  };
+
+  // Highlight search terms in text
+  const highlightSearchTerms = (text: string, searchTerm: string) => {
+    if (!searchTerm.trim()) return text;
+    
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.split(regex).map((part, index) => 
+      regex.test(part) ? 
+        `<mark class="bg-yellow-300/30 text-yellow-900 px-1 rounded">${part}</mark>` : 
+        part
+    ).join('');
+  };
+
+  const processedStructures = document ? processTextContent(document.content) : [];
+  const hasSearchResults = searchTerm && document?.content.toLowerCase().includes(searchTerm.toLowerCase());
 
   return (
     <AnimatePresence>
@@ -118,6 +200,36 @@ export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProp
                 </div>
                 
                 <div className="flex items-center gap-2">
+                  {/* Text formatting toggle */}
+                  <Button 
+                    variant={showFormatted ? "primary" : "ghost"}
+                    size="sm" 
+                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    onClick={() => setShowFormatted(!showFormatted)}
+                    title={showFormatted ? "Switch to raw text view" : "Switch to formatted text view"}
+                  >
+                    <Type size={18} />
+                  </Button>
+                  
+                  {/* Copy to clipboard */}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 relative"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(document.content);
+                        setShowCopySuccess(true);
+                        setTimeout(() => setShowCopySuccess(false), 2000);
+                      } catch (err) {
+                        console.error('Failed to copy to clipboard');
+                      }
+                    }}
+                    title="Copy document content to clipboard"
+                  >
+                    <Copy size={18} />
+                  </Button>
+                  
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -142,6 +254,7 @@ export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProp
                         alert('Download failed. Please try again.');
                       }
                     }}
+                    title="Download document as text file"
                   >
                     <Download size={18} />
                   </Button>
@@ -163,51 +276,211 @@ export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProp
                         // Fallback: copy to clipboard
                         try {
                           await navigator.clipboard.writeText(document.content);
-                          alert('Document content copied to clipboard!');
+                          setShowCopySuccess(true);
+                          setTimeout(() => setShowCopySuccess(false), 2000);
                         } catch (err) {
                           console.error('Failed to copy to clipboard');
                         }
                       }
                     }}
+                    title="Share document"
                   >
                     <Share2 size={18} />
                   </Button>
-                  <Button variant="ghost" size="sm" className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100" onClick={onClose}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100" 
+                    onClick={onClose}
+                    title="Close document viewer"
+                  >
                     <X size={18} />
                   </Button>
                 </div>
+                
+                {/* Copy Success Notification */}
+                <AnimatePresence>
+                  {showCopySuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                      className="absolute top-16 right-6 z-10"
+                    >
+                      <div className="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium">
+                        <Check size={16} />
+                        Content copied to clipboard!
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              
+              {/* Search Bar for Text Content - Show for all documents */}
+              <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search within document..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-black"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="Clear search"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+                {hasSearchResults && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Found search term in document
+                  </p>
+                )}
               </div>
               
               {/* Content */}
               <div className="flex-1 overflow-y-auto p-6 bg-white">
                 {isPDF ? (
                   <div className="flex flex-col items-center">
-                    {/* Use simple iframe for now - this should definitely work */}
+                    {/* Try to load PDF, fall back to text if it fails */}
                     <iframe
                       src={pdfUrl}
                       width="100%"
                       height="600px"
                       style={{ border: '1px solid #ddd', borderRadius: '8px' }}
                       title={document.title}
-                      onLoad={() => console.log('PDF iframe loaded successfully')}
-                      onError={() => console.error('PDF iframe failed to load')}
+                      onLoad={() => {
+                        console.log('PDF iframe loaded successfully');
+                        setPdfLoadFailed(false);
+                      }}
+                      onError={() => {
+                        console.error('PDF iframe failed to load');
+                        setPdfLoadFailed(true);
+                      }}
                     />
-                    <p className="text-sm text-gray-600 mt-2">
-                      PDF displayed using browser's native viewer
-                    </p>
-                  </div>
-                ) : (
-                  <div className="prose prose-gray max-w-none">
-                    {pdfLoadFailed && isPDF && (
-                      <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 rounded">
-                        <p className="text-yellow-800 text-sm">
-                          PDF viewer failed to load. Showing text content instead.
+                    {!pdfLoadFailed && (
+                      <p className="text-sm text-gray-600 mt-2">
+                        PDF displayed using browser's native viewer
+                      </p>
+                    )}
+                    {pdfLoadFailed && (
+                      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg w-full">
+                        <p className="text-yellow-800 text-sm mb-2">
+                          PDF file not available. Showing extracted text content:
                         </p>
+                        <div className="prose prose-sm max-w-none bg-white p-4 rounded border max-h-96 overflow-y-auto">
+                          {showFormatted ? (
+                            <div className="space-y-4">
+                              {processedStructures.map((structure, index) => {
+                                const content = highlightSearchTerms(structure.content, searchTerm);
+                                
+                                switch (structure.type) {
+                                  case 'heading':
+                                    return (
+                                      <h3 
+                                        key={index} 
+                                        className="text-lg font-bold text-black mt-6 mb-3 pb-2 border-b border-gray-200"
+                                        dangerouslySetInnerHTML={{ __html: content }}
+                                      />
+                                    );
+                                  case 'list':
+                                    return (
+                                      <div 
+                                        key={index} 
+                                        className="ml-4 text-black leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: content }}
+                                      />
+                                    );
+                                  case 'code':
+                                    return (
+                                      <pre 
+                                        key={index} 
+                                        className="bg-gray-100 p-3 rounded-lg text-sm font-mono text-black overflow-x-auto"
+                                        dangerouslySetInnerHTML={{ __html: content }}
+                                      />
+                                    );
+                                  case 'paragraph':
+                                  default:
+                                    return (
+                                      <p 
+                                        key={index} 
+                                        className="text-black leading-relaxed mb-4 text-justify"
+                                        dangerouslySetInnerHTML={{ __html: content }}
+                                      />
+                                    );
+                                }
+                              })}
+                            </div>
+                          ) : (
+                            <div 
+                              className="whitespace-pre-wrap text-black leading-relaxed text-sm font-mono"
+                              dangerouslySetInnerHTML={{ 
+                                __html: highlightSearchTerms(document.content, searchTerm) 
+                              }}
+                            />
+                          )}
+                        </div>
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap text-gray-800 leading-relaxed text-base">
-                      {document.content}
-                    </div>
+                  </div>
+                ) : (
+                  <div className="prose prose-gray max-w-none max-h-[60vh] overflow-y-auto">
+                    {showFormatted ? (
+                      <div className="space-y-4">
+                        {processedStructures.map((structure, index) => {
+                          const content = highlightSearchTerms(structure.content, searchTerm);
+                          
+                          switch (structure.type) {
+                            case 'heading':
+                              return (
+                                <h2 
+                                  key={index} 
+                                  className="text-xl font-bold text-black mt-8 mb-4 pb-2 border-b-2 border-blue-200"
+                                  dangerouslySetInnerHTML={{ __html: content }}
+                                />
+                              );
+                            case 'list':
+                              return (
+                                <div 
+                                  key={index} 
+                                  className="ml-6 text-black leading-relaxed text-base"
+                                  dangerouslySetInnerHTML={{ __html: content }}
+                                />
+                              );
+                            case 'code':
+                              return (
+                                <pre 
+                                  key={index} 
+                                  className="bg-gray-100 p-4 rounded-lg text-sm font-mono text-black overflow-x-auto border-l-4 border-blue-400"
+                                  dangerouslySetInnerHTML={{ __html: content }}
+                                />
+                              );
+                            case 'paragraph':
+                            default:
+                              return (
+                                <p 
+                                  key={index} 
+                                  className="text-black leading-relaxed mb-6 text-base text-justify"
+                                  dangerouslySetInnerHTML={{ __html: content }}
+                                />
+                              );
+                          }
+                        })}
+                      </div>
+                    ) : (
+                      <div 
+                        className="whitespace-pre-wrap text-black leading-relaxed text-base font-mono"
+                        dangerouslySetInnerHTML={{ 
+                          __html: highlightSearchTerms(document.content, searchTerm) 
+                        }}
+                      />
+                    )}
                   </div>
                 )}
               </div>

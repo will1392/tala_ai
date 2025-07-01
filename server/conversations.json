@@ -1,0 +1,99 @@
+{
+  "conversations": [
+    [
+      "conv_1751335036270_admin-1",
+      {
+        "id": "conv_1751335036270_admin-1",
+        "userId": "admin-1",
+        "title": "tell me about Greece, what should I know about the...",
+        "createdAt": "2025-07-01T01:57:16.270Z",
+        "lastActivity": "2025-07-01T01:58:06.498Z",
+        "messageCount": 4,
+        "lastMessage": "It's recommended that a passport be valid for at least **six months beyond the date of your return**..."
+      }
+    ]
+  ],
+  "messages": [
+    [
+      "conv_1751335036270_admin-1",
+      [
+        {
+          "id": "user_1751335036270",
+          "content": "tell me about Greece, what should I know about the country?",
+          "sender": "user",
+          "timestamp": "2025-07-01T01:57:16.270Z",
+          "conversationId": "conv_1751335036270_admin-1"
+        },
+        {
+          "id": "ai_1751335036270",
+          "content": "Absolutely, Greece is a beautiful country rich in history, culture, and stunning landscapes! Here are some essential points you should know about Greece:\n\n### A Land of Indulgence\n- **Scenic Beauty**: Greece is known for its breathtaking views, exotic beaches, and charming villages. With over 1400 islands, each island offers unique terrains and captivating landscapes.\n- **Cultural Heritage**: The country is home to ancient ruins and historical sites, including the Acropolis in Athens, which showcases its rich history.\n\n### Essential Travel Information\n- **Passport Requirements**: You need a valid passport with a minimum of 90 days remaining beyond your intended departure date from Greece. Ensure your name matches your travel documents.\n- **Visa Requirements**: American and Canadian citizens do not need a visa for stays up to 90 days. Visitors from other countries should check with the Embassy of Greece for current visa requirements.\n- **Insurance**: It is recommended to have medical and cancellation insurance for your trip.\n\n### Local Customs\n- **Language**: The official language is Greek, but many locals speak English, especially in tourist areas.\n- **Currency**: The local currency is the Euro (EUR). Credit cards are widely accepted, but it's good to have some cash for small purchases.\n- **Tipping**: Tipping is not mandatory but appreciated. A tip of 5-10% in restaurants is customary.\n\n### Health and Safety\n- **Healthcare**: Medical facilities are generally good, similar to those in North America, but may be limited in rural areas. In case of emergencies, you can dial 166 for medical assistance.\n- **Health Precautions**: It's advisable to have basic medical items with you and to check on vaccination requirements prior to travel.\n\n### Local Etiquette\n- **Dining**: Meals are an important part of Greek culture. Expect to enjoy Mediterranean cuisine, including dishes such as moussaka, souvlaki, and various seafood options.\n- **Respect for Nature**: Be mindful of Greece's natural environment. Follow marked trails and refrain from disturbing wildlife or littering.\n\n### Transportation\n- **Getting Around**: Taxis and buses are available for local transport. Ferries are the primary mode of transport between islands.\n- **Airport Pick-Up**: If you're arriving by air, a driver will typically meet you in the Arrivals Hall with a sign bearing your name.\n\n### Climate\n- **Weather**: Greece has a Mediterranean climate with hot, dry summers and mild, wet winters. The best time to visit is typically from late spring to early fall.\n\n### Final Tips\n- **Cultural Sensitivity**: Be respectful of local customs and traditions. Greeks are known for their hospitality and appreciation for visitors.\n\nEnjoy your time in Greece, whether you're exploring the historical sites, relaxing on the beaches, or indulging in the local cuisine! If you have more specific questions or need further assistance, feel free to ask!",
+          "sender": "tala",
+          "timestamp": "2025-07-01T01:57:16.270Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.60951215,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.35268736,
+              "documentId": "5bcbd9c8-cc80-4b08-b066-469b75af6a9b"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.35263085,
+              "documentId": "3f0aad31-a2c4-4451-b861-e40e4ee9d057"
+            },
+            {
+              "title": "Kensington Portugal Guide.pdf",
+              "type": "document",
+              "score": 0.33207887,
+              "documentId": "3f8a3e94-6e84-4482-871c-49b1d91cc359"
+            },
+            {
+              "title": "Kensington England Guide.pdf",
+              "type": "document",
+              "score": 0.30204692,
+              "documentId": "2fab42a2-04dc-43c6-a45d-48abdddb830b"
+            }
+          ],
+          "conversationId": "conv_1751335036270_admin-1",
+          "tokensUsed": 52720
+        },
+        {
+          "id": "user_1751335086498",
+          "content": "My client's passport expires on October 3rd, 2025 but they leave on July 14th, will they be okay?",
+          "sender": "user",
+          "timestamp": "2025-07-01T01:58:06.498Z",
+          "conversationId": "conv_1751335036270_admin-1"
+        },
+        {
+          "id": "ai_1751335086498",
+          "content": "It's recommended that a passport be valid for at least **six months beyond the date of your return** for international travel. Since your client's passport expires on **October 3rd, 2025** and they are leaving on **July 14th, 2025**, they would not meet the six-month validity rule for many destinations.\n\nIn this case, it would be best for your client to **renew their passport** before their trip to avoid any potential issues at immigration or when boarding their flight. It's always better to have peace of mind when traveling internationally! If you need assistance with the passport renewal process, feel free to ask!",
+          "sender": "tala",
+          "timestamp": "2025-07-01T01:58:06.498Z",
+          "sources": [
+            {
+              "title": "Travel agent training_ June 19, 2025.docx",
+              "type": "document",
+              "score": 0.38768864,
+              "documentId": "8ad87a08-025a-48e1-a7be-01869a189d8f"
+            },
+            {
+              "title": "TFL Tours Docs.pdf",
+              "type": "document",
+              "score": 0.32361212,
+              "documentId": "a910d406-00bc-483b-ad62-24bb83b8b647"
+            }
+          ],
+          "conversationId": "conv_1751335036270_admin-1",
+          "tokensUsed": 13236
+        }
+      ]
+    ]
+  ]
+}

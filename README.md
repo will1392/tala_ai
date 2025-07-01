@@ -15,7 +15,7 @@ Tala is an AI-powered travel assistant platform designed to transform how travel
 
 ### 🎯 Core Vision
 
-- 🤖 **Intelligent Document Search** using RAG (Retrieval-Augmented Generation)
+- 🤖 **Intelligent Document Search** using Tala AI (Retrieval-Augmented Generation)
 - 💬 **Natural Language Chat Interface** for instant assistance
 - 📚 **Comprehensive Knowledge Base** management
 - 🎥 **Video Content Understanding** and extraction
@@ -43,36 +43,58 @@ tala-ui/
 ├── src/
 │   ├── components/          # Reusable UI components
 │   │   ├── chat/           # Chat-related components
+│   │   │   ├── ChatMessage.tsx    # Message display with markdown
+│   │   │   ├── ChatInput.tsx      # Enhanced input with attachments
+│   │   │   └── ChatWidget.tsx     # Floating chat widget
 │   │   ├── knowledge/      # Knowledge base components
-│   │   │   ├── DocumentCard.tsx
-│   │   │   ├── DocumentMenu.tsx
-│   │   │   ├── DocumentViewer.tsx
-│   │   │   ├── DeleteDocumentModal.tsx
-│   │   │   ├── MoveDocumentModal.tsx
-│   │   │   ├── FolderMenu.tsx
-│   │   │   └── DeleteFolderModal.tsx
+│   │   │   ├── DocumentCard.tsx          # Document display cards
+│   │   │   ├── SelectableDocumentCard.tsx # Bulk selection cards
+│   │   │   ├── DocumentViewer.tsx        # Enhanced document viewer
+│   │   │   ├── EnhancedSearchBar.tsx     # Advanced search with filters
+│   │   │   ├── SearchResultsSummary.tsx  # Search results display
+│   │   │   ├── EnhancedUploadZone.tsx    # Advanced upload with progress
+│   │   │   ├── BulkActionsToolbar.tsx    # Bulk operations UI
+│   │   │   ├── BulkMoveModal.tsx         # Bulk move interface
+│   │   │   ├── FloatingUploadProgress.tsx # Upload progress tracking
+│   │   │   ├── GlobalDragDropOverlay.tsx  # Global drag & drop
+│   │   │   ├── DocumentMenu.tsx          # Action dropdown for documents
+│   │   │   ├── DeleteDocumentModal.tsx   # Document deletion confirmation
+│   │   │   ├── MoveDocumentModal.tsx     # Document moving interface
+│   │   │   ├── FolderMenu.tsx           # Action dropdown for folders
+│   │   │   ├── DeleteFolderModal.tsx    # Folder deletion confirmation
+│   │   │   ├── EditFolderModal.tsx      # Folder editing interface
+│   │   │   └── CreateFolderModal.tsx    # Folder creation interface
 │   │   ├── layout/         # Layout and navigation
 │   │   └── shared/         # Shared utility components
 │   ├── pages/              # Main application pages
 │   │   ├── Dashboard.tsx   # Analytics and overview
-│   │   ├── Knowledge.tsx   # Document management
-│   │   ├── Chat.tsx        # Full chat interface
+│   │   ├── Knowledge.tsx   # Enhanced document management
+│   │   ├── Chat.tsx        # Full Tala AI chat interface
 │   │   └── Settings.tsx    # User preferences
 │   ├── services/           # API and business logic
+│   │   ├── apiSearchService.ts   # Knowledge base search API
+│   │   ├── chatService.ts        # Tala AI chat service
+│   │   ├── folderService.ts      # Folder management
+│   │   └── searchSuggestions.ts  # Search suggestions
+│   ├── hooks/              # Custom React hooks
+│   │   └── useChat.ts             # Chat state management
 │   ├── store/              # Zustand state management
 │   ├── styles/             # Global styles and themes
 │   └── utils/              # Helper functions
 ├── server/                 # Backend API server
-│   ├── server.js          # Express.js server with RAG endpoints
-│   ├── package.json       # Backend dependencies
-│   └── folders.json       # Persistent folder storage
+│   ├── server.js          # Express.js server with Tala AI endpoints
+│   ├── services/          # Backend services
+│   │   └── cloudStorage.js # Cloud storage abstraction
+│   ├── conversations.json # Persistent conversation storage
+│   ├── folders.json       # Persistent folder storage
+│   └── package.json       # Backend dependencies
 ├── public/                 # Static assets
 └── docs/                   # Documentation
 ```
 
 ## ✅ Current Implementation Status
 
-### 🎯 Phase 0: Foundation (COMPLETED)
+### 🎯 Phase 0: Foundation (COMPLETED ✅)
 - ✅ React + TypeScript + Vite setup
 - ✅ Tailwind CSS with custom glassmorphic design
 - ✅ Complete UI component library
@@ -82,109 +104,207 @@ tala-ui/
 - ✅ All main pages (Dashboard, Knowledge, Chat, Settings)
 - ✅ Beautiful glassmorphic animations
 
-### 🎯 Phase 1: Knowledge Base & RAG Implementation (COMPLETED ✅)
+### 🎯 Phase 1: Knowledge Base & Document Management (COMPLETED ✅)
+- ✅ Backend server with Express.js and document processing
+- ✅ Qdrant vector database integration with OpenAI embeddings
+- ✅ Document upload and processing (PDF, Word, Excel, Text)
+- ✅ Semantic search with vector similarity
+- ✅ Document viewer with enhanced text formatting
+- ✅ Folder organization system with CRUD operations
+- ✅ Document management (delete, move between folders)
+- ✅ Three-dots action menus and confirmation dialogs
+- ✅ Real-time UI updates and folder synchronization
+
+### 🎯 Phase 1.5: Knowledge Base Enhancements (COMPLETED ✅)
+- ✅ **Enhanced search functionality** - Advanced search UI with filters and folder search
+- ✅ **Bulk operations** - Multi-select documents with bulk delete/move operations
+- ✅ **Improved upload experience** - Drag & drop interface with real-time progress tracking
+- ✅ **Document preview improvements** - Smart text structure detection and in-document search
+
+### 🎯 Phase 2: Tala AI Chat System (COMPLETED ✅)
+- ✅ **Full Tala AI chat interface** - Complete chat system with knowledge base integration
+- ✅ **Conversation management** - Persistent conversation history (last 15 conversations)
+- ✅ **Knowledge base integration** - AI searches uploaded documents for context
+- ✅ **Source citations** - Documents referenced in AI responses are clearly cited
+- ✅ **Real-time messaging** - Smooth chat experience with typing indicators
+- ✅ **Error handling** - Comprehensive error management and user feedback
+
+## 🎉 Latest Updates (January 1, 2025)
+
+### ✨ Major Features Completed Tonight
+
+#### **Phase 1.5: Knowledge Base Enhancements (100% Complete)**
+1. **Enhanced Search Functionality**
+   - Advanced search bar with intelligent filters (category, file type, folder)
+   - Context-aware search suggestions based on current folder
+   - Recent searches history with quick access
+   - Search within specific folders capability
+   - Search results summary with clear metrics
+
+2. **Bulk Operations System**
+   - Multi-select mode with visual selection indicators
+   - Bulk delete with confirmation and progress tracking
+   - Bulk move operations between folders
+   - Select all/clear selection functionality
+   - Keyboard shortcuts (Ctrl+A, Delete, Escape)
+
+3. **Enhanced Upload Experience**
+   - Advanced drag & drop with global overlay
+   - Real-time upload progress with pause/resume/retry
+   - Concurrent upload management (configurable 1-5 files)
+   - File validation with user-friendly error messages
+   - Floating progress tracker for background uploads
+
+4. **Document Preview Improvements**
+   - Smart text structure detection (headings, lists, code blocks)
+   - In-document search with real-time highlighting
+   - Toggle between formatted and raw text views
+   - Enhanced copy functionality with toast notifications
+   - Improved tooltips and user guidance
+
+#### **Phase 2: Tala AI Chat System (100% Complete)**
+1. **Complete Chat Interface**
+   - Real-time chat with Tala AI powered by OpenAI GPT-4o-mini
+   - Knowledge base integration using Retrieval-Augmented Generation
+   - Message formatting with ReactMarkdown support
+   - Source citations showing which documents were referenced
+   - Smooth animations and loading states
+
+2. **Conversation Management**
+   - Persistent conversation history (last 15 conversations)
+   - File-based storage with automatic saving/loading
+   - Conversation switching with full message history
+   - Delete conversations with confirmation
+   - Auto-generated conversation titles
+
+3. **Advanced Chat Features**
+   - Context-aware responses based on uploaded documents
+   - Error handling with graceful fallbacks
+   - System status indicators
+   - Quick action buttons for common queries
+   - Token usage tracking and display
+
+### 🔧 Technical Achievements
+
+#### **Backend Enhancements**
+- **Tala AI Chat API** - Complete chat endpoint with RAG integration
+- **Conversation Storage** - Persistent conversation and message storage
+- **Enhanced Search** - Advanced filtering and context injection
+- **Cloud Storage Abstraction** - Prepared infrastructure for S3/Cloudinary integration
+- **Error Handling** - Comprehensive error management across all endpoints
+
+#### **Frontend Architecture**
+- **Advanced Component System** - 15+ new specialized components
+- **State Management** - Complex state handling for chat and bulk operations
+- **Service Layer** - Clean API abstraction with TypeScript interfaces
+- **Custom Hooks** - Reusable logic for chat management
+- **Performance Optimization** - Efficient rendering and memory management
+
+#### **User Experience**
+- **Glassmorphic Design** - Consistent beautiful UI across all new features
+- **Responsive Design** - Mobile-friendly implementations
+- **Accessibility** - Keyboard navigation and screen reader support
+- **Loading States** - Comprehensive feedback for all async operations
+- **Error Recovery** - User-friendly error messages with recovery options
+
+### 📊 New Components Added Tonight
+
+#### **Knowledge Base Components**
+- `EnhancedSearchBar.tsx` - Advanced search with filters and suggestions
+- `SearchResultsSummary.tsx` - Search results with metrics and filters
+- `SelectableDocumentCard.tsx` - Document cards with selection capability
+- `BulkActionsToolbar.tsx` - Bulk operations interface
+- `BulkMoveModal.tsx` - Bulk move dialog with folder selection
+- `EnhancedUploadZone.tsx` - Advanced upload with progress tracking
+- `FloatingUploadProgress.tsx` - Background upload progress display
+- `GlobalDragDropOverlay.tsx` - Global drag and drop functionality
+
+#### **Chat System Components**
+- `chatService.ts` - Complete Tala AI API integration
+- `useChat.ts` - Chat state management hook
+- Enhanced `ChatInput.tsx` - Improved input with disabled states
+- Enhanced `ChatMessage.tsx` - Message display with source citations
+- Updated `Chat.tsx` - Full conversation management interface
+
+#### **Backend Services**
+- `cloudStorage.js` - Multi-provider storage abstraction (S3, local, Cloudinary)
+- Enhanced `server.js` - Tala AI chat endpoints and conversation management
+- Conversation storage system with file persistence
+- Advanced document search with context injection
+
+## 🗓️ Development Roadmap
+
+### ✅ Completed Phases
+
+#### **Phase 1: Knowledge Base & Document Management (COMPLETED)**
 - ✅ Backend server with Express.js and document processing
 - ✅ Qdrant vector database integration with OpenAI embeddings
 - ✅ Document upload and processing (PDF, Word, Excel, Text)
 - ✅ Semantic search with vector similarity
 - ✅ Document viewer with PDF support
 - ✅ Folder organization system with CRUD operations
-- ✅ **Document Management System (Latest Update - Dec 30, 2025)**
-  - ✅ Delete documents with confirmation dialogs
-  - ✅ Move documents between folders
-  - ✅ Three-dots action menu on all document cards
-  - ✅ Real-time UI updates and folder count synchronization
-  - ✅ Enhanced PDF viewing with iframe fallback
-  - ✅ Fixed document search and filtering within folders
-
-## 🎉 Recent Updates (December 30, 2025)
-
-### ✨ Major Features Completed Today
-- **Complete Document Management System**: Users can now fully manage their documents with delete and move functionality
-- **Advanced UI Components**: Added comprehensive modal system with confirmation dialogs
-- **Enhanced PDF Viewing**: Fixed PDF loading issues with reliable iframe implementation
-- **Folder Organization**: Complete CRUD operations for folders with real-time count updates
-- **Three-Dots Action Menus**: Professional dropdown menus on every document and folder
-- **Bug Fixes**: Resolved Qdrant vector update operations and search filtering issues
-
-### 🔧 Technical Improvements
-- **Backend API Endpoints**: Added DELETE and PUT endpoints for document management
-- **Error Handling**: Comprehensive error handling with user-friendly messages
-- **State Management**: Improved React state management for real-time UI updates
-- **Vector Database**: Fixed Qdrant operations using proper `setPayload()` method
-- **Component Architecture**: Created reusable modal and menu components
-
-### 📊 Components Added Today
-- `DocumentMenu.tsx` - Action dropdown for documents
-- `DeleteDocumentModal.tsx` - Confirmation dialog for deletions
-- `MoveDocumentModal.tsx` - Folder selection for moving documents
-- `DeleteFolderModal.tsx` - Folder deletion confirmation
-- `EditFolderModal.tsx` - Folder editing interface
-- `FolderMenu.tsx` - Action dropdown for folders
-
-## 🗓️ Development Roadmap
-
-### 🏆 Phase 1: Knowledge Base & RAG Implementation (COMPLETED ✅)
-**Goal**: Create a working document search system with vector database
-
-#### Completed Tasks:
-- ✅ Install RAG dependencies (`@qdrant/js-client`, `openai`, `langchain`)
-- ✅ Create document processing service (PDF, Word, Excel)
-- ✅ Set up Qdrant vector database integration
-- ✅ Implement vector search with OpenAI embeddings
-- ✅ Connect Knowledge Base UI to real search
-- ✅ Add document preview and source attribution
-- ✅ Complete folder organization system
 - ✅ Document management (delete, move between folders)
-- ✅ Enhanced user interface with action menus
 
-#### Success Metrics Achieved:
-- ✅ Upload and process PDF, Word, Excel files
-- ✅ Search returns relevant results with highlights
-- ✅ Response time < 500ms for search
-- ✅ Source attribution working
-- ✅ Full document lifecycle management
+#### **Phase 1.5: Knowledge Base Enhancements (COMPLETED)**
+- ✅ Enhanced search functionality with advanced filters
+- ✅ Bulk operations with multi-select and batch actions
+- ✅ Improved upload experience with drag & drop and progress
+- ✅ Document preview improvements with smart text formatting
 
-### 🎯 Phase 1.5: Knowledge Base Enhancements (CURRENT PRIORITY)
-**Goal**: Improve user experience and add advanced document management features
+#### **Phase 2: Tala AI Chat System (COMPLETED)**
+- ✅ Complete chat interface with Tala AI integration
+- ✅ Conversation management with persistent history
+- ✅ Knowledge base integration with source citations
+- ✅ Real-time messaging with error handling
 
-#### Current Tasks (In Progress):
-- [ ] **Enhanced search functionality** - Better search UI, search within folders
-- [ ] **Bulk operations** - Select multiple docs, bulk delete/move
-- [ ] **Improved upload experience** - Drag & drop, progress indicators
-- [ ] **Document preview improvements** - Better text extraction display
+### 🔮 Future Phases
 
-### 🤖 Phase 2: Intelligent Chat with RAG Context (PRIORITY 2)
-**Goal**: Chat that can answer questions using the knowledge base
-
-#### Tasks:
-- [ ] Enhance chat service with RAG context injection
-- [ ] Implement streaming responses for better UX
-- [ ] Add source citations to chat responses
-- [ ] Create context-aware conversation memory
-- [ ] Add suggested follow-up questions
-
-#### Success Metrics:
-- ✅ Chat answers include knowledge base context
-- ✅ Sources are cited in responses
-- ✅ Streaming responses work smoothly
-- ✅ Context doesn't exceed token limits
-
-### 🎥 Phase 3: Video RAG System (PRIORITY 3)
+#### **Phase 3: Video Processing System (PRIORITY 1)**
 **Goal**: Extract and search information from travel videos
 
-#### Tasks:
-- [ ] Install video processing dependencies
+##### Tasks:
+- [ ] Install video processing dependencies (ffmpeg.js, whisper)
 - [ ] Create video upload and processing pipeline
 - [ ] Implement transcript extraction (Whisper API)
 - [ ] Add video timeline segmentation
 - [ ] Enable jump-to-timestamp functionality
+- [ ] Integrate video content into Tala AI responses
 
-#### Success Metrics:
-- ✅ Process videos up to 10 minutes
-- ✅ Transcript searchable within 30 seconds
-- ✅ Jump to specific timestamps
-- ✅ Video segments appear in search results
+##### Success Metrics:
+- Process videos up to 10 minutes
+- Transcript searchable within 30 seconds
+- Jump to specific timestamps from chat
+- Video segments appear in search results
+
+#### **Phase 4: Multi-Agent System (PRIORITY 2)**
+**Goal**: Specialized AI agents for different travel tasks
+
+##### Tasks:
+- [ ] Create specialized agents (visa, flights, accommodation, activities)
+- [ ] Implement agent orchestration system
+- [ ] Add agent handoff capabilities
+- [ ] Create agent-specific knowledge bases
+- [ ] Implement agent performance monitoring
+
+#### **Phase 5: Embeddable Widget (PRIORITY 3)**
+**Goal**: Add Tala to any travel agency website
+
+##### Tasks:
+- [ ] Create embeddable chat widget
+- [ ] Implement widget customization options
+- [ ] Add white-label branding support
+- [ ] Create widget analytics dashboard
+- [ ] Implement widget security measures
+
+### 🔧 Infrastructure Improvements (Ongoing)
+
+#### **Pending Tasks**
+- [ ] **Cloud Storage Migration** - Move from local to S3/Cloudinary storage
+- [ ] **Database Migration** - Move from file-based to proper database (PostgreSQL/MongoDB)
+- [ ] **Authentication System** - User management and multi-tenancy
+- [ ] **Analytics Dashboard** - Usage metrics and performance monitoring
+- [ ] **API Rate Limiting** - Implement proper rate limiting and caching
+- [ ] **Deployment Pipeline** - Docker containers and CI/CD setup
 
 ## 🛠️ Quick Start
 
@@ -205,26 +325,30 @@ tala-ui/
 2. **Install dependencies**
    ```bash
    npm install
+   cd server && npm install && cd ..
    ```
 
 3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Add your API keys:
+   Create `.env` file in the root directory:
    ```env
    # Frontend variables
-   VITE_QDRANT_URL=your-qdrant-url
-   VITE_QDRANT_API_KEY=your-qdrant-key
-   VITE_OPENAI_API_KEY=your-openai-key
+   VITE_QDRANT_URL=https://your-cluster.qdrant.io:6333
+   VITE_QDRANT_API_KEY=your-qdrant-api-key
+   VITE_OPENAI_API_KEY=sk-your-openai-api-key
    
    # Backend variables (same values, without VITE_ prefix)
-   QDRANT_URL=your-qdrant-url
-   QDRANT_API_KEY=your-qdrant-key
-   OPENAI_API_KEY=your-openai-key
+   QDRANT_URL=https://your-cluster.qdrant.io:6333
+   QDRANT_API_KEY=your-qdrant-api-key
+   OPENAI_API_KEY=sk-your-openai-api-key
    CORS_ORIGIN=http://localhost:5173
    PORT=3001
+   
+   # Storage Configuration (Optional)
+   STORAGE_TYPE=local
+   # For AWS S3 (when implementing cloud storage)
+   # AWS_ACCESS_KEY_ID=your-aws-access-key
+   # AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+   # AWS_S3_BUCKET=tala-ai-documents
    ```
 
 4. **Start the backend server**
@@ -244,11 +368,21 @@ tala-ui/
 6. **Open in browser**
    Navigate to `http://localhost:5173`
 
-### For RAG Implementation (Phase 1)
-```bash
-# Install additional dependencies for RAG
-npm install @qdrant/js-client openai langchain @langchain/community pdf-parse mammoth xlsx
-```
+### Testing the Complete System
+
+#### **Knowledge Base Testing**
+1. Upload documents (PDF, Word, Excel, Text)
+2. Create folders and organize documents
+3. Test advanced search with filters
+4. Try bulk operations (select multiple documents)
+5. Test drag & drop upload with progress tracking
+
+#### **Tala AI Chat Testing**
+1. Navigate to the Chat page
+2. Send a message asking about your uploaded documents
+3. Verify AI responses include source citations
+4. Test conversation switching and deletion
+5. Try quick action buttons
 
 ## 🏗️ Architecture Overview
 
@@ -256,51 +390,64 @@ npm install @qdrant/js-client openai langchain @langchain/community pdf-parse ma
 - **Frontend**: React 18 + TypeScript + Vite
 - **Styling**: Tailwind CSS with custom glassmorphic theme
 - **Routing**: React Router v6
-- **State Management**: Zustand
+- **State Management**: Zustand + Custom Hooks
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
-
-### Upcoming Stack (Phase 1+)
+- **Backend**: Express.js + Node.js
 - **Vector Database**: Qdrant Cloud
-- **AI/LLM**: OpenAI GPT-4 + Embeddings
+- **AI/LLM**: OpenAI GPT-4o-mini + Embeddings
 - **Document Processing**: pdf-parse, mammoth, xlsx
+- **Storage**: File-based (local) with cloud storage abstraction ready
+
+### Planned Stack Additions
 - **Video Processing**: Whisper API, ffmpeg.js
-- **Orchestration**: LangChain
+- **Database**: PostgreSQL or MongoDB for production
+- **Cloud Storage**: AWS S3 or Cloudinary
+- **Authentication**: Auth0 or custom JWT system
+- **Deployment**: Docker + Kubernetes or Vercel/Netlify
 
 ## 🎮 Features
 
 ### ✅ Currently Available
-- **Beautiful UI**: Glassmorphic design with smooth animations
-- **Dashboard**: Travel agency metrics and activity overview
-- **Knowledge Base**: Full document management system
-  - Document upload and processing (PDF, Word, Excel, Text)
-  - Vector-based semantic search with OpenAI embeddings
-  - Folder organization with create, edit, delete operations
-  - Document viewer with PDF support
-  - Document management (delete, move between folders)
-  - Three-dots action menus and confirmation dialogs
-  - Real-time UI updates and folder synchronization
-- **Chat Interface**: Beautiful chat UI with message formatting
-- **Settings**: Comprehensive user and system preferences
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Backend API**: Complete Express.js server with Qdrant integration
 
-### 🚧 In Development (Phase 1.5)
-- **Enhanced Search UI**: Better search interface and folder-specific search
-- **Bulk Operations**: Multi-select for documents with bulk actions
-- **Improved Upload**: Drag & drop interface with progress indicators
-- **Document Previews**: Enhanced text extraction and display
+#### **Complete Knowledge Base System**
+- **Document Management**: Upload, organize, search, delete, and move documents
+- **Advanced Search**: Semantic search with filters, suggestions, and folder-specific search
+- **Bulk Operations**: Multi-select documents for batch operations
+- **Smart Upload**: Drag & drop with real-time progress and error handling
+- **Document Viewer**: Enhanced text extraction with search and formatting
+- **Folder System**: Complete CRUD operations with real-time synchronization
+
+#### **Complete Tala AI Chat System**
+- **Intelligent Chat**: AI-powered responses using your knowledge base
+- **Conversation History**: Persistent chat history with last 15 conversations
+- **Source Citations**: Clear attribution of documents used in responses
+- **Real-time Messaging**: Smooth chat experience with typing indicators
+- **Error Handling**: Comprehensive error management and recovery
+
+#### **Beautiful User Interface**
+- **Glassmorphic Design**: Consistent beautiful UI across all features
+- **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- **Smooth Animations**: Framer Motion animations throughout
+- **Loading States**: Comprehensive feedback for all operations
+- **Accessibility**: Keyboard navigation and screen reader support
 
 ### 🔮 Planned Features
 - **Video Processing**: Extract and search video content
 - **Multi-Agent System**: Specialized AI agents for different tasks
 - **Embeddable Widget**: Add Tala to any website
 - **Advanced Analytics**: Detailed usage and performance metrics
+- **Cloud Storage**: Migrate to scalable cloud storage
+- **Authentication**: Multi-user support with proper authentication
 
 ## 🚀 Deployment
 
 ### Development
 ```bash
+# Start backend
+cd server && node server.js
+
+# Start frontend (in new terminal)
 npm run dev
 ```
 
@@ -312,7 +459,7 @@ npm run preview
 
 ### Environment Variables
 ```env
-# Required for RAG functionality
+# Required for Tala AI functionality
 VITE_QDRANT_URL=https://your-cluster.qdrant.io
 VITE_QDRANT_API_KEY=your-qdrant-api-key
 VITE_OPENAI_API_KEY=sk-your-openai-key
@@ -352,7 +499,7 @@ VITE_APP_ENV=production
 
 ### Development Process
 1. Check the [Development Roadmap](#-development-roadmap) for current priorities
-2. Pick a task from Phase 1 (highest priority)
+2. Pick a task from Phase 3 (Video Processing - current priority)
 3. Follow the [coding guidelines](#development-guidelines)
 4. Test your changes thoroughly
 5. Update documentation as needed

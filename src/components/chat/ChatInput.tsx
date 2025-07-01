@@ -6,9 +6,11 @@ import { cn } from '../../utils/cn';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: File[]) => void;
+  disabled?: boolean;
+  placeholder?: string;
 }
 
-export const ChatInput = ({ onSend }: ChatInputProps) => {
+export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your message..." }: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -81,7 +83,8 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
+            placeholder={placeholder}
+            disabled={disabled}
             rows={1}
             className={cn(
               'w-full resize-none rounded-xl px-4 py-3 pr-12',
@@ -115,6 +118,7 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             className="p-3"
+            disabled={disabled}
           >
             <Paperclip size={20} />
           </Button>
@@ -127,6 +131,7 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
               'p-3',
               isRecording && 'text-red-500 animate-pulse'
             )}
+            disabled={disabled}
           >
             <Mic size={20} />
           </Button>
@@ -135,7 +140,7 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
             variant="primary"
             size="sm"
             onClick={handleSend}
-            disabled={!message.trim() && attachments.length === 0}
+            disabled={disabled || (!message.trim() && attachments.length === 0)}
             className="p-3"
           >
             <Send size={20} />
