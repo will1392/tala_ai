@@ -145,7 +145,32 @@ tala-ui/
 
 ## 🎉 Latest Updates (January 3, 2025)
 
-### 🚀 Document Management System & Metadata Tagging (NEW!)
+### 🚀 Document Management System & Cloud Storage (NEW!)
+
+#### **☁️ Enterprise Cloud Storage Implementation**
+1. **Multi-Provider Storage Support**
+   - ✅ **AWS S3 Integration** - Secure cloud storage with signed URL access
+   - ✅ **Local Storage Fallback** - Automatic fallback for development and backup
+   - ✅ **Cloudinary Ready** - Infrastructure for image and video processing
+   - ✅ **Automatic File Migration** - Seamless transition from local to cloud storage
+
+2. **Advanced Security & Access Control**
+   - ✅ **Signed URLs** - Time-limited, secure access to private S3 documents (1-hour expiry)
+   - ✅ **Private Bucket Support** - No public access required, full security
+   - ✅ **Access Control** - Server-side validation before URL generation
+   - ✅ **Cross-Origin Resource Sharing (CORS)** - Proper browser security handling
+
+3. **Scalable File Processing**
+   - ✅ **500MB File Limit** - Increased from 10MB to handle large documents
+   - ✅ **Multi-Format Support** - PDF, DOCX, XLSX, TXT processing
+   - ✅ **Real-time Upload Progress** - Enhanced UX with loading indicators
+   - ✅ **Automatic Cleanup** - Cloud files deleted when documents are removed
+
+4. **Developer Experience**
+   - ✅ **Environment-Based Configuration** - Easy switching between local/cloud storage
+   - ✅ **Comprehensive Error Handling** - Detailed logging and fallback mechanisms
+   - ✅ **Migration Tools** - Scripts to migrate existing documents to cloud storage
+   - ✅ **Connection Testing** - Startup verification of cloud storage connectivity
 
 #### **📁 Complete Folder Organization System**
 1. **Hierarchical Primary Folders**
@@ -418,26 +443,32 @@ tala-ui/
    ```
 
 3. **Set up environment variables**
-   Create `.env` file in the root directory:
+   Create `.env` file in the server directory:
    ```env
-   # Frontend variables
-   VITE_QDRANT_URL=https://your-cluster.qdrant.io:6333
-   VITE_QDRANT_API_KEY=your-qdrant-api-key
-   VITE_OPENAI_API_KEY=sk-your-openai-api-key
+   # OpenAI Configuration
+   OPENAI_API_KEY=sk-your-openai-api-key
    
-   # Backend variables (same values, without VITE_ prefix)
+   # Qdrant Configuration
    QDRANT_URL=https://your-cluster.qdrant.io:6333
    QDRANT_API_KEY=your-qdrant-api-key
-   OPENAI_API_KEY=sk-your-openai-api-key
-   CORS_ORIGIN=http://localhost:5173
-   PORT=3001
    
-   # Storage Configuration (Optional)
-   STORAGE_TYPE=local
-   # For AWS S3 (when implementing cloud storage)
-   # AWS_ACCESS_KEY_ID=your-aws-access-key
-   # AWS_SECRET_ACCESS_KEY=your-aws-secret-key
-   # AWS_S3_BUCKET=tala-ai-documents
+   # Server Configuration
+   PORT=3001
+   CORS_ORIGIN=http://localhost:5173
+   
+   # Storage Configuration
+   STORAGE_TYPE=s3  # Options: local, s3, cloudinary
+   
+   # AWS S3 Configuration (for cloud storage)
+   AWS_ACCESS_KEY_ID=your-aws-access-key
+   AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+   AWS_REGION=us-east-1
+   AWS_S3_BUCKET=your-bucket-name
+   
+   # Cloudinary Configuration (alternative to S3)
+   # CLOUDINARY_CLOUD_NAME=your-cloud-name
+   # CLOUDINARY_API_KEY=your-api-key
+   # CLOUDINARY_API_SECRET=your-api-secret
    ```
 
 4. **Start the backend server**

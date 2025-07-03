@@ -61,7 +61,7 @@ export const TagFilter = ({
     } else {
       onFilterChange(null);
     }
-  }, [selectedTags, selectedCategories, includeMode, onFilterChange]);
+  }, [selectedTags, selectedCategories, includeMode]);
 
   const loadTags = async () => {
     setLoading(true);

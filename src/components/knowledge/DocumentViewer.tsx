@@ -2,7 +2,7 @@ import { X, Download, Share2, FileText, Clock, User, Search, Type, Copy, Check, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../shared/Button';
 import { pdfjs } from 'react-pdf';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import '../../styles/pdf-viewer.css';
 
 // Back to the original working configuration
@@ -48,7 +48,47 @@ export const DocumentViewer = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [showFormatted, setShowFormatted] = useState(true);
   const [showCopySuccess, setShowCopySuccess] = useState(false);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState(false);
   
+  // Fetch signed URL for cloud storage documents
+  useEffect(() => {
+    const fetchSignedUrl = async () => {
+      if (!document?.fileUrl || document.fileType !== 'application/pdf') return;
+      
+      // If it's already a local URL or http URL, use it directly
+      if (!document.fileUrl.startsWith('http') || document.fileUrl.includes('localhost')) {
+        setSignedUrl(document.fileUrl);
+        return;
+      }
+      
+      // For cloud URLs, fetch signed URL
+      setLoadingUrl(true);
+      try {
+        const response = await fetch(
+          `http://localhost:3001/api/documents/${document.id}/url?userId=admin-1&isAdmin=true`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setSignedUrl(data.url);
+        } else {
+          console.error('Failed to fetch signed URL');
+          setSignedUrl(document.fileUrl); // Fallback to original URL
+        }
+      } catch (error) {
+        console.error('Error fetching signed URL:', error);
+        setSignedUrl(document.fileUrl); // Fallback to original URL
+      } finally {
+        setLoadingUrl(false);
+      }
+    };
+
+    if (isOpen && document) {
+      fetchSignedUrl();
+    }
+  }, [isOpen, document?.id, document?.fileUrl]);
+
   if (!document) return null;
 
   const categoryIcons: Record<string, string> = {
@@ -60,8 +100,14 @@ export const DocumentViewer = ({
   };
 
   const isPDF = document.fileType === 'application/pdf' && document.fileUrl;
-  // Ensure the URL is properly encoded
-  const pdfUrl = isPDF ? `http://localhost:3001${document.fileUrl}`.replace(/ /g, '%20') : '';
+  // Use signed URL for cloud storage, construct local URL for local storage
+  const pdfUrl = isPDF ? (
+    signedUrl 
+      ? (signedUrl.startsWith('http') 
+          ? signedUrl 
+          : `http://localhost:3001${signedUrl}`.replace(/ /g, '%20'))
+      : ''
+  ) : '';
   
   console.log('DocumentViewer Debug:', {
     fileType: document.fileType,
@@ -384,21 +430,34 @@ export const DocumentViewer = ({
                 {isPDF ? (
                   <div className="flex flex-col items-center">
                     {/* Try to load PDF, fall back to text if it fails */}
-                    <iframe
-                      src={pdfUrl}
-                      width="100%"
-                      height="600px"
-                      style={{ border: '1px solid #ddd', borderRadius: '8px' }}
-                      title={document.title}
-                      onLoad={() => {
-                        console.log('PDF iframe loaded successfully');
-                        setPdfLoadFailed(false);
-                      }}
-                      onError={() => {
-                        console.error('PDF iframe failed to load');
-                        setPdfLoadFailed(true);
-                      }}
-                    />
+                    {loadingUrl ? (
+                      <div className="flex items-center justify-center h-96 w-full border border-gray-300 rounded-lg">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-600">Loading secure document...</p>
+                        </div>
+                      </div>
+                    ) : pdfUrl ? (
+                      <iframe
+                        src={pdfUrl}
+                        width="100%"
+                        height="600px"
+                        style={{ border: '1px solid #ddd', borderRadius: '8px' }}
+                        title={document.title}
+                        onLoad={() => {
+                          console.log('PDF iframe loaded successfully');
+                          setPdfLoadFailed(false);
+                        }}
+                        onError={() => {
+                          console.error('PDF iframe failed to load');
+                          setPdfLoadFailed(true);
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-96 w-full border border-gray-300 rounded-lg">
+                        <p className="text-sm text-gray-600">Unable to load document</p>
+                      </div>
+                    )}
                     {!pdfLoadFailed && (
                       <p className="text-sm text-gray-600 mt-2">
                         PDF displayed using browser's native viewer

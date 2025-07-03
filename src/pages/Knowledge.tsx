@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Grid, List, AlertCircle, Loader2, FolderPlus, Folder, ArrowLeft, Plus, ChevronDown, ChevronRight, Hash } from 'lucide-react';
 import { Button } from '../components/shared/Button';
@@ -185,7 +185,7 @@ export const Knowledge = () => {
   }, [isInitialized, selectedFolder, selectedPrimaryFolder, searchQuery]);
 
   // Handle tag filtering
-  const handleTagFilterChange = async (filter: TagFilterType | null) => {
+  const handleTagFilterChange = useCallback(async (filter: TagFilterType | null) => {
     setActiveTagFilter(filter);
     
     if (!filter) {
@@ -203,7 +203,7 @@ export const Knowledge = () => {
       console.error('Failed to filter by tags:', error);
       setTagFilteredDocuments([]);
     }
-  };
+  }, []);
 
   // Keyboard shortcuts for bulk operations and search
   useEffect(() => {
@@ -265,7 +265,7 @@ export const Knowledge = () => {
   };
 
   // Handle primary folder selection
-  const handlePrimaryFolderSelect = (primaryFolder: PrimaryFolder) => {
+  const handlePrimaryFolderSelect = useCallback((primaryFolder: PrimaryFolder) => {
     setSelectedPrimaryFolder(primaryFolder);
     setCurrentView('folder-contents');
     setSelectedFolder('all');
@@ -275,10 +275,10 @@ export const Knowledge = () => {
       clearResults();
       setSearchQuery('');
     }
-  };
+  }, [searchQuery, clearResults]);
 
   // Handle back to primary folders
-  const handleBackToPrimaryFolders = () => {
+  const handleBackToPrimaryFolders = useCallback(() => {
     setCurrentView('primary-folders');
     setSelectedPrimaryFolder(null);
     setSelectedFolder('all');
@@ -288,7 +288,7 @@ export const Knowledge = () => {
       clearResults();
       setSearchQuery('');
     }
-  };
+  }, [searchQuery, clearResults]);
 
   // Handle folder change
   const handleFolderChange = async (folderId: string) => {

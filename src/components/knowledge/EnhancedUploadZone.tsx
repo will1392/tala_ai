@@ -57,6 +57,7 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
   
   const { uploadDocument, isInitialized } = useSearchService();
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const uploadStartTimeRef = useRef<number | null>(null);
 
   // Load primary folders on mount
   useEffect(() => {
@@ -115,13 +116,16 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
       'text/plain': ['.txt']
     },
     disabled: !isInitialized,
-    maxSize: 50 * 1024 * 1024, // 50MB limit
+    maxSize: 500 * 1024 * 1024, // 500MB limit (increased from 50MB)
     multiple: true
   });
 
-  // Calculate upload statistics
-  const calculateStats = useCallback(() => {
-    if (fileStatuses.length === 0) return null;
+  // Update stats whenever file statuses change
+  useEffect(() => {
+    if (fileStatuses.length === 0) {
+      setUploadStats(null);
+      return;
+    }
 
     const totalFiles = fileStatuses.length;
     const completedFiles = fileStatuses.filter(f => f.status === 'success').length;
@@ -136,31 +140,35 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
     const uploadingFiles = fileStatuses.filter(f => f.status === 'uploading');
     let estimatedTimeRemaining;
     
-    if (uploadingFiles.length > 0 && uploadStats?.startTime) {
-      const elapsed = Date.now() - uploadStats.startTime;
+    // Set start time when first upload begins
+    if (uploadingFiles.length > 0 && !uploadStartTimeRef.current) {
+      uploadStartTimeRef.current = Date.now();
+    }
+    
+    // Clear start time when all uploads complete
+    if (uploadingFiles.length === 0 && (completedFiles > 0 || failedFiles > 0)) {
+      uploadStartTimeRef.current = null;
+    }
+    
+    if (uploadingFiles.length > 0 && uploadStartTimeRef.current) {
+      const elapsed = Date.now() - uploadStartTimeRef.current;
       const avgSpeed = uploadedSize / elapsed; // bytes per ms
       const remainingSize = totalSize - uploadedSize;
       estimatedTimeRemaining = remainingSize / avgSpeed;
     }
 
-    return {
+    const newStats = {
       totalFiles,
       completedFiles,
       failedFiles,
       totalSize,
       uploadedSize,
-      startTime: uploadStats?.startTime || Date.now(),
+      startTime: uploadStartTimeRef.current || Date.now(),
       estimatedTimeRemaining
     };
-  }, [fileStatuses, uploadStats]);
 
-  // Update stats
-  useEffect(() => {
-    const stats = calculateStats();
-    if (stats) {
-      setUploadStats(stats);
-    }
-  }, [fileStatuses, calculateStats]);
+    setUploadStats(newStats);
+  }, [fileStatuses]);
 
   const removeFile = useCallback((fileId: string) => {
     // Cancel upload if in progress
@@ -322,9 +330,8 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
       }
 
       // Final statistics
-      const finalStats = calculateStats();
-      if (finalStats) {
-        const { completedFiles, failedFiles, totalFiles } = finalStats;
+      if (uploadStats) {
+        const { completedFiles, failedFiles, totalFiles } = uploadStats;
         
         if (completedFiles > 0) {
           toast.success(`🎉 ${completedFiles}/${totalFiles} documents uploaded successfully!`);

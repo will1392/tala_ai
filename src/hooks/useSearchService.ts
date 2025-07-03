@@ -102,7 +102,7 @@ export const useSearchService = (): UseSearchServiceReturn => {
     } finally {
       setIsInitializing(false);
     }
-  }, [isInitialized, isInitializing, serviceInfo.mode]);
+  }, [isInitialized, serviceInfo.mode]);
 
   // Initialize on mount
   useEffect(() => {

@@ -12,6 +12,7 @@ const PDFParse = require('pdf-parse');
 import mammoth from 'mammoth';
 import XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
+import CloudStorageService from './services/cloudStorage.js';
 
 // Load environment variables
 dotenv.config();
@@ -29,6 +30,24 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Initialize cloud storage service
+const cloudStorage = new CloudStorageService();
+
+// Test cloud storage connection on startup
+(async () => {
+  if (process.env.STORAGE_TYPE && process.env.STORAGE_TYPE !== 'local') {
+    try {
+      await cloudStorage.testConnection();
+      console.log(`✅ Cloud storage (${process.env.STORAGE_TYPE}) connection verified`);
+    } catch (error) {
+      console.error(`❌ Cloud storage connection failed:`, error.message);
+      console.error(`⚠️  Falling back to local storage`);
+    }
+  } else {
+    console.log(`📁 Using local storage (uploads directory)`);
+  }
+})();
+
 // Create uploads directory if it doesn't exist
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -44,7 +63,8 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 // Serve uploaded files with proper headers
 app.use('/api/files', (req, res, next) => {
@@ -70,7 +90,7 @@ app.use((req, res, next) => {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 500 * 1024 * 1024, // 500MB limit (increased from 10MB)
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
@@ -154,19 +174,30 @@ async function generateEmbedding(text) {
 }
 
 async function extractTextFromFile(buffer, mimetype, filename) {
+  console.log(`🔍 Extracting text from ${filename} (${mimetype}, ${buffer.length} bytes)`);
+  
   try {
+    let extractedText = '';
+    
     switch (mimetype) {
       case 'application/pdf':
+        console.log(`📄 Processing PDF: ${filename}`);
         const pdfData = await PDFParse(buffer);
-        return pdfData.text;
+        extractedText = pdfData.text;
+        console.log(`✅ PDF text extracted: ${extractedText.length} characters`);
+        break;
         
       case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
       case 'application/msword':
+        console.log(`📝 Processing Word document: ${filename}`);
         const wordResult = await mammoth.extractRawText({ buffer });
-        return wordResult.value;
+        extractedText = wordResult.value;
+        console.log(`✅ Word text extracted: ${extractedText.length} characters`);
+        break;
         
       case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
       case 'application/vnd.ms-excel':
+        console.log(`📊 Processing Excel document: ${filename}`);
         const workbook = XLSX.read(buffer);
         let text = '';
         workbook.SheetNames.forEach(sheetName => {
@@ -174,16 +205,37 @@ async function extractTextFromFile(buffer, mimetype, filename) {
           const csvData = XLSX.utils.sheet_to_csv(sheet);
           text += `Sheet: ${sheetName}\\n${csvData}\\n\\n`;
         });
-        return text;
+        extractedText = text;
+        console.log(`✅ Excel text extracted: ${extractedText.length} characters from ${workbook.SheetNames.length} sheets`);
+        break;
         
       case 'text/plain':
-        return buffer.toString('utf-8');
+        console.log(`📃 Processing text file: ${filename}`);
+        extractedText = buffer.toString('utf-8');
+        console.log(`✅ Text file processed: ${extractedText.length} characters`);
+        break;
         
       default:
+        console.error(`❌ Unsupported file type: ${mimetype} for file: ${filename}`);
         throw new Error(`Unsupported file type: ${mimetype}`);
     }
+    
+    if (!extractedText || extractedText.trim().length === 0) {
+      console.warn(`⚠️ No text content extracted from ${filename}`);
+      throw new Error(`No text content found in ${filename}`);
+    }
+    
+    console.log(`✅ Successfully extracted ${extractedText.length} characters from ${filename}`);
+    return extractedText;
+    
   } catch (error) {
-    console.error(`Error extracting text from ${filename}:`, error);
+    console.error(`❌ Error extracting text from ${filename}:`, error);
+    console.error(`❌ Error details:`, {
+      message: error.message,
+      stack: error.stack?.split('\\n')[0],
+      mimetype,
+      bufferSize: buffer.length
+    });
     throw new Error(`Failed to extract text from ${filename}: ${error.message}`);
   }
 }
@@ -924,29 +976,59 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
     
     // Save original file for PDFs
     let fileUrl = null;
-    console.log(`📁 Uploads directory: ${uploadsDir}`);
+    let storageProvider = process.env.STORAGE_TYPE || 'local';
+    let storageKey = null;
+    console.log(`📁 Storage provider: ${storageProvider}`);
     console.log(`📁 Checking mimetype: "${file.mimetype}" === "application/pdf"? ${file.mimetype === 'application/pdf'}`);
     
     if (file.mimetype === 'application/pdf') {
       const filename = `${documentId}-${file.originalname}`;
-      const filepath = path.join(uploadsDir, filename);
-      console.log(`📁 Saving PDF to: ${filepath}`);
       console.log(`📁 File buffer size: ${file.buffer.length} bytes`);
       
       try {
-        fs.writeFileSync(filepath, file.buffer);
-        console.log(`✅ PDF saved successfully: ${filename}`);
-        fileUrl = `/api/files/${filename}`;
-        
-        // Verify file was saved
-        if (fs.existsSync(filepath)) {
-          const stats = fs.statSync(filepath);
-          console.log(`✅ File verified - size: ${stats.size} bytes`);
+        // Use cloud storage service
+        if (storageProvider !== 'local') {
+          const uploadResult = await cloudStorage.uploadFile(
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+            documentId
+          );
+          console.log(`✅ PDF uploaded to ${storageProvider}: ${uploadResult.url}`);
+          fileUrl = uploadResult.url;
+          storageKey = uploadResult.key; // Use the full S3 key including documents/ prefix
         } else {
-          console.error(`❌ File not found after save: ${filepath}`);
+          // Fallback to local storage
+          const filepath = path.join(uploadsDir, filename);
+          console.log(`📁 Saving PDF locally to: ${filepath}`);
+          fs.writeFileSync(filepath, file.buffer);
+          console.log(`✅ PDF saved locally: ${filename}`);
+          fileUrl = `/api/files/${filename}`;
+          storageKey = null; // No storage key for local files
+          
+          // Verify file was saved
+          if (fs.existsSync(filepath)) {
+            const stats = fs.statSync(filepath);
+            console.log(`✅ File verified - size: ${stats.size} bytes`);
+          } else {
+            console.error(`❌ File not found after save: ${filepath}`);
+          }
         }
       } catch (saveError) {
         console.error(`❌ Failed to save PDF:`, saveError);
+        // Fallback to local storage if cloud fails
+        if (storageProvider !== 'local') {
+          try {
+            const filepath = path.join(uploadsDir, filename);
+            fs.writeFileSync(filepath, file.buffer);
+            fileUrl = `/api/files/${filename}`;
+            storageProvider = 'local';
+            storageKey = null; // No storage key for local fallback
+            console.log(`⚠️ Fell back to local storage due to cloud error`);
+          } catch (localError) {
+            console.error(`❌ Failed to save to local storage as well:`, localError);
+          }
+        }
       }
     } else {
       console.log(`⚠️ File is not a PDF, mimetype: ${file.mimetype}`);
@@ -1005,7 +1087,9 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
               fileSize: file.size,
               userId: userId,
               isAdminDocument: isAdmin === 'true',
-              fileUrl: fileUrl
+              fileUrl: fileUrl,
+              storageProvider: storageProvider,
+              storageKey: storageKey
             }
           }
         });
@@ -1664,7 +1748,10 @@ app.delete('/api/documents/:documentId', async (req, res) => {
           documentInfo = {
             folderId: firstPoint.payload?.metadata?.folderId,
             folderName: firstPoint.payload?.metadata?.folderName,
-            title: firstPoint.payload?.metadata?.title || firstPoint.payload?.document?.originalName
+            title: firstPoint.payload?.metadata?.title || firstPoint.payload?.document?.originalName,
+            fileUrl: firstPoint.payload?.document?.fileUrl,
+            storageProvider: firstPoint.payload?.document?.storageProvider || 'local',
+            storageKey: firstPoint.payload?.document?.storageKey
           };
           
           // Delete all points for this document
@@ -1678,6 +1765,28 @@ app.delete('/api/documents/:documentId', async (req, res) => {
         }
       } catch (error) {
         console.warn(`Failed to delete from collection ${collectionName}:`, error.message);
+      }
+    }
+    
+    // Delete the PDF file from storage if it exists
+    if (documentInfo?.fileUrl) {
+      try {
+        if (documentInfo.storageProvider === 'local') {
+          // Delete from local storage
+          const filename = documentInfo.fileUrl.replace('/api/files/', '');
+          const filepath = path.join(uploadsDir, filename);
+          if (fs.existsSync(filepath)) {
+            fs.unlinkSync(filepath);
+            console.log(`🗑️ Deleted local file: ${filename}`);
+          }
+        } else if (documentInfo.storageKey) {
+          // Delete from cloud storage
+          await cloudStorage.deleteFile(documentInfo.storageKey);
+          console.log(`🗑️ Deleted file from ${documentInfo.storageProvider}: ${documentInfo.storageKey}`);
+        }
+      } catch (fileDeleteError) {
+        console.error(`❌ Failed to delete file from storage:`, fileDeleteError);
+        // Continue even if file deletion fails
       }
     }
     
@@ -1837,6 +1946,99 @@ app.put('/api/documents/:documentId/move', async (req, res) => {
   }
 });
 
+// Get signed URL for secure file access
+app.get('/api/documents/:documentId/url', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { userId, isAdmin = 'false' } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    // Determine collections to search
+    const collectionsToSearch = [];
+    if (isAdmin === 'true') {
+      collectionsToSearch.push('tala_admin_knowledge');
+      const collections = await qdrant.getCollections();
+      collections.collections.forEach(c => {
+        if (c.name.startsWith('tala_user_') && c.name.endsWith('_knowledge')) {
+          collectionsToSearch.push(c.name);
+        }
+      });
+    } else {
+      collectionsToSearch.push('tala_admin_knowledge');
+      collectionsToSearch.push(getCollectionName(userId, false));
+    }
+
+    // Find the document
+    let documentInfo = null;
+    for (const collectionName of collectionsToSearch) {
+      try {
+        const collections = await qdrant.getCollections();
+        const exists = collections.collections.some(c => c.name === collectionName);
+        if (!exists) continue;
+
+        const scrollResult = await qdrant.scroll(collectionName, {
+          filter: {
+            must: [{
+              key: 'documentId',
+              match: { value: documentId }
+            }]
+          },
+          limit: 1,
+          with_payload: true,
+          with_vector: false
+        });
+
+        if (scrollResult.points.length > 0) {
+          const point = scrollResult.points[0];
+          documentInfo = {
+            fileUrl: point.payload?.document?.fileUrl,
+            storageProvider: point.payload?.document?.storageProvider || 'local',
+            storageKey: point.payload?.document?.storageKey,
+            originalName: point.payload?.document?.originalName
+          };
+          break;
+        }
+      } catch (error) {
+        console.warn(`Failed to search collection ${collectionName}:`, error.message);
+      }
+    }
+
+    if (!documentInfo) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Generate appropriate URL
+    let accessUrl = documentInfo.fileUrl;
+
+    if (documentInfo.storageProvider === 's3' && documentInfo.storageKey) {
+      // Generate signed URL for S3
+      try {
+        accessUrl = await cloudStorage.getSignedUrl(documentInfo.storageKey, 3600); // 1 hour expiry
+        console.log(`🔗 Generated signed URL for document ${documentId}`);
+      } catch (error) {
+        console.error(`❌ Failed to generate signed URL for ${documentId}:`, error);
+        return res.status(500).json({ error: 'Failed to generate access URL' });
+      }
+    }
+
+    res.json({
+      url: accessUrl,
+      expiresIn: documentInfo.storageProvider === 's3' ? 3600 : null,
+      storageProvider: documentInfo.storageProvider
+    });
+
+  } catch (error) {
+    console.error('🔗 URL generation error:', error);
+    res.status(500).json({
+      error: 'Failed to generate document URL',
+      details: error.message
+    });
+  }
+});
+
 // Get collections info
 app.get('/api/collections', async (req, res) => {
   try {
@@ -1852,7 +2054,7 @@ app.get('/api/collections', async (req, res) => {
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
+      return res.status(400).json({ error: 'File too large. Maximum size is 500MB.' });
     }
   }
   
