@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ChatService, ChatMessage, Conversation } from '../services/chatService';
+import { ChatService, type ChatMessage, type Conversation } from '../services/chatService';
 
 interface UseChatOptions {
   userId?: string;
@@ -62,7 +62,7 @@ export const useChat = (options: UseChatOptions = {}) => {
     initializeChat();
   }, [initialConversationId]);
 
-  const sendMessage = useCallback(async (content: string, attachments?: File[]) => {
+  const sendMessage = useCallback(async (content: string, _attachments?: File[]) => {
     if (!content.trim()) return;
 
     try {

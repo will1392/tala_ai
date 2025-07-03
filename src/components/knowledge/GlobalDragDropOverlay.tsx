@@ -15,7 +15,7 @@ export const GlobalDragDropOverlay = ({
   acceptedFileTypes = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt']
 }: GlobalDragDropOverlayProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const [dragCounter, setDragCounter] = useState(0);
+  const [_dragCounter, setDragCounter] = useState(0);
   const [hasValidFiles, setHasValidFiles] = useState(true);
 
   const isValidFile = useCallback((file: File) => {

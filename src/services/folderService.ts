@@ -5,6 +5,7 @@ export interface Folder {
   createdAt: string;
   documentCount: number;
   userId: string;
+  primaryFolderId?: string;
 }
 
 export interface CreateFolderRequest {
@@ -12,6 +13,7 @@ export interface CreateFolderRequest {
   description?: string;
   userId: string;
   isAdmin?: boolean;
+  primaryFolderId?: string;
 }
 
 class FolderService {

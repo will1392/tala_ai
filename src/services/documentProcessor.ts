@@ -127,7 +127,7 @@ export class DocumentProcessor {
   /**
    * Extract text from PDF files
    */
-  private async extractPDFText(buffer: ArrayBuffer): Promise<string> {
+  private async extractPDFText(_buffer: ArrayBuffer): Promise<string> {
     // PDF parsing needs to be done server-side or with a browser-compatible library
     // For now, return a placeholder or use a different approach
     console.warn('PDF parsing in browser requires server-side processing or browser-compatible library');

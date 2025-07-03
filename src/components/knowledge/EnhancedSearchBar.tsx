@@ -2,21 +2,13 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, Sparkles, Loader2, Filter, X, Clock, TrendingUp, Folder } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../utils/cn';
-import { SearchSuggestionsService, type SearchSuggestion } from '../../services/searchSuggestions';
+import { SearchSuggestionsService, type SearchSuggestion as ServiceSearchSuggestion } from '../../services/searchSuggestions';
 
 interface SearchFilter {
   id: string;
   label: string;
   value: string;
   type: 'category' | 'fileType' | 'dateRange';
-}
-
-interface SearchSuggestion {
-  id: string;
-  text: string;
-  type: 'recent' | 'popular' | 'folder';
-  icon?: string;
-  metadata?: string;
 }
 
 interface EnhancedSearchBarProps {
@@ -94,7 +86,7 @@ export const EnhancedSearchBar = ({
     setShowDropdown(true);
   }, []);
 
-  const handleSuggestionClick = useCallback((suggestion: SearchSuggestion) => {
+  const handleSuggestionClick = useCallback((suggestion: ServiceSearchSuggestion) => {
     setValue(suggestion.text);
     onSearch(suggestion.text);
     setShowDropdown(false);
@@ -177,7 +169,7 @@ export const EnhancedSearchBar = ({
         <div className="relative group">
           <Search className={cn(
             "absolute left-4 top-1/2 -translate-y-1/2 transition-colors z-10",
-            isSearching ? "text-primary animate-pulse" : "text-white/50 group-focus-within:text-primary"
+            isSearching ? "text-primary animate-pulse drop-shadow-[0_0_8px_rgba(15,198,198,0.6)]" : "text-white/60 group-focus-within:text-primary group-focus-within:drop-shadow-[0_0_4px_rgba(15,198,198,0.4)]"
           )} size={20} />
           
           <input
@@ -187,16 +179,17 @@ export const EnhancedSearchBar = ({
             onChange={handleInputChange}
             onFocus={() => setShowDropdown(true)}
             placeholder={disabled ? "Initializing..." : currentFolder && currentFolder.id !== 'all' 
-              ? `Search in ${currentFolder.name}...` 
-              : "Search documents, visa requirements, airline policies..."
+              ? `Search this folder (${currentFolder.name})...` 
+              : "Search this folder..."
             }
             disabled={disabled}
             className={cn(
               'w-full pl-12 pr-40 py-4 rounded-2xl text-lg transition-all',
               'glass-input',
               'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-secondary-900',
-              'disabled:opacity-50 disabled:cursor-not-allowed',
-              isSearching && 'ring-2 ring-primary/50',
+              'focus:shadow-lg focus:shadow-primary/20',
+              'disabled:opacity-60 disabled:cursor-not-allowed',
+              isSearching && 'ring-2 ring-primary/50 shadow-lg shadow-primary/25',
               showDropdown && 'rounded-b-none border-b-0'
             )}
           />
@@ -232,10 +225,12 @@ export const EnhancedSearchBar = ({
               disabled={disabled || !value.trim() || isSearching}
               className={cn(
                 "px-4 py-2 rounded-xl font-medium",
-                "flex items-center gap-2 transition-all",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
+                "flex items-center gap-2 transition-all duration-300",
+                "disabled:opacity-75 disabled:cursor-not-allowed",
+                "shadow-lg shadow-primary/30 hover:shadow-primary/50 hover:scale-[1.02] border border-primary/20",
+                "brightness-110",
                 isSearching 
-                  ? "bg-primary/80 text-secondary-900" 
+                  ? "bg-primary/90 text-secondary-900 animate-pulse" 
                   : "bg-primary text-secondary-900 hover:bg-primary-dark"
               )}
             >

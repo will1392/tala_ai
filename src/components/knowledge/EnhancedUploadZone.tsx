@@ -3,18 +3,21 @@ import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Upload, FileText, CheckCircle, AlertCircle, Loader2, Folder, 
-  Pause, Play, RotateCcw, Eye, Trash2, AlertTriangle, Clock
+  Pause, Play, RotateCcw, Eye, Trash2, Clock
 } from 'lucide-react';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { useSearchService } from '../../hooks/useSearchService';
 import { type Folder as FolderType } from '../../services/folderService';
+import { primaryFolderService } from '../../services/primaryFolderService';
+import type { PrimaryFolder } from '../../types/primaryFolder';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
 interface UploadZoneProps {
   onClose: () => void;
   folders: FolderType[];
+  primaryFolderId?: string;
   onUploadComplete?: () => void;
 }
 
@@ -40,17 +43,37 @@ interface UploadStats {
   estimatedTimeRemaining?: number;
 }
 
-export const EnhancedUploadZone = ({ onClose, folders, onUploadComplete }: UploadZoneProps) => {
+export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUploadComplete }: UploadZoneProps) => {
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string>('');
+  const [primaryFolders, setPrimaryFolders] = useState<PrimaryFolder[]>([]);
+  const [selectedPrimaryFolder, setSelectedPrimaryFolder] = useState<string>(primaryFolderId || '');
+  const [loadingPrimaryFolders, setLoadingPrimaryFolders] = useState(false);
   const [maxConcurrentUploads, setMaxConcurrentUploads] = useState(3);
   const [uploadStats, setUploadStats] = useState<UploadStats | null>(null);
   const [showUploadDetails, setShowUploadDetails] = useState(false);
   
   const { uploadDocument, isInitialized } = useSearchService();
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
+  // Load primary folders on mount
+  useEffect(() => {
+    const loadPrimaryFolders = async () => {
+      setLoadingPrimaryFolders(true);
+      try {
+        const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+        setPrimaryFolders(primaryFoldersData);
+      } catch (err) {
+        console.warn('Failed to load primary folders:', err);
+      } finally {
+        setLoadingPrimaryFolders(false);
+      }
+    };
+
+    loadPrimaryFolders();
+  }, []);
 
   // Generate unique ID for files
   const generateFileId = () => `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -229,7 +252,7 @@ export const EnhancedUploadZone = ({ onClose, folders, onUploadComplete }: Uploa
       const stopProgress = simulateProgress(id);
       
       try {
-        const result = await uploadDocument(file, selectedFolder || undefined);
+        const result = await uploadDocument(file, selectedFolder || undefined, selectedPrimaryFolder || undefined);
         stopProgress();
         
         // Complete progress and mark as success
@@ -389,12 +412,37 @@ export const EnhancedUploadZone = ({ onClose, folders, onUploadComplete }: Uploa
 
             <div className="flex-1 overflow-y-auto p-6">
               {/* Settings */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {/* Folder Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Primary Folder Selection */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    🗂️ Category
+                  </label>
+                  <select
+                    value={selectedPrimaryFolder}
+                    onChange={(e) => setSelectedPrimaryFolder(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 
+                             focus:border-primary focus:ring-1 focus:ring-primary/20 
+                             text-white transition-all text-sm"
+                    disabled={isUploading || loadingPrimaryFolders}
+                  >
+                    <option value="">Select Category</option>
+                    {primaryFolders.map((folder) => (
+                      <option key={folder.id} value={folder.id} className="bg-gray-800">
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingPrimaryFolders && (
+                    <p className="text-xs text-white/50 mt-1">Loading categories...</p>
+                  )}
+                </div>
+
+                {/* Sub-Folder Selection */}
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     <Folder size={14} className="inline mr-1" />
-                    Destination Folder
+                    Sub-Folder
                   </label>
                   <select
                     value={selectedFolder}
@@ -404,7 +452,7 @@ export const EnhancedUploadZone = ({ onClose, folders, onUploadComplete }: Uploa
                              text-white transition-all text-sm"
                     disabled={isUploading}
                   >
-                    <option value="">Root Folder</option>
+                    <option value="">No Sub-Folder</option>
                     {folders.map((folder) => (
                       <option key={folder.id} value={folder.id} className="bg-gray-800">
                         {folder.name}

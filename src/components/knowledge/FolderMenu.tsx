@@ -4,13 +4,11 @@ import { MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '../shared/Button';
 
 interface FolderMenuProps {
-  folderId: string;
-  folderName: string;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export const FolderMenu = ({ folderId, folderName, onEdit, onDelete }: FolderMenuProps) => {
+export const FolderMenu = ({ onEdit, onDelete }: FolderMenuProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);

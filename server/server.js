@@ -300,7 +300,7 @@ app.get('/api/health', (req, res) => {
 // Create folder
 app.post('/api/folders', async (req, res) => {
   try {
-    const { name, description, userId, isAdmin = false } = req.body;
+    const { name, description, userId, isAdmin = false, primaryFolderId } = req.body;
     
     if (!name || !userId) {
       return res.status(400).json({ error: 'Name and userId are required' });
@@ -314,11 +314,17 @@ app.post('/api/folders', async (req, res) => {
       createdAt: new Date().toISOString(),
       documentCount: 0,
       userId,
-      isAdmin
+      isAdmin,
+      primaryFolderId: primaryFolderId || null
     };
 
     folders.set(folderId, folder);
     saveFolders(folders);
+    
+    // Update primary folder counts if this folder belongs to a primary folder
+    if (primaryFolderId) {
+      updatePrimaryFolderCounts();
+    }
     
     console.log(`📁 Created folder: ${name} (ID: ${folderId})`);
     res.json(folder);
@@ -403,14 +409,460 @@ app.delete('/api/folders/:folderId', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
+    // Store primaryFolderId before deleting
+    const deletedFolderPrimaryId = folder.primaryFolderId;
+    
     folders.delete(folderId);
     saveFolders(folders);
+    
+    // Update primary folder counts if this folder belonged to a primary folder
+    if (deletedFolderPrimaryId) {
+      updatePrimaryFolderCounts();
+    }
     
     console.log(`📁 Deleted folder: ${folder.name} (ID: ${folderId})`);
     res.json({ success: true });
   } catch (error) {
     console.error('📁 Folder deletion error:', error);
     res.status(500).json({ error: 'Failed to delete folder' });
+  }
+});
+
+// Move folder to new parent
+app.put('/api/folders/:folderId/move', async (req, res) => {
+  try {
+    const { folderId } = req.params;
+    const { newParentId, newParentType, userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    if (!newParentId || !newParentType) {
+      return res.status(400).json({ error: 'newParentId and newParentType are required' });
+    }
+    
+    if (!['primary', 'subfolder'].includes(newParentType)) {
+      return res.status(400).json({ error: 'newParentType must be "primary" or "subfolder"' });
+    }
+
+    const folder = folders.get(folderId);
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    if (folder.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Store old primary folder ID for count updates
+    const oldPrimaryFolderId = folder.primaryFolderId;
+    
+    // Validate new parent exists
+    if (newParentType === 'primary') {
+      const primaryFolder = primaryFolders.get(newParentId);
+      if (!primaryFolder) {
+        return res.status(404).json({ error: 'Target primary folder not found' });
+      }
+      
+      // Check if user can create in this primary folder
+      if (!primaryFolder.permissions.canCreate) {
+        return res.status(403).json({ error: 'Cannot create folders in this primary folder' });
+      }
+      
+      // Update folder's primary folder ID
+      folder.primaryFolderId = newParentId;
+    } else if (newParentType === 'subfolder') {
+      const parentFolder = folders.get(newParentId);
+      if (!parentFolder) {
+        return res.status(404).json({ error: 'Target parent folder not found' });
+      }
+      
+      // Prevent circular references
+      if (newParentId === folderId) {
+        return res.status(400).json({ error: 'Cannot move folder into itself' });
+      }
+      
+      // Update folder's primary folder to match parent's primary folder
+      folder.primaryFolderId = parentFolder.primaryFolderId;
+    }
+    
+    folder.updatedAt = new Date().toISOString();
+    folders.set(folderId, folder);
+    saveFolders(folders);
+    
+    // Update primary folder counts for both old and new primary folders
+    updatePrimaryFolderCounts();
+    
+    console.log(`📁 Moved folder: ${folder.name} (ID: ${folderId}) to ${newParentType} ${newParentId}`);
+    res.json(folder);
+  } catch (error) {
+    console.error('📁 Folder move error:', error);
+    res.status(500).json({ error: 'Failed to move folder' });
+  }
+});
+
+// Primary Folder Management System
+const primaryFoldersFilePath = path.join(__dirname, 'primaryFolders.json');
+
+// Default primary folders configuration
+const DEFAULT_PRIMARY_FOLDERS = [
+  {
+    slug: 'destinations',
+    name: 'Destinations',
+    description: 'Travel destination guides, requirements, and information',
+    icon: 'MapPin',
+    color: '#10b981',
+    order: 1,
+    permissions: {
+      visibility: 'public',
+      canCreate: true,
+      canUpload: true,
+      canEdit: false
+    },
+    isSystem: true
+  },
+  {
+    slug: 'suppliers',
+    name: 'Suppliers',
+    description: 'Hotel, airline, and service provider information',
+    icon: 'Building',
+    color: '#3b82f6',
+    order: 2,
+    permissions: {
+      visibility: 'public',
+      canCreate: true,
+      canUpload: true,
+      canEdit: false
+    },
+    isSystem: true
+  },
+  {
+    slug: 'policies-regulations',
+    name: 'Policies & Regulations',
+    description: 'Travel policies, visa requirements, and regulatory information',
+    icon: 'FileText',
+    color: '#f59e0b',
+    order: 3,
+    permissions: {
+      visibility: 'public',
+      canCreate: true,
+      canUpload: true,
+      canEdit: false
+    },
+    isSystem: true
+  },
+  {
+    slug: 'marketing-materials',
+    name: 'Marketing Materials',
+    description: 'Brochures, promotional content, and marketing assets',
+    icon: 'Megaphone',
+    color: '#ec4899',
+    order: 4,
+    permissions: {
+      visibility: 'admin-only',
+      canCreate: true,
+      canUpload: true,
+      canEdit: false
+    },
+    isSystem: true
+  },
+  {
+    slug: 'miscellaneous',
+    name: 'Miscellaneous',
+    description: 'Other documents and files that don\'t fit into specific categories',
+    icon: 'Archive',
+    color: '#6b7280',
+    order: 5,
+    permissions: {
+      visibility: 'public',
+      canCreate: true,
+      canUpload: true,
+      canEdit: false
+    },
+    isSystem: true
+  }
+];
+
+// Load primary folders from file
+function loadPrimaryFolders() {
+  try {
+    if (fs.existsSync(primaryFoldersFilePath)) {
+      const data = fs.readFileSync(primaryFoldersFilePath, 'utf8');
+      const primaryFoldersArray = JSON.parse(data);
+      const primaryFoldersMap = new Map();
+      primaryFoldersArray.forEach(folder => primaryFoldersMap.set(folder.id, folder));
+      console.log(`🗂️ Loaded ${primaryFoldersArray.length} primary folders from storage`);
+      return primaryFoldersMap;
+    }
+  } catch (error) {
+    console.warn('Failed to load primary folders:', error);
+  }
+  return new Map();
+}
+
+// Save primary folders to file
+function savePrimaryFolders(primaryFoldersMap) {
+  try {
+    const primaryFoldersArray = Array.from(primaryFoldersMap.values());
+    fs.writeFileSync(primaryFoldersFilePath, JSON.stringify(primaryFoldersArray, null, 2));
+    console.log(`🗂️ Saved ${primaryFoldersArray.length} primary folders to storage`);
+  } catch (error) {
+    console.error('Failed to save primary folders:', error);
+  }
+}
+
+// Update primary folder counts
+function updatePrimaryFolderCounts() {
+  for (const [primaryFolderId, primaryFolder] of primaryFolders.entries()) {
+    const subFolders = Array.from(folders.values()).filter(f => f.primaryFolderId === primaryFolderId);
+    primaryFolder.subFolderCount = subFolders.length;
+    primaryFolder.updatedAt = new Date().toISOString();
+  }
+  savePrimaryFolders(primaryFolders);
+}
+
+// Initialize primary folders from persistent storage
+const primaryFolders = loadPrimaryFolders();
+
+// Initialize default primary folders if none exist
+if (primaryFolders.size === 0) {
+  console.log('🗂️ No primary folders found, creating default folders...');
+  const adminUserId = 'admin-1'; // Default admin user
+  
+  DEFAULT_PRIMARY_FOLDERS.forEach((folderConfig, index) => {
+    const primaryFolderId = uuidv4();
+    const primaryFolder = {
+      id: primaryFolderId,
+      ...folderConfig,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      userId: adminUserId,
+      subFolderCount: 0,
+      documentCount: 0,
+      totalSize: 0
+    };
+    
+    primaryFolders.set(primaryFolderId, primaryFolder);
+  });
+  
+  savePrimaryFolders(primaryFolders);
+  console.log(`🗂️ Created ${DEFAULT_PRIMARY_FOLDERS.length} default primary folders`);
+}
+
+// Update primary folder counts on startup
+updatePrimaryFolderCounts();
+
+// Primary Folder API Routes
+
+// Get all primary folders
+app.get('/api/primary-folders', async (req, res) => {
+  try {
+    const { userId, isAdmin = 'false' } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const userIsAdmin = isAdmin === 'true';
+    const primaryFoldersArray = Array.from(primaryFolders.values())
+      .filter(folder => {
+        // Filter based on permissions
+        if (folder.permissions.visibility === 'public') return true;
+        if (folder.permissions.visibility === 'admin-only') return userIsAdmin;
+        // For role-based, we'll implement proper role checking later
+        return true;
+      })
+      .map(folder => {
+        // Calculate real-time counts
+        const subFolders = Array.from(folders.values()).filter(f => f.primaryFolderId === folder.id);
+        const subFolderCount = subFolders.length;
+        
+        // For document count, we'd need to scan all documents, but for now let's set it to 0
+        // This would require scanning all Qdrant collections which is expensive
+        const documentCount = 0; // TODO: Calculate actual document count
+        
+        return {
+          ...folder,
+          subFolderCount,
+          documentCount
+        };
+      })
+      .sort((a, b) => a.order - b.order);
+
+    res.json(primaryFoldersArray);
+  } catch (error) {
+    console.error('🗂️ Primary folder fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch primary folders' });
+  }
+});
+
+// Create primary folder (admin only)
+app.post('/api/primary-folders', async (req, res) => {
+  try {
+    const { slug, name, description, icon, color, order, permissions, userId } = req.body;
+    
+    if (!slug || !name || !userId) {
+      return res.status(400).json({ error: 'Slug, name, and userId are required' });
+    }
+
+    // Check if slug already exists
+    const existingFolder = Array.from(primaryFolders.values()).find(f => f.slug === slug);
+    if (existingFolder) {
+      return res.status(400).json({ error: 'A primary folder with this slug already exists' });
+    }
+
+    const primaryFolderId = uuidv4();
+    const primaryFolder = {
+      id: primaryFolderId,
+      slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      name: name.trim(),
+      description: description?.trim(),
+      icon: icon || 'Folder',
+      color: color || '#6b7280',
+      order: order || Array.from(primaryFolders.values()).length + 1,
+      permissions: {
+        visibility: 'public',
+        canCreate: true,
+        canUpload: true,
+        canEdit: false,
+        ...permissions
+      },
+      isSystem: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      userId,
+      subFolderCount: 0,
+      documentCount: 0,
+      totalSize: 0
+    };
+
+    primaryFolders.set(primaryFolderId, primaryFolder);
+    savePrimaryFolders(primaryFolders);
+    
+    console.log(`🗂️ Created primary folder: ${name} (ID: ${primaryFolderId})`);
+    res.json(primaryFolder);
+  } catch (error) {
+    console.error('🗂️ Primary folder creation error:', error);
+    res.status(500).json({ error: 'Failed to create primary folder' });
+  }
+});
+
+// Update primary folder
+app.put('/api/primary-folders/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { slug, name, description, icon, color, order, permissions, userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const primaryFolder = primaryFolders.get(id);
+    if (!primaryFolder) {
+      return res.status(404).json({ error: 'Primary folder not found' });
+    }
+
+    // System folders can only be updated by their creator or admin
+    if (primaryFolder.isSystem && primaryFolder.userId !== userId) {
+      return res.status(403).json({ error: 'Cannot edit system primary folder' });
+    }
+
+    // Check slug uniqueness if it's being changed
+    if (slug && slug !== primaryFolder.slug) {
+      const existingFolder = Array.from(primaryFolders.values()).find(f => f.slug === slug && f.id !== id);
+      if (existingFolder) {
+        return res.status(400).json({ error: 'A primary folder with this slug already exists' });
+      }
+    }
+
+    const updatedFolder = {
+      ...primaryFolder,
+      ...(slug && { slug: slug.toLowerCase().replace(/[^a-z0-9-]/g, '-') }),
+      ...(name && { name: name.trim() }),
+      ...(description !== undefined && { description: description?.trim() }),
+      ...(icon && { icon }),
+      ...(color && { color }),
+      ...(order !== undefined && { order }),
+      ...(permissions && { permissions: { ...primaryFolder.permissions, ...permissions } }),
+      updatedAt: new Date().toISOString()
+    };
+
+    primaryFolders.set(id, updatedFolder);
+    savePrimaryFolders(primaryFolders);
+    
+    console.log(`🗂️ Updated primary folder: ${updatedFolder.name} (ID: ${id})`);
+    res.json(updatedFolder);
+  } catch (error) {
+    console.error('🗂️ Primary folder update error:', error);
+    res.status(500).json({ error: 'Failed to update primary folder' });
+  }
+});
+
+// Delete primary folder
+app.delete('/api/primary-folders/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const primaryFolder = primaryFolders.get(id);
+    if (!primaryFolder) {
+      return res.status(404).json({ error: 'Primary folder not found' });
+    }
+
+    // Cannot delete system folders
+    if (primaryFolder.isSystem) {
+      return res.status(403).json({ error: 'Cannot delete system primary folder' });
+    }
+
+    // Only creator can delete
+    if (primaryFolder.userId !== userId) {
+      return res.status(403).json({ error: 'Unauthorized to delete this primary folder' });
+    }
+
+    primaryFolders.delete(id);
+    savePrimaryFolders(primaryFolders);
+    
+    console.log(`🗂️ Deleted primary folder: ${primaryFolder.name} (ID: ${id})`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('🗂️ Primary folder deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete primary folder' });
+  }
+});
+
+// Get folder hierarchy (primary folder with its sub-folders)
+app.get('/api/primary-folders/:id/hierarchy', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, isAdmin = 'false' } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const primaryFolder = primaryFolders.get(id);
+    if (!primaryFolder) {
+      return res.status(404).json({ error: 'Primary folder not found' });
+    }
+
+    // Get all sub-folders for this primary folder
+    const subFolders = Array.from(folders.values()).filter(folder => {
+      // This will need to be updated when we add primaryFolderId to regular folders
+      return folder.primaryFolderId === id;
+    });
+
+    res.json({
+      primaryFolder,
+      subFolders
+    });
+  } catch (error) {
+    console.error('🗂️ Folder hierarchy error:', error);
+    res.status(500).json({ error: 'Failed to fetch folder hierarchy' });
   }
 });
 
@@ -421,17 +873,38 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { userId, isAdmin = 'false', folderId } = req.body;
+    const { userId, isAdmin = 'false', folderId, primaryFolderId } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    console.log(`📄 Processing upload for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}`);
+    console.log(`📄 Processing upload for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}, primaryFolder: ${primaryFolderId || 'none'}`);
     
+    // Validate primary folder if provided
+    let primaryFolder = null;
+    if (primaryFolderId) {
+      primaryFolder = primaryFolders.get(primaryFolderId);
+      console.log(`🗂️ Primary folder details:`, primaryFolder ? { id: primaryFolder.id, name: primaryFolder.name } : 'Primary folder not found');
+      
+      if (!primaryFolder) {
+        return res.status(400).json({ error: 'Primary folder not found' });
+      }
+      
+      // Check upload permissions
+      if (!primaryFolder.permissions.canUpload) {
+        return res.status(403).json({ error: 'Upload not allowed in this primary folder' });
+      }
+    }
+    
+    // Validate sub-folder if provided
     if (folderId) {
       const folder = folders.get(folderId);
-      console.log(`📁 Folder details:`, folder ? { id: folder.id, name: folder.name } : 'Folder not found');
+      console.log(`📁 Sub-folder details:`, folder ? { id: folder.id, name: folder.name } : 'Sub-folder not found');
+      
+      if (!folder) {
+        return res.status(400).json({ error: 'Sub-folder not found' });
+      }
     }
     
     const file = req.file;
@@ -515,12 +988,15 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
             content: chunk.content,
             metadata: {
               title: file.originalname,
-              category: 'general', // Could be enhanced with classification
+              category: primaryFolder?.slug || 'general',
               chunkIndex: chunk.metadata.chunkIndex,
               wordCount: chunk.metadata.wordCount,
               headings: [], // Could be enhanced with heading extraction
               folderId: folderId || null,
-              folderName: folderId ? folders.get(folderId)?.name : null
+              folderName: folderId ? folders.get(folderId)?.name : null,
+              primaryFolderId: primaryFolderId || null,
+              primaryFolderName: primaryFolder?.name || null,
+              primaryFolderSlug: primaryFolder?.slug || null
             },
             document: {
               originalName: file.originalname,
@@ -542,12 +1018,21 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       points: points
     });
     
-    // Update folder document count
+    // Update folder document counts
     if (folderId && folders.has(folderId)) {
       const folder = folders.get(folderId);
       folder.documentCount += 1;
       folders.set(folderId, folder);
       saveFolders(folders);
+    }
+    
+    // Update primary folder document count
+    if (primaryFolderId && primaryFolders.has(primaryFolderId)) {
+      const primaryFolderToUpdate = primaryFolders.get(primaryFolderId);
+      primaryFolderToUpdate.documentCount += 1;
+      primaryFolderToUpdate.updatedAt = new Date().toISOString();
+      primaryFolders.set(primaryFolderId, primaryFolderToUpdate);
+      savePrimaryFolders(primaryFolders);
     }
 
     console.log(`✅ Stored ${points.length} vectors for document: ${file.originalname}`);
@@ -558,7 +1043,9 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       filename: file.originalname,
       collectionName,
       isAdminDocument: isAdmin === 'true',
-      folderId: folderId || null
+      folderId: folderId || null,
+      primaryFolderId: primaryFolderId || null,
+      primaryFolderName: primaryFolder?.name || null
     });
     
   } catch (error) {
@@ -817,7 +1304,7 @@ app.delete('/api/chat/conversations/:conversationId', async (req, res) => {
 // Search documents
 app.post('/api/documents/search', async (req, res) => {
   try {
-    const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.2, folderId, category, fileType } = req.body;
+    const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.2, folderId, primaryFolderId, category, fileType } = req.body;
     
     if (!query || !userId) {
       return res.status(400).json({ error: 'Query and userId are required' });
@@ -827,6 +1314,7 @@ app.post('/api/documents/search', async (req, res) => {
       query: query.substring(0, 50),
       userId: userId.substring(0, 8),
       folderId,
+      primaryFolderId,
       category,
       fileType,
       limit
@@ -861,7 +1349,15 @@ app.post('/api/documents/search', async (req, res) => {
         // Build search filters
         const searchFilter = { must: [] };
         
-        // Filter by folder
+        // Filter by primary folder
+        if (primaryFolderId && primaryFolderId !== 'all') {
+          searchFilter.must.push({
+            key: 'metadata.primaryFolderId',
+            match: { value: primaryFolderId }
+          });
+        }
+        
+        // Filter by sub-folder
         if (folderId && folderId !== 'all') {
           searchFilter.must.push({
             key: 'metadata.folderId',
@@ -938,13 +1434,13 @@ app.post('/api/documents/search', async (req, res) => {
 // Get all documents
 app.get('/api/documents', async (req, res) => {
   try {
-    const { userId, isAdmin = 'false', folderId, limit = 50, offset = 0 } = req.query;
+    const { userId, isAdmin = 'false', folderId, primaryFolderId, limit = 50, offset = 0 } = req.query;
     
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
     
-    console.log(`📄 Getting documents for user ${userId} (admin: ${isAdmin}), folder: ${folderId || 'all'}, limit: ${limit}`);
+    console.log(`📄 Getting documents for user ${userId} (admin: ${isAdmin}), folder: ${folderId || 'all'}, primaryFolder: ${primaryFolderId || 'all'}, limit: ${limit}`);
     
     // Determine collections to search
     const collectionsToSearch = [];
@@ -987,15 +1483,28 @@ app.get('/api/documents', async (req, res) => {
           };
           
           // Add filter only if we're filtering by folder
+          // Build filter conditions
+          const filterConditions = [];
+          
           if (folderId && folderId !== 'all') {
-            // Try without nested path first
+            filterConditions.push({
+              key: 'folderId',
+              match: { value: folderId }
+            });
+          }
+          
+          if (primaryFolderId && primaryFolderId !== 'all') {
+            filterConditions.push({
+              key: 'primaryFolderId',
+              match: { value: primaryFolderId }
+            });
+          }
+          
+          if (filterConditions.length > 0) {
             scrollRequest.filter = {
-              must: [{
-                key: 'folderId',
-                match: { value: folderId }
-              }]
+              must: filterConditions
             };
-            console.log(`📄 Filtering by folder: ${folderId}`);
+            console.log(`📄 Filtering by conditions:`, filterConditions);
           }
           
           let scrollResult;
@@ -1018,17 +1527,26 @@ app.get('/api/documents', async (req, res) => {
           scrollResult.points.forEach(point => {
             const docId = point.payload.documentId;
             const pointFolderId = point.payload.metadata?.folderId;
+            const pointPrimaryFolderId = point.payload.metadata?.primaryFolderId;
             
             console.log(`📄 Point folder info:`, {
               docId: docId.substring(0, 8),
               pointFolderId,
+              pointPrimaryFolderId,
               requestedFolderId: folderId,
+              requestedPrimaryFolderId: primaryFolderId,
               title: point.payload.metadata?.title || point.payload.document?.originalName
             });
             
             // Filter out documents that don't match the folder when folder is specified
             if (folderId && folderId !== 'all' && pointFolderId !== folderId) {
               console.log(`📄 Skipping document - folder mismatch`);
+              return;
+            }
+            
+            // Filter out documents that don't match the primary folder when primary folder is specified
+            if (primaryFolderId && primaryFolderId !== 'all' && pointPrimaryFolderId !== primaryFolderId) {
+              console.log(`📄 Skipping document - primary folder mismatch`);
               return;
             }
             
@@ -1045,6 +1563,7 @@ app.get('/api/documents', async (req, res) => {
                 fileUrl: point.payload.document?.fileUrl || null,
                 folderId: point.payload.metadata?.folderId || null,
                 folderName: point.payload.metadata?.folderName || null,
+                primaryFolderId: point.payload.metadata?.primaryFolderId || null,
                 collectionName,
                 chunkCount: 1,
                 excerpt: point.payload.content ? point.payload.content.substring(0, 200) + '...' : ''
@@ -1196,13 +1715,13 @@ app.delete('/api/documents/:documentId', async (req, res) => {
 app.put('/api/documents/:documentId/move', async (req, res) => {
   try {
     const { documentId } = req.params;
-    const { userId, isAdmin = 'false', folderId } = req.body;
+    const { userId, isAdmin = 'false', folderId, primaryFolderId } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
     
-    console.log(`📁 Moving document: ${documentId} to folder: ${folderId || 'root'} for user ${userId}`);
+    console.log(`📁 Moving document: ${documentId} to folder: ${folderId || 'root'}, primaryFolder: ${primaryFolderId || 'none'} for user ${userId}`);
     
     // Determine collections to search
     const collectionsToSearch = [];
@@ -1261,7 +1780,8 @@ app.put('/api/documents/:documentId/move', async (req, res) => {
             metadata: {
               ...scrollResult.points[0].payload.metadata,
               folderId: folderId || null,
-              folderName: folderId ? folders.get(folderId)?.name : null
+              folderName: folderId ? folders.get(folderId)?.name : null,
+              primaryFolderId: primaryFolderId || null
             }
           };
           

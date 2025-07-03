@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion';
 import { Search, Clock, Folder, Tag, FileText, X } from 'lucide-react';
-import { cn } from '../../utils/cn';
 
 interface SearchResultsSummaryProps {
   query: string;

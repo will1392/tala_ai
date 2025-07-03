@@ -5,17 +5,15 @@ import { Button } from '../shared/Button';
 
 interface DocumentMenuProps {
   documentId: string;
-  documentTitle: string;
+  documentTitle?: string;
   currentFolderId?: string;
-  onDelete: () => void;
-  onMove: () => void;
+  onDelete?: (documentId: string) => void;
+  onMove?: (documentId: string) => void;
   onEdit?: () => void;
 }
 
 export const DocumentMenu = ({ 
   documentId, 
-  documentTitle, 
-  currentFolderId,
   onDelete, 
   onMove,
   onEdit 
@@ -58,13 +56,13 @@ export const DocumentMenu = ({
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsOpen(false);
-    onDelete();
+    onDelete?.(documentId);
   };
 
   const handleMove = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsOpen(false);
-    onMove();
+    onMove?.(documentId);
   };
 
   const handleEdit = (e: React.MouseEvent) => {

@@ -1,8 +1,7 @@
-import { X, Download, Share2, FileText, Clock, User, Search, Type, Hash, Copy, Check } from 'lucide-react';
+import { X, Download, Share2, FileText, Clock, User, Search, Type, Copy, Check, ArrowLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../shared/Button';
-import { GlassCard } from '../layout/GlassCard';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { pdfjs } from 'react-pdf';
 import { useState } from 'react';
 import '../../styles/pdf-viewer.css';
 
@@ -23,6 +22,10 @@ interface DocumentViewerProps {
     fileUrl?: string;
     fileType?: string;
   } | null;
+  currentPrimaryFolder?: string;
+  currentSubFolder?: string;
+  onNavigateToCategories?: () => void;
+  onNavigateToPrimaryFolder?: () => void;
 }
 
 interface TextStructure {
@@ -32,9 +35,15 @@ interface TextStructure {
   items?: string[];
 }
 
-export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProps) => {
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
+export const DocumentViewer = ({ 
+  isOpen, 
+  onClose, 
+  document, 
+  currentPrimaryFolder,
+  currentSubFolder,
+  onNavigateToCategories,
+  onNavigateToPrimaryFolder 
+}: DocumentViewerProps) => {
   const [pdfLoadFailed, setPdfLoadFailed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFormatted, setShowFormatted] = useState(true);
@@ -61,21 +70,6 @@ export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProp
     isPDF: isPDF,
     title: document.title
   });
-  
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    console.log('PDF loaded successfully:', numPages, 'pages');
-    setNumPages(numPages);
-  };
-
-  const onDocumentLoadError = (error: Error) => {
-    console.error('PDF load error:', error);
-    console.error('PDF load error details:', {
-      message: error.message,
-      stack: error.stack,
-      url: pdfUrl
-    });
-    setPdfLoadFailed(true);
-  };
 
   // Enhanced text processing for better structure and readability
   const processTextContent = (content: string): TextStructure[] => {
@@ -139,7 +133,7 @@ export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProp
     if (!searchTerm.trim()) return text;
     
     const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.split(regex).map((part, index) => 
+    return text.split(regex).map((part) => 
       regex.test(part) ? 
         `<mark class="bg-yellow-300/30 text-yellow-900 px-1 rounded">${part}</mark>` : 
         part
@@ -181,6 +175,47 @@ export const DocumentViewer = ({ isOpen, onClose, document }: DocumentViewerProp
                     <span className="text-2xl">{categoryIcons[document.category] || '📄'}</span>
                   </div>
                   <div>
+                    {/* Breadcrumb Navigation */}
+                    {(currentPrimaryFolder || currentSubFolder) && (
+                      <div className="flex items-center gap-1 mb-2 text-sm text-gray-500">
+                        {onNavigateToCategories && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToCategories();
+                                onClose();
+                              }}
+                              className="flex items-center gap-1 hover:text-blue-600 transition-colors"
+                            >
+                              <ArrowLeft size={14} />
+                              Categories
+                            </button>
+                            <ChevronRight size={12} />
+                          </>
+                        )}
+                        {currentPrimaryFolder && (
+                          <>
+                            {onNavigateToPrimaryFolder ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onNavigateToPrimaryFolder();
+                                  onClose();
+                                }}
+                                className="hover:text-blue-600 transition-colors"
+                              >
+                                {currentPrimaryFolder}
+                              </button>
+                            ) : (
+                              <span>{currentPrimaryFolder}</span>
+                            )}
+                            {currentSubFolder && <ChevronRight size={12} />}
+                          </>
+                        )}
+                        {currentSubFolder && <span>{currentSubFolder}</span>}
+                      </div>
+                    )}
                     <h2 className="text-2xl font-bold mb-2 text-gray-900">{document.title}</h2>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span className="flex items-center gap-1">

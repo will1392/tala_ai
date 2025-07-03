@@ -39,7 +39,7 @@ export class ApiSearchService implements ISearchService {
   /**
    * Upload and process a document
    */
-  async uploadDocument(file: File, userId?: string, isAdmin: boolean = false, folderId?: string): Promise<{ documentId: string; chunksStored: number }> {
+  async uploadDocument(file: File, userId?: string, isAdmin: boolean = false, folderId?: string, primaryFolderId?: string): Promise<{ documentId: string; chunksStored: number }> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -52,8 +52,11 @@ export class ApiSearchService implements ISearchService {
       if (folderId) {
         formData.append('folderId', folderId);
       }
+      if (primaryFolderId) {
+        formData.append('primaryFolderId', primaryFolderId);
+      }
 
-      console.log(`📄 Uploading document: ${file.name} for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}`);
+      console.log(`📄 Uploading document: ${file.name} for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}, primaryFolder: ${primaryFolderId || 'none'}`);
 
       const response = await fetch(`${this.baseUrl}/documents/upload`, {
         method: 'POST',
@@ -100,6 +103,7 @@ export class ApiSearchService implements ISearchService {
           isAdmin,
           limit,
           folderId: filters?.folderId,
+          primaryFolderId: filters?.primaryFolderId,
           category: filters?.category,
           fileType: filters?.fileType,
           scoreThreshold: 0.2
@@ -191,13 +195,13 @@ export class ApiSearchService implements ISearchService {
   /**
    * Get all documents with optional folder filtering
    */
-  async getDocuments(userId?: string, isAdmin: boolean = false, folderId?: string, limit: number = 50, offset: number = 0): Promise<any> {
+  async getDocuments(userId?: string, isAdmin: boolean = false, folderId?: string, limit: number = 50, offset: number = 0, primaryFolderId?: string): Promise<any> {
     if (!this.initialized) {
       await this.initialize();
     }
 
     try {
-      console.log(`📄 Getting documents for user ${userId} (admin: ${isAdmin}), folder: ${folderId || 'all'}`);
+      console.log(`📄 Getting documents for user ${userId} (admin: ${isAdmin}), folder: ${folderId || 'all'}, primaryFolder: ${primaryFolderId || 'all'}`);
 
       const params = new URLSearchParams({
         userId: userId || 'default-user',
@@ -208,6 +212,10 @@ export class ApiSearchService implements ISearchService {
 
       if (folderId && folderId !== 'all') {
         params.append('folderId', folderId);
+      }
+
+      if (primaryFolderId) {
+        params.append('primaryFolderId', primaryFolderId);
       }
 
       const response = await fetch(`${this.baseUrl}/documents?${params.toString()}`, {

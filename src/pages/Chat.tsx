@@ -16,15 +16,6 @@ interface Conversation {
   createdAt: string;
 }
 
-interface ChatMessageType {
-  id: string;
-  content: string;
-  sender: 'user' | 'tala';
-  timestamp: string;
-  sources?: Array<{ title: string; type: string; score?: number }>;
-  conversationId?: string;
-  tokensUsed?: number;
-}
 
 // Simple chat service with conversation support
 const chatService = {

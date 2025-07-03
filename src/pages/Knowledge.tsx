@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Upload, Filter, Grid, List, AlertCircle, Loader2, FolderPlus, Folder } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Upload, Grid, List, AlertCircle, Loader2, FolderPlus, Folder, ArrowLeft, Plus, ChevronDown, ChevronRight, Hash } from 'lucide-react';
 import { Button } from '../components/shared/Button';
-import { EnhancedSearchBar } from '../components/knowledge/EnhancedSearchBar';
 import { SearchResultsSummary } from '../components/knowledge/SearchResultsSummary';
-import { DocumentCard } from '../components/knowledge/DocumentCard';
 import { SelectableDocumentCard } from '../components/knowledge/SelectableDocumentCard';
 import { BulkActionsToolbar } from '../components/knowledge/BulkActionsToolbar';
 import { BulkMoveModal } from '../components/knowledge/BulkMoveModal';
-import { UploadZone } from '../components/knowledge/UploadZone';
 import { EnhancedUploadZone } from '../components/knowledge/EnhancedUploadZone';
 import { GlobalDragDropOverlay } from '../components/knowledge/GlobalDragDropOverlay';
 import { FloatingUploadProgress } from '../components/knowledge/FloatingUploadProgress';
@@ -16,32 +13,64 @@ import { DocumentViewer } from '../components/knowledge/DocumentViewer';
 import { CreateFolderModal } from '../components/knowledge/CreateFolderModal';
 import { EditFolderModal } from '../components/knowledge/EditFolderModal';
 import { DeleteFolderModal } from '../components/knowledge/DeleteFolderModal';
-import { FolderMenu } from '../components/knowledge/FolderMenu';
+import { FolderTree } from '../components/knowledge/FolderTree';
+import { ComprehensiveSearchInterface } from '../components/knowledge/ComprehensiveSearchInterface';
+import { QuickSearchShortcut } from '../components/knowledge/QuickSearchShortcut';
 import { DeleteDocumentModal } from '../components/knowledge/DeleteDocumentModal';
 import { MoveDocumentModal } from '../components/knowledge/MoveDocumentModal';
+import { PrimaryFolderCard } from '../components/knowledge/PrimaryFolderCard';
+import { CreatePrimaryFolderModal } from '../components/knowledge/CreatePrimaryFolderModal';
+import { EditPrimaryFolderModal } from '../components/knowledge/EditPrimaryFolderModal';
+import { DeletePrimaryFolderModal } from '../components/knowledge/DeletePrimaryFolderModal';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
+import { TagManager } from '../components/knowledge/TagManager';
+import { TagFilter } from '../components/knowledge/TagFilter';
 import { useSearchService } from '../hooks/useSearchService';
 import { folderService, type Folder as FolderType } from '../services/folderService';
+import { primaryFolderService } from '../services/primaryFolderService';
 import { ApiSearchService } from '../services/apiSearchService';
+import { tagService } from '../services/tagService';
+import type { PrimaryFolder } from '../types/primaryFolder';
+import type { TagFilter as TagFilterType } from '../types/tags';
 import { cn } from '../utils/cn';
 
 export const Knowledge = () => {
+  // Navigation state
+  const [currentView, setCurrentView] = useState<'primary-folders' | 'folder-contents'>('primary-folders');
+  const [selectedPrimaryFolder, setSelectedPrimaryFolder] = useState<PrimaryFolder | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // UI state
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  
+  // Primary folders state
+  const [primaryFolders, setPrimaryFolders] = useState<PrimaryFolder[]>([]);
+  const [loadingPrimaryFolders, setLoadingPrimaryFolders] = useState(false);
+  
+  // Sub-folders state
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
+  
+  // Documents state
   const [allDocuments, setAllDocuments] = useState<any[]>([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Modal state
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<FolderType | null>(null);
   const [deletingDocument, setDeletingDocument] = useState<{id: string, title: string} | null>(null);
   const [movingDocument, setMovingDocument] = useState<{id: string, title: string, folderId?: string} | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  
+  // Primary folder modals state
+  const [showCreatePrimaryFolder, setShowCreatePrimaryFolder] = useState(false);
+  const [editingPrimaryFolder, setEditingPrimaryFolder] = useState<PrimaryFolder | null>(null);
+  const [deletingPrimaryFolder, setDeletingPrimaryFolder] = useState<PrimaryFolder | null>(null);
   
   // Bulk operations state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -56,7 +85,17 @@ export const Knowledge = () => {
     status: 'uploading' | 'completed' | 'error' | 'paused';
     error?: string;
   }>>([]);
-  const [isBackgroundUploading, setIsBackgroundUploading] = useState(false);
+  
+  // Folder structure collapsible state
+  const [isFolderStructureExpanded, setIsFolderStructureExpanded] = useState(false);
+  
+  // Comprehensive search state
+  const [showComprehensiveSearch, setShowComprehensiveSearch] = useState(false);
+  
+  // Tag management state
+  const [showTagManager, setShowTagManager] = useState(false);
+  const [activeTagFilter, setActiveTagFilter] = useState<TagFilterType | null>(null);
+  const [tagFilteredDocuments, setTagFilteredDocuments] = useState<any[]>([]);
 
   const {
     searchResults,
@@ -66,7 +105,6 @@ export const Knowledge = () => {
     serviceInfo,
     search,
     clearResults,
-    getStatistics,
     error,
     clearError,
     totalResults,
@@ -76,15 +114,39 @@ export const Knowledge = () => {
   // Create API service instance
   const apiService = new ApiSearchService();
 
-  // Load folders on mount
+  // Load primary folders on mount
+  useEffect(() => {
+    const loadPrimaryFolders = async () => {
+      if (!isInitialized) return;
+      
+      setLoadingPrimaryFolders(true);
+      try {
+        const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+        setPrimaryFolders(primaryFoldersData);
+      } catch (err) {
+        console.warn('Failed to load primary folders:', err);
+      } finally {
+        setLoadingPrimaryFolders(false);
+      }
+    };
+
+    loadPrimaryFolders();
+  }, [isInitialized]);
+
+  // Load folders when primary folder changes (sub-folders)
   useEffect(() => {
     const loadFolders = async () => {
-      if (!isInitialized) return;
+      if (!isInitialized || currentView !== 'folder-contents') return;
       
       setLoadingFolders(true);
       try {
         const userFolders = await folderService.getFolders('admin-1', true);
-        setFolders(userFolders);
+        // Filter folders by primary folder if one is selected
+        const filteredFolders = selectedPrimaryFolder 
+          ? userFolders.filter(folder => folder.primaryFolderId === selectedPrimaryFolder.id)
+          : userFolders;
+        
+        setFolders(filteredFolders);
       } catch (err) {
         console.warn('Failed to load folders:', err);
       } finally {
@@ -93,9 +155,9 @@ export const Knowledge = () => {
     };
 
     loadFolders();
-  }, [isInitialized]);
+  }, [isInitialized, selectedPrimaryFolder, currentView]);
 
-  // Load all documents when folder changes
+  // Load all documents when folder or primary folder changes
   useEffect(() => {
     const loadDocuments = async () => {
       if (!isInitialized || searchQuery) return; // Don't load if there's an active search
@@ -106,7 +168,9 @@ export const Knowledge = () => {
           'admin-1',
           true,
           selectedFolder === 'all' ? undefined : selectedFolder,
-          10 // Limit to 10 most recent documents
+          selectedFolder === 'all' ? 50 : 10, // More documents for "all" view, 10 for specific folders
+          0, // offset
+          selectedPrimaryFolder?.id // primaryFolderId
         );
         setAllDocuments(result.documents);
       } catch (err) {
@@ -118,20 +182,51 @@ export const Knowledge = () => {
     };
 
     loadDocuments();
-  }, [isInitialized, selectedFolder, searchQuery]);
+  }, [isInitialized, selectedFolder, selectedPrimaryFolder, searchQuery]);
 
-  // Keyboard shortcuts for bulk operations
+  // Handle tag filtering
+  const handleTagFilterChange = async (filter: TagFilterType | null) => {
+    setActiveTagFilter(filter);
+    
+    if (!filter) {
+      setTagFilteredDocuments([]);
+      return;
+    }
+
+    try {
+      const results = await tagService.searchByTags(filter, 'admin-1', 50);
+      const documents = results
+        .filter(result => result.item.type === 'document')
+        .map(result => result.item);
+      setTagFilteredDocuments(documents);
+    } catch (error) {
+      console.error('Failed to filter by tags:', error);
+      setTagFilteredDocuments([]);
+    }
+  };
+
+  // Keyboard shortcuts for bulk operations and search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + K to open comprehensive search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowComprehensiveSearch(true);
+      }
+      
+      // Escape to close search or exit selection mode
+      if (e.key === 'Escape') {
+        if (showComprehensiveSearch) {
+          setShowComprehensiveSearch(false);
+        } else if (isSelectionMode) {
+          handleExitSelectionMode();
+        }
+      }
+      
       // Ctrl/Cmd + A to select all
       if ((e.ctrlKey || e.metaKey) && e.key === 'a' && isSelectionMode) {
         e.preventDefault();
         handleSelectAll();
-      }
-      
-      // Escape to exit selection mode
-      if (e.key === 'Escape' && isSelectionMode) {
-        handleExitSelectionMode();
       }
       
       // Delete key to delete selected
@@ -142,7 +237,7 @@ export const Knowledge = () => {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelectionMode, selectedDocuments.size]);
+  }, [isSelectionMode, selectedDocuments.size, showComprehensiveSearch]);
 
   // Handle search
   const handleSearch = async (query: string, searchFilters?: any) => {
@@ -162,10 +257,37 @@ export const Knowledge = () => {
     // Combine folder filter with search filters
     const filters = {
       ...searchFilters,
-      folderId: selectedFolder === 'all' ? undefined : selectedFolder
+      folderId: selectedFolder === 'all' ? undefined : selectedFolder,
+      primaryFolderId: currentView === 'folder-contents' && selectedPrimaryFolder ? selectedPrimaryFolder.id : undefined
     };
 
     await search(query, filters);
+  };
+
+  // Handle primary folder selection
+  const handlePrimaryFolderSelect = (primaryFolder: PrimaryFolder) => {
+    setSelectedPrimaryFolder(primaryFolder);
+    setCurrentView('folder-contents');
+    setSelectedFolder('all');
+    
+    // Clear search when changing primary folders
+    if (searchQuery) {
+      clearResults();
+      setSearchQuery('');
+    }
+  };
+
+  // Handle back to primary folders
+  const handleBackToPrimaryFolders = () => {
+    setCurrentView('primary-folders');
+    setSelectedPrimaryFolder(null);
+    setSelectedFolder('all');
+    
+    // Clear search when going back
+    if (searchQuery) {
+      clearResults();
+      setSearchQuery('');
+    }
   };
 
   // Handle folder change
@@ -181,16 +303,35 @@ export const Knowledge = () => {
 
   // Handle folder creation
   const handleCreateFolder = async (name: string, description?: string) => {
-    await folderService.createFolder({
-      name,
-      description,
-      userId: 'admin-1',
-      isAdmin: true,
-    });
-    
-    // Reload folders
-    const userFolders = await folderService.getFolders('admin-1', true);
-    setFolders(userFolders);
+    try {
+      console.log('Creating folder:', { name, description, primaryFolderId: selectedPrimaryFolder?.id });
+      
+      await folderService.createFolder({
+        name,
+        description,
+        userId: 'admin-1',
+        isAdmin: true,
+        primaryFolderId: selectedPrimaryFolder?.id,
+      });
+      
+      console.log('Folder created successfully, reloading data...');
+      
+      // Reload folders
+      const userFolders = await folderService.getFolders('admin-1', true);
+      const filteredFolders = selectedPrimaryFolder 
+        ? userFolders.filter(folder => folder.primaryFolderId === selectedPrimaryFolder.id)
+        : userFolders;
+      setFolders(filteredFolders);
+      
+      // Reload primary folders to update counts
+      const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+      setPrimaryFolders(primaryFoldersData);
+      
+      console.log('Data reloaded successfully');
+    } catch (error) {
+      console.error('Failed to create folder:', error);
+      throw error; // Re-throw so modal can handle the error
+    }
   };
 
   // Handle folder edit
@@ -204,7 +345,14 @@ export const Knowledge = () => {
     
     // Reload folders
     const userFolders = await folderService.getFolders('admin-1', true);
-    setFolders(userFolders);
+    const filteredFolders = selectedPrimaryFolder 
+      ? userFolders.filter(folder => folder.primaryFolderId === selectedPrimaryFolder.id)
+      : userFolders;
+    setFolders(filteredFolders);
+    
+    // Reload primary folders to update counts
+    const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+    setPrimaryFolders(primaryFoldersData);
     setEditingFolder(null);
   };
 
@@ -221,8 +369,90 @@ export const Knowledge = () => {
     
     // Reload folders
     const userFolders = await folderService.getFolders('admin-1', true);
-    setFolders(userFolders);
+    const filteredFolders = selectedPrimaryFolder 
+      ? userFolders.filter(folder => folder.primaryFolderId === selectedPrimaryFolder.id)
+      : userFolders;
+    setFolders(filteredFolders);
+    
+    // Reload primary folders to update counts
+    const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+    setPrimaryFolders(primaryFoldersData);
     setDeletingFolder(null);
+  };
+
+  // Handle folder move (drag and drop)
+  const handleMoveFolder = async (folderId: string, newParentId: string, newParentType: 'primary' | 'subfolder') => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/folders/${folderId}/move`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: 'admin-1',
+          newParentId,
+          newParentType
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to move folder');
+      }
+
+      // Reload folders to reflect the change
+      const userFolders = await folderService.getFolders('admin-1', true);
+      const filteredFolders = selectedPrimaryFolder 
+        ? userFolders.filter(folder => folder.primaryFolderId === selectedPrimaryFolder.id)
+        : userFolders;
+      setFolders(filteredFolders);
+      
+      // Reload primary folders to update counts
+      const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+      setPrimaryFolders(primaryFoldersData);
+      
+      console.log(`📁 Successfully moved folder ${folderId} to ${newParentId} (${newParentType})`);
+    } catch (error) {
+      console.error('Failed to move folder:', error);
+      // You might want to show a toast notification here
+    }
+  };
+
+  // Primary folder handlers
+  const handleCreatePrimaryFolder = async () => {
+    // Reload primary folders
+    try {
+      const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+      setPrimaryFolders(primaryFoldersData);
+    } catch (err) {
+      console.warn('Failed to reload primary folders:', err);
+    }
+  };
+
+  const handleEditPrimaryFolder = async () => {
+    // Reload primary folders
+    try {
+      const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+      setPrimaryFolders(primaryFoldersData);
+    } catch (err) {
+      console.warn('Failed to reload primary folders:', err);
+    }
+    setEditingPrimaryFolder(null);
+  };
+
+  const handleDeletePrimaryFolder = async () => {
+    // If we're viewing the deleted primary folder, go back to main view
+    if (selectedPrimaryFolder && deletingPrimaryFolder && selectedPrimaryFolder.id === deletingPrimaryFolder.id) {
+      handleBackToPrimaryFolders();
+    }
+    
+    // Reload primary folders
+    try {
+      const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+      setPrimaryFolders(primaryFoldersData);
+    } catch (err) {
+      console.warn('Failed to reload primary folders:', err);
+    }
+    setDeletingPrimaryFolder(null);
   };
 
   // Handle document delete
@@ -248,14 +478,16 @@ export const Knowledge = () => {
       // Reload documents
       if (searchQuery) {
         // If in search mode, re-run search
-        search(searchQuery, selectedFolder !== 'all' ? selectedFolder : undefined);
+        search(searchQuery, selectedFolder !== 'all' ? { category: 'all' } : undefined);
       } else {
         // If browsing, reload all documents
         const result = await apiService.getDocuments(
           'admin-1',
           true,
           selectedFolder === 'all' ? undefined : selectedFolder,
-          10
+          10,
+          0,
+          selectedPrimaryFolder?.id
         );
         setAllDocuments(result.documents);
       }
@@ -272,7 +504,7 @@ export const Knowledge = () => {
   };
 
   // Handle document move
-  const handleMoveDocument = async (folderId: string | null) => {
+  const handleMoveDocument = async (folderId: string | null, primaryFolderId?: string) => {
     if (!movingDocument) return;
     
     try {
@@ -284,7 +516,8 @@ export const Knowledge = () => {
         body: JSON.stringify({
           userId: 'admin-1',
           isAdmin: 'true',
-          folderId: folderId
+          folderId: folderId,
+          primaryFolderId: primaryFolderId
         })
       });
 
@@ -295,14 +528,16 @@ export const Knowledge = () => {
       // Reload documents
       if (searchQuery) {
         // If in search mode, re-run search
-        search(searchQuery, selectedFolder !== 'all' ? selectedFolder : undefined);
+        search(searchQuery, selectedFolder !== 'all' ? { category: 'all' } : undefined);
       } else {
         // If browsing, reload all documents
         const result = await apiService.getDocuments(
           'admin-1',
           true,
           selectedFolder === 'all' ? undefined : selectedFolder,
-          10
+          10,
+          0,
+          selectedPrimaryFolder?.id
         );
         setAllDocuments(result.documents);
       }
@@ -364,7 +599,7 @@ export const Knowledge = () => {
 
       // Refresh documents and folders
       const apiSearchService = new ApiSearchService();
-      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder);
+      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder, 50, 0, selectedPrimaryFolder?.id);
       setAllDocuments(result.documents);
       
       const userFolders = await folderService.getFolders('admin-1', true);
@@ -381,7 +616,7 @@ export const Knowledge = () => {
     }
   };
 
-  const handleBulkMove = (folderId: string | null) => {
+  const handleBulkMove = () => {
     setShowBulkMoveModal(true);
   };
 
@@ -410,7 +645,7 @@ export const Knowledge = () => {
 
       // Refresh documents and folders
       const apiSearchService = new ApiSearchService();
-      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder);
+      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder, 50, 0, selectedPrimaryFolder?.id);
       setAllDocuments(result.documents);
       
       const userFolders = await folderService.getFolders('admin-1', true);
@@ -434,7 +669,7 @@ export const Knowledge = () => {
   };
 
   // Enhanced upload handlers
-  const handleGlobalFileDrop = (files: File[]) => {
+  const handleGlobalFileDrop = (_files: File[]) => {
     setShowUpload(true);
     // Files will be handled by the EnhancedUploadZone
   };
@@ -443,7 +678,7 @@ export const Knowledge = () => {
     // Refresh documents and folders after upload
     try {
       const apiSearchService = new ApiSearchService();
-      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder);
+      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder, 50, 0, selectedPrimaryFolder?.id);
       setAllDocuments(result.documents);
       
       const userFolders = await folderService.getFolders('admin-1', true);
@@ -457,31 +692,52 @@ export const Knowledge = () => {
     setBackgroundUploads(prev => prev.filter(upload => upload.id !== id));
   };
 
-  // Transform documents based on search or browse mode
-  const transformedDocuments = searchQuery ? 
-    // Transform search results
-    searchResults.map(result => ({
-      id: result.id,
-      title: result.metadata?.title || result.document?.originalName || 'Untitled',
-      category: result.metadata?.category || 'general',
-      excerpt: result.content ? result.content.substring(0, 200) + '...' : 'No preview available',
-      uploadedBy: result.document?.userId || 'Unknown',
-      uploadedAt: new Date(result.document?.uploadedAt || Date.now()),
-      size: result.document?.fileSize ? `${(result.document.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown',
-      views: Math.floor(Math.random() * 500) + 50, // Mock views for now
-      starred: Math.random() > 0.7, // Random starred status
-      score: result.score,
-      highlights: [], // Backend doesn't provide highlights yet
-      fileUrl: result.document?.fileUrl,
-      fileType: result.document?.fileType,
-      folderId: result.metadata?.folderId,
-      folderName: result.metadata?.folderName
-    })) :
-    // Transform all documents
-    allDocuments.map(doc => ({
-      id: doc.id,
-      title: doc.title,
-      category: doc.category,
+  // Transform documents based on search, tag filter, or browse mode
+  const transformedDocuments = (() => {
+    if (activeTagFilter && tagFilteredDocuments.length > 0) {
+      // Show tag-filtered results
+      return tagFilteredDocuments.map(doc => ({
+        id: doc.id,
+        title: doc.title || 'Untitled',
+        category: doc.category || 'general',
+        excerpt: doc.excerpt || doc.content?.slice(0, 200) + '...' || 'No preview available',
+        uploadedBy: doc.uploadedBy || 'Unknown',
+        uploadedAt: new Date(doc.uploadedAt || Date.now()),
+        size: doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown',
+        views: Math.floor(Math.random() * 500) + 50,
+        starred: Math.random() > 0.7,
+        score: 1.0,
+        highlights: [],
+        fileUrl: doc.fileUrl,
+        fileType: doc.fileType,
+        folderId: doc.folderId,
+        folderName: doc.folderName
+      }));
+    } else if (searchQuery) {
+      // Transform search results
+      return searchResults.map(result => ({
+        id: result.id,
+        title: result.title || result.metadata?.originalName || 'Untitled',
+        category: result.category || 'general',
+        excerpt: result.excerpt || (result.content ? result.content.substring(0, 200) + '...' : 'No preview available'),
+        uploadedBy: result.metadata?.author || 'Unknown',
+        uploadedAt: new Date(result.metadata?.uploadedAt || Date.now()),
+        size: result.metadata?.fileSize ? `${(result.metadata.fileSize / 1024 / 1024).toFixed(1)} MB` : 'Unknown',
+        views: Math.floor(Math.random() * 500) + 50,
+        starred: Math.random() > 0.7,
+        score: result.score,
+        highlights: result.highlights || [],
+        fileUrl: `/uploads/${result.metadata?.originalName}`,
+        fileType: result.fileType,
+        folderId: result.metadata?.originalName, // Use originalName as folderId for now
+        folderName: 'Search Results'
+      }));
+    } else {
+      // Transform all documents
+      return allDocuments.map(doc => ({
+        id: doc.id,
+        title: doc.title,
+        category: doc.category,
       excerpt: doc.excerpt,
       uploadedBy: doc.uploadedBy,
       uploadedAt: new Date(doc.uploadedAt),
@@ -494,7 +750,9 @@ export const Knowledge = () => {
       fileType: doc.fileType,
       folderId: doc.folderId,
       folderName: doc.folderName
-    }));
+      }));
+    }
+  })();
 
   // Show initialization loading
   if (isInitializing) {
@@ -554,12 +812,47 @@ export const Knowledge = () => {
         </motion.div>
       )}
 
-      {/* Header - Responsive */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Knowledge Base</h1>
-          <p className="text-white/70 text-sm sm:text-base">
-            Search and manage your travel documents
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-4 mb-6">
+        {/* Breadcrumb Navigation - Mobile Friendly */}
+        {currentView === 'folder-contents' && selectedPrimaryFolder && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBackToPrimaryFolders}
+              className="flex items-center gap-2 text-primary hover:text-primary-light transition-colors text-sm bg-white/5 px-3 py-2 rounded-lg border border-white/10"
+            >
+              <ArrowLeft size={14} />
+              <span className="hidden xs:inline">Categories</span>
+              <span className="xs:hidden">Back</span>
+            </button>
+            <div className="flex items-center gap-2 text-sm overflow-hidden">
+              <span className="text-white/30">/</span>
+              <span className="text-white/70 truncate">{selectedPrimaryFolder.name}</span>
+              {selectedFolder !== 'all' && (
+                <>
+                  <span className="text-white/30 hidden sm:inline">/</span>
+                  <span className="text-white/50 truncate hidden sm:inline">
+                    {folders.find(f => f.id === selectedFolder)?.name || 'Unknown Folder'}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Title and Description */}
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 truncate">
+            {currentView === 'primary-folders' 
+              ? 'Knowledge Base' 
+              : selectedPrimaryFolder?.name || 'Knowledge Base'
+            }
+          </h1>
+          <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+            {currentView === 'primary-folders'
+              ? 'Organize and search your travel documents by category'
+              : selectedPrimaryFolder?.description || 'Search and manage your travel documents'
+            }
             {isInitialized && (
               <span className="ml-2 text-xs text-primary">
                 • {serviceInfo.mode} mode
@@ -567,177 +860,312 @@ export const Knowledge = () => {
             )}
           </p>
         </div>
-        <div className="flex gap-3 w-full sm:w-auto">
+        
+        {/* Action Buttons - Mobile Grid Layout */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:w-auto gap-3">
+          {currentView === 'folder-contents' && (
+            <>
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  console.log('Create Folder button clicked');
+                  setShowCreateFolder(true);
+                }}
+                className="flex items-center gap-2 justify-center py-3 sm:py-2"
+                disabled={!isInitialized || (!selectedPrimaryFolder && currentView === 'folder-contents')}
+              >
+                <FolderPlus size={18} />
+                <span className="text-sm sm:text-base">Create Folder</span>
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={() => setShowUpload(true)}
+                className="flex items-center gap-2 justify-center glow-on-hover brightness-110 py-3 sm:py-2"
+                disabled={!isInitialized}
+              >
+                <Upload size={18} />
+                <span className="text-sm sm:text-base">Upload Document</span>
+              </Button>
+            </>
+          )}
+          
+          {/* Tag Manager Button - Available in all views */}
           <Button 
-            variant="ghost" 
-            onClick={() => setShowCreateFolder(true)}
-            className="flex items-center gap-2 flex-1 sm:flex-none justify-center"
+            variant="glass"
+            onClick={() => setShowTagManager(true)}
+            className="flex items-center gap-2 justify-center py-3 sm:py-2"
             disabled={!isInitialized}
           >
-            <FolderPlus size={20} />
-            Create Folder
+            <Hash size={18} />
+            <span className="text-sm sm:text-base hidden sm:inline">Tag Manager</span>
+            <span className="text-sm sm:text-base sm:hidden">Tags</span>
           </Button>
-          <Button 
-            variant="primary" 
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 flex-1 sm:flex-none justify-center"
-            disabled={!isInitialized}
-          >
-            <Upload size={20} />
-            Upload Document
-          </Button>
-        </div>
-      </div>
-
-      {/* Enhanced Search Bar */}
-      <div className="w-full">
-        <EnhancedSearchBar 
-          onSearch={handleSearch}
-          disabled={!isInitialized}
-          isSearching={isSearching}
-          currentFolder={selectedFolder === 'all' ? null : folders.find(f => f.id === selectedFolder)}
-          recentSearches={recentSearches}
-          folders={folders}
-        />
-      </div>
-
-      {/* Search Results Summary */}
-      {searchQuery && (
-        <SearchResultsSummary
-          query={searchQuery}
-          totalResults={totalResults}
-          processingTime={processingTime}
-          currentFolder={selectedFolder === 'all' ? null : folders.find(f => f.id === selectedFolder)}
-          onClearSearch={() => {
-            setSearchQuery('');
-            clearResults();
-          }}
-        />
-      )}
-
-      {/* Folders - Fixed Spacing */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-white/60">Folders</h3>
-          {processingTime > 0 && (
-            <span className="text-xs text-white/50">
-              Search completed in {processingTime}ms
-            </span>
+          {currentView === 'primary-folders' && (
+            <>
+              <Button 
+                variant="ghost"
+                onClick={() => setShowCreatePrimaryFolder(true)}
+                className="flex items-center gap-2 justify-center py-3 sm:py-2"
+                disabled={!isInitialized}
+              >
+                <Plus size={18} />
+                <span className="text-sm sm:text-base">Create Category</span>
+              </Button>
+              <Button 
+                variant="glass" 
+                onClick={() => setCurrentView('folder-contents')}
+                className="flex items-center gap-2 justify-center py-3 sm:py-2"
+                disabled={!isInitialized}
+              >
+                <Folder size={18} />
+                <span className="text-sm sm:text-base">Browse All Documents</span>
+              </Button>
+            </>
           )}
         </div>
-        <div className="flex items-center gap-3 overflow-x-auto overflow-y-visible pb-2 scrollbar-hide">
-          {/* All Documents */}
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => handleFolderChange('all')}
-            disabled={!isInitialized}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit',
-              'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
-              selectedFolder === 'all' 
-                ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
-                : 'bg-white/5 hover:bg-white/10'
-            )}
-          >
-            <span className="text-lg">📄</span>
-            <span className="font-medium text-sm">All Documents</span>
-            <span className="text-xs text-white/60">
-              ({searchQuery ? `${transformedDocuments.length}` : selectedFolder === 'all' ? `${allDocuments.length}+` : allDocuments.length})
-            </span>
-          </motion.button>
+      </div>
 
-          {/* User Folders */}
-          {loadingFolders ? (
-            <div className="flex items-center gap-2 px-4 py-2.5 text-white/50">
-              <Loader2 size={16} className="animate-spin" />
-              <span className="text-sm">Loading folders...</span>
+      {/* Main Content - Conditional Rendering */}
+      {currentView === 'primary-folders' ? (
+        /* Primary Folders View */
+        <div className="space-y-8">
+          {/* Primary Folders Loading */}
+          {loadingPrimaryFolders ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4 text-white/70">Loading categories...</p>
+              </div>
             </div>
           ) : (
-            folders.map((folder) => (
-              <motion.div
-                key={folder.id}
-                className="relative"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                <button
-                  onClick={() => handleFolderChange(folder.id)}
-                  disabled={!isInitialized}
-                  className={cn(
-                    'flex items-center gap-2 px-4 pr-10 py-2.5 rounded-xl transition-all whitespace-nowrap min-w-fit w-full',
-                    'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
-                    selectedFolder === folder.id 
-                      ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
-                      : 'bg-white/5 hover:bg-white/10'
-                  )}
-                >
-                  <Folder size={18} className="text-primary" />
-                  <span className="font-medium text-sm">{folder.name}</span>
-                  <span className="text-xs text-white/60">({folder.documentCount})</span>
-                </button>
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 z-50">
-                  <FolderMenu
-                    folderId={folder.id}
-                    folderName={folder.name}
-                    onEdit={() => setEditingFolder(folder)}
-                    onDelete={() => setDeletingFolder(folder)}
-                  />
-                </div>
-              </motion.div>
-            ))
+            /* Primary Folders Grid - Mobile Optimized */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {primaryFolders.map((primaryFolder) => (
+                <PrimaryFolderCard
+                  key={primaryFolder.id}
+                  primaryFolder={primaryFolder}
+                  isAdmin={true}
+                  onClick={() => handlePrimaryFolderSelect(primaryFolder)}
+                  onEdit={(folder) => setEditingPrimaryFolder(folder)}
+                  onDelete={(folder) => setDeletingPrimaryFolder(folder)}
+                  className="h-full"
+                />
+              ))}
+            </div>
+          )}
+          
+          {/* Empty State for Primary Folders */}
+          {!loadingPrimaryFolders && primaryFolders.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🗂️</div>
+              <h3 className="text-xl font-semibold mb-2">No Categories Available</h3>
+              <p className="text-white/60 mb-6">
+                Contact your administrator to set up knowledge base categories.
+              </p>
+            </div>
           )}
         </div>
-      </div>
+      ) : (
+        /* Folder Contents View */
+        <div className="space-y-6">
+          {/* Quick Comprehensive Search */}
+          <div className="w-full">
+            <QuickSearchShortcut 
+              onOpenSearch={() => setShowComprehensiveSearch(true)}
+              placeholder="Search the Knowledge Base... (⌘K)"
+            />
+          </div>
 
-      {/* Toolbar - Better Spacing */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="glass" size="sm" className="px-3 py-2">
-            <Filter size={18} />
-          </Button>
-          <span className="text-sm text-white/60">
+
+          {/* Search Results Summary */}
+          {searchQuery && (
+            <SearchResultsSummary
+              query={searchQuery}
+              totalResults={totalResults}
+              processingTime={processingTime}
+              currentFolder={selectedFolder === 'all' ? null : folders.find(f => f.id === selectedFolder)}
+              onClearSearch={() => {
+                setSearchQuery('');
+                clearResults();
+              }}
+            />
+          )}
+
+          {/* Folder Tree Navigation */}
+          <div className="space-y-4">
+            <button
+              onClick={() => setIsFolderStructureExpanded(!isFolderStructureExpanded)}
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all touch-manipulation"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {isFolderStructureExpanded ? (
+                  <ChevronDown size={14} className="text-white/70 shrink-0" />
+                ) : (
+                  <ChevronRight size={14} className="text-white/70 shrink-0" />
+                )}
+                <h3 className="text-xs sm:text-sm font-medium text-white/60 truncate">Knowledge Base Structure</h3>
+                <span className="text-xs text-white/40 bg-white/10 px-2 py-1 rounded-full shrink-0">
+                  {primaryFolders.length}
+                  <span className="hidden sm:inline"> categories</span>
+                </span>
+              </div>
+              {processingTime > 0 && (
+                <span className="text-xs text-white/50 hidden md:inline">
+                  Search completed in {processingTime}ms
+                </span>
+              )}
+            </button>
+            
+            <AnimatePresence>
+              {isFolderStructureExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden space-y-4"
+                >
+                  {/* All Documents Quick Access - Only show when not in a specific primary folder */}
+                  {!selectedPrimaryFolder && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleFolderChange('all')}
+                      disabled={!isInitialized}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl transition-all touch-manipulation',
+                        'border border-white/10 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed',
+                        selectedFolder === 'all' 
+                          ? 'bg-primary/20 border-primary shadow-lg shadow-primary/25' 
+                          : 'bg-white/5 hover:bg-white/10'
+                      )}
+                    >
+                      <span className="text-base sm:text-lg">📄</span>
+                      <span className="font-medium text-xs sm:text-sm">All Documents</span>
+                      <span className="text-xs text-white/60 ml-auto">
+                        ({searchQuery ? `${transformedDocuments.length}` : `${allDocuments.length}`})
+                      </span>
+                    </motion.button>
+                  )}
+
+                  {/* Folder Tree */}
+                  {loadingFolders || loadingPrimaryFolders ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex items-center gap-2 text-white/50">
+                        <Loader2 size={16} className="animate-spin" />
+                        <span className="text-sm">Loading folder structure...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <FolderTree
+                      primaryFolders={primaryFolders}
+                      folders={folders}
+                      selectedFolderId={selectedFolder === 'all' ? undefined : selectedFolder}
+                      selectedPrimaryFolderId={selectedPrimaryFolder?.id}
+                      onFolderSelect={(folderId, type) => {
+                        if (type === 'primary') {
+                          const primaryFolder = primaryFolders.find(pf => pf.id === folderId);
+                          if (primaryFolder) {
+                            handlePrimaryFolderSelect(primaryFolder);
+                          }
+                        } else {
+                          handleFolderChange(folderId);
+                        }
+                      }}
+                      onCreateSubfolder={(parentId, type) => {
+                        if (type === 'primary') {
+                          // Creating a subfolder under a primary folder
+                          const primaryFolder = primaryFolders.find(pf => pf.id === parentId);
+                          if (primaryFolder) {
+                            setSelectedPrimaryFolder(primaryFolder);
+                            setCurrentView('folder-contents');
+                          }
+                        }
+                        setShowCreateFolder(true);
+                      }}
+                      onEditFolder={setEditingFolder}
+                      onDeleteFolder={setDeletingFolder}
+                      onMoveFolder={handleMoveFolder}
+                      canCreateFolders={selectedPrimaryFolder?.permissions.canCreate}
+                      enableDragDrop={true}
+                      className="bg-white/5 rounded-xl p-4 border border-white/10"
+                    />
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+      {/* Toolbar - Mobile Responsive */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        {/* Status and Filter - Mobile Stack */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <TagFilter 
+            onFilterChange={handleTagFilterChange}
+            className="shrink-0"
+            showClearButton={true}
+          />
+          <span className="text-xs sm:text-sm text-white/60 truncate">
             {isSearching || loadingDocuments ? (
               <span className="flex items-center gap-2">
-                <Loader2 size={14} className="animate-spin" />
-                {isSearching ? 'Searching...' : 'Loading...'}
+                <Loader2 size={12} className="animate-spin" />
+                <span className="hidden xs:inline">{isSearching ? 'Searching...' : 'Loading...'}</span>
+              </span>
+            ) : activeTagFilter ? (
+              <span className="truncate">
+                <span className="hidden sm:inline">Found </span>
+                {transformedDocuments.length} 
+                <span className="hidden sm:inline"> items</span>
+                <span className="hidden md:inline"> by tags</span>
               </span>
             ) : searchQuery ? (
-              `Found ${transformedDocuments.length} results for "${searchQuery}"`
+              <span className="truncate">
+                <span className="hidden sm:inline">Found </span>
+                {transformedDocuments.length} 
+                <span className="hidden sm:inline"> results</span>
+                <span className="hidden md:inline"> for "{searchQuery}"</span>
+                <span className="hidden lg:inline">{selectedPrimaryFolder ? ` in ${selectedPrimaryFolder.name}` : ''}</span>
+              </span>
             ) : (
-              `Showing ${transformedDocuments.length} documents`
+              <span className="truncate">
+                <span className="hidden sm:inline">Showing </span>
+                {transformedDocuments.length} 
+                <span className="hidden sm:inline"> documents</span>
+                <span className="hidden lg:inline">{selectedPrimaryFolder ? ` in ${selectedPrimaryFolder.name}` : ''}</span>
+              </span>
             )}
           </span>
         </div>
         
-        <div className="flex items-center gap-2">
+        {/* View Controls - Mobile Responsive */}
+        <div className="flex items-center gap-2 shrink-0">
           {/* Selection Mode Toggle */}
           {transformedDocuments.length > 0 && !isSelectionMode && (
             <Button
               variant="glass"
               size="sm"
-              className="px-3 py-2"
+              className="px-2 sm:px-3 py-2"
               onClick={() => setIsSelectionMode(true)}
             >
-              Select
+              <span className="text-xs sm:text-sm">Select</span>
             </Button>
           )}
           
           <Button
             variant={viewMode === 'grid' ? 'primary' : 'glass'}
             size="sm"
-            className="px-3 py-2"
+            className="px-2 sm:px-3 py-2"
             onClick={() => setViewMode('grid')}
           >
-            <Grid size={18} />
+            <Grid size={16} />
           </Button>
           <Button
             variant={viewMode === 'list' ? 'primary' : 'glass'}
             size="sm"
-            className="px-3 py-2"
+            className="px-2 sm:px-3 py-2"
             onClick={() => setViewMode('list')}
           >
-            <List size={18} />
+            <List size={16} />
           </Button>
         </div>
       </div>
@@ -769,9 +1197,9 @@ export const Knowledge = () => {
         <motion.div
           layout
           className={cn(
-            'grid gap-6',
+            'grid gap-4 sm:gap-6',
             viewMode === 'grid' 
-              ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
+              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' 
               : 'grid-cols-1'
           )}
         >
@@ -796,23 +1224,27 @@ export const Knowledge = () => {
                     console.log('Knowledge.tsx Debug:', {
                       document: document,
                       fullResult: fullResult,
-                      fileUrl: fullResult?.document?.fileUrl,
-                      fileType: fullResult?.document?.fileType
+                      fileUrl: fullResult?.metadata?.originalName,
+                      fileType: fullResult?.fileType
                     });
                     
                     setSelectedDocument({
                       ...document,
                       content: fullResult?.content || document.excerpt,
-                      fileUrl: fullResult?.document?.fileUrl,
-                      fileType: fullResult?.document?.fileType
+                      uploadedBy: document.uploadedBy || 'Unknown',
+                      uploadedAt: document.uploadedAt || new Date(),
+                      size: document.size || 'Unknown',
+                      fileUrl: (document as any).fileUrl || `/uploads/${document.title}`,
+                      fileType: (document as any).fileType || 'application/pdf'
                     });
                   } else {
                     // For browsing mode, use document directly
                     setSelectedDocument({
                       ...document,
                       content: document.excerpt,
-                      fileUrl: document.fileUrl,
-                      fileType: document.fileType
+                      uploadedBy: document.uploadedBy || 'Unknown',
+                      uploadedAt: document.uploadedAt || new Date(),
+                      size: document.size || 'Unknown'
                     });
                   }
                   setShowDocumentViewer(true);
@@ -837,21 +1269,73 @@ export const Knowledge = () => {
             </motion.div>
           ))}
         </motion.div>
+      ) : selectedPrimaryFolder && selectedFolder === 'all' && !searchQuery ? (
+        /* Show sub-folders when primary folder is selected but no specific sub-folder */
+        <div className="space-y-6">
+          <div className="text-center py-8">
+            <div className="text-6xl mb-4">{selectedPrimaryFolder.name === 'Destinations' ? '🌍' : selectedPrimaryFolder.name === 'Suppliers' ? '🏢' : selectedPrimaryFolder.name === 'Policies & Regulations' ? '📋' : selectedPrimaryFolder.name === 'Marketing Materials' ? '📊' : '📁'}</div>
+            <h3 className="text-xl font-semibold mb-2">{selectedPrimaryFolder.name}</h3>
+            <p className="text-white/60 mb-6">
+              Select a folder below to view documents, or create a new folder to organize your content.
+            </p>
+          </div>
+          
+          {/* Sub-folders Grid */}
+          {loadingFolders ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4 text-white/70">Loading folders...</p>
+              </div>
+            </div>
+          ) : folders.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {folders.map((folder) => (
+                <motion.button
+                  key={folder.id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleFolderChange(folder.id)}
+                  className="p-4 sm:p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all text-left group touch-manipulation"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <Folder size={20} className="text-primary group-hover:text-primary-light sm:w-6 sm:h-6" />
+                    <h4 className="font-medium text-white group-hover:text-white text-sm sm:text-base truncate">{folder.name}</h4>
+                  </div>
+                  {folder.description && (
+                    <p className="text-sm text-white/60 mb-3 line-clamp-2">{folder.description}</p>
+                  )}
+                  <div className="flex items-center justify-between text-xs text-white/50">
+                    <span>{folder.documentCount || 0} documents</span>
+                    <span>Updated {new Date((folder as any).updatedAt || (folder as any).createdAt).toLocaleDateString()}</span>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">📂</div>
+              <h4 className="text-lg font-medium mb-2">No Folders Yet</h4>
+              <p className="text-white/60 mb-4">Create your first folder to organize documents in {selectedPrimaryFolder.name}.</p>
+              <Button 
+                variant="primary" 
+                onClick={() => setShowCreateFolder(true)}
+                className="flex items-center gap-2"
+                disabled={!selectedPrimaryFolder?.permissions.canCreate}
+              >
+                <FolderPlus size={18} />
+                Create Folder
+              </Button>
+            </div>
+          )}
+        </div>
       ) : !searchQuery && transformedDocuments.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📁</div>
-          <h3 className="text-xl font-semibold mb-2">
-            {selectedFolder === 'all' ? 'No Documents Yet' : 'Empty Folder'}
-          </h3>
-          <p className="text-white/60 mb-6">
-            {selectedFolder === 'all' 
-              ? 'Upload your first document to get started'
-              : 'This folder doesn\'t contain any documents yet'}
+          <h3 className="text-xl font-semibold mb-2">Empty Folder</h3>
+          <p className="text-white/60">
+            This folder doesn't contain any documents yet. Use the upload button above to add documents.
           </p>
-          <Button variant="primary" onClick={() => setShowUpload(true)}>
-            <Upload size={20} className="mr-2" />
-            Upload Document
-          </Button>
         </div>
       ) : searchQuery && searchResults.length === 0 ? (
         <div className="text-center py-12">
@@ -886,6 +1370,8 @@ export const Knowledge = () => {
           </div>
         </div>
       )}
+        </div>
+      )}
 
       {/* Enhanced Upload Modal */}
       {showUpload && (
@@ -893,6 +1379,7 @@ export const Knowledge = () => {
           onClose={() => setShowUpload(false)}
           onUploadComplete={handleUploadComplete}
           folders={folders}
+          primaryFolderId={selectedPrimaryFolder?.id}
         />
       )}
 
@@ -911,6 +1398,13 @@ export const Knowledge = () => {
           setSelectedDocument(null);
         }}
         document={selectedDocument}
+        currentPrimaryFolder={selectedPrimaryFolder?.name}
+        currentSubFolder={selectedFolder !== 'all' ? folders.find(f => f.id === selectedFolder)?.name : undefined}
+        onNavigateToCategories={handleBackToPrimaryFolders}
+        onNavigateToPrimaryFolder={() => {
+          setSelectedFolder('all');
+          // Stay in current primary folder but go to folder view
+        }}
       />
 
       {/* Edit Folder Modal */}
@@ -953,7 +1447,9 @@ export const Knowledge = () => {
           onMoveDocument={handleMoveDocument}
           documentTitle={movingDocument.title}
           currentFolderId={movingDocument.folderId}
+          currentPrimaryFolderId={selectedPrimaryFolder?.id}
           folders={folders}
+          primaryFolders={primaryFolders}
         />
       )}
 
@@ -984,6 +1480,77 @@ export const Knowledge = () => {
         uploads={backgroundUploads}
         isVisible={backgroundUploads.length > 0}
         onDismiss={dismissBackgroundUpload}
+      />
+
+      {/* Primary Folder Admin Modals */}
+      <CreatePrimaryFolderModal
+        isOpen={showCreatePrimaryFolder}
+        onClose={() => setShowCreatePrimaryFolder(false)}
+        onCreatePrimaryFolder={handleCreatePrimaryFolder}
+      />
+
+      {editingPrimaryFolder && (
+        <EditPrimaryFolderModal
+          isOpen={!!editingPrimaryFolder}
+          onClose={() => setEditingPrimaryFolder(null)}
+          onEditPrimaryFolder={handleEditPrimaryFolder}
+          primaryFolder={editingPrimaryFolder}
+        />
+      )}
+
+      {deletingPrimaryFolder && (
+        <DeletePrimaryFolderModal
+          isOpen={!!deletingPrimaryFolder}
+          onClose={() => setDeletingPrimaryFolder(null)}
+          onDeletePrimaryFolder={handleDeletePrimaryFolder}
+          primaryFolder={deletingPrimaryFolder}
+        />
+      )}
+
+      {/* Comprehensive Search Modal */}
+      <ComprehensiveSearchInterface
+        isOpen={showComprehensiveSearch}
+        onClose={() => setShowComprehensiveSearch(false)}
+        primaryFolders={primaryFolders}
+        onResultSelect={(result) => {
+          if (result.type === 'document') {
+            // Handle document selection
+            setSelectedDocument({
+              id: result.id,
+              title: result.title,
+              content: result.content || result.description || '',
+              category: result.metadata.category || 'general',
+              uploadedBy: 'Unknown',
+              uploadedAt: result.metadata.uploadedAt || new Date(),
+              size: result.metadata.size || '0 KB',
+              fileUrl: '',
+              fileType: result.metadata.fileType || ''
+            });
+            setShowDocumentViewer(true);
+          }
+        }}
+        onFolderNavigate={(folderId, type) => {
+          if (type === 'primary') {
+            const primaryFolder = primaryFolders.find(pf => pf.id === folderId);
+            if (primaryFolder) {
+              handlePrimaryFolderSelect(primaryFolder);
+            }
+          } else {
+            handleFolderChange(folderId);
+          }
+        }}
+      />
+
+      {/* Tag Manager Modal */}
+      <TagManager
+        isOpen={showTagManager}
+        onClose={() => setShowTagManager(false)}
+        onTagUpdate={() => {
+          // Refresh data when tags are updated
+          if (activeTagFilter) {
+            handleTagFilterChange(activeTagFilter);
+          }
+        }}
       />
     </div>
   );

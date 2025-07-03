@@ -1,4 +1,4 @@
-import { FileText, Clock, Eye, Star, Download, Share2, Folder, Check } from 'lucide-react';
+import { Clock, Eye, Folder, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
@@ -160,6 +160,7 @@ export const SelectableDocumentCard = ({
                   </Button>
                   <DocumentMenu
                     documentId={document.id}
+                    documentTitle={document.title}
                     onDelete={onDelete}
                     onMove={onMove}
                   />
@@ -217,6 +218,7 @@ export const SelectableDocumentCard = ({
         {!isSelectionMode && (
           <DocumentMenu
             documentId={document.id}
+            documentTitle={document.title}
             onDelete={onDelete}
             onMove={onMove}
           />
@@ -258,18 +260,18 @@ export const SelectableDocumentCard = ({
       
       {/* Quick Actions (only show when not in selection mode) */}
       {!isSelectionMode && (
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-2">
+        <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
           <Button 
             variant="primary" 
             size="sm" 
-            className="px-4 py-2"
+            className="px-4 py-2 bg-primary/90 backdrop-blur-sm"
             onClick={(e) => {
               e.stopPropagation();
               handleViewDocument();
             }}
           >
             <Eye size={16} className="mr-1" />
-            View
+            View Document
           </Button>
         </div>
       )}

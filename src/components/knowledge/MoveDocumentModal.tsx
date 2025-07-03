@@ -2,15 +2,18 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, FolderOpen, Folder } from 'lucide-react';
 import { Button } from '../shared/Button';
-import { folderService, type Folder as FolderType } from '../../services/folderService';
+import { type Folder as FolderType } from '../../services/folderService';
+import type { PrimaryFolder } from '../../types/primaryFolder';
 
 interface MoveDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onMoveDocument: (folderId: string | null) => Promise<void>;
+  onMoveDocument: (folderId: string | null, primaryFolderId?: string) => Promise<void>;
   documentTitle: string;
   currentFolderId?: string;
+  currentPrimaryFolderId?: string;
   folders: FolderType[];
+  primaryFolders: PrimaryFolder[];
 }
 
 export const MoveDocumentModal = ({ 
@@ -19,20 +22,23 @@ export const MoveDocumentModal = ({
   onMoveDocument,
   documentTitle,
   currentFolderId,
-  folders
+  currentPrimaryFolderId,
+  folders,
+  primaryFolders
 }: MoveDocumentModalProps) => {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(currentFolderId || null);
+  const [selectedPrimaryFolderId, setSelectedPrimaryFolderId] = useState<string | null>(currentPrimaryFolderId || null);
   const [isMoving, setIsMoving] = useState(false);
 
   const handleMove = async () => {
-    if (selectedFolderId === currentFolderId) {
+    if (selectedFolderId === currentFolderId && selectedPrimaryFolderId === currentPrimaryFolderId) {
       onClose();
       return;
     }
 
     setIsMoving(true);
     try {
-      await onMoveDocument(selectedFolderId);
+      await onMoveDocument(selectedFolderId, selectedPrimaryFolderId || undefined);
       onClose();
     } catch (error) {
       console.error('Failed to move document:', error);
@@ -76,46 +82,79 @@ export const MoveDocumentModal = ({
               Move <strong className="text-white">"{documentTitle}"</strong> to:
             </p>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto">
-              {/* No Folder Option */}
-              <button
-                onClick={() => setSelectedFolderId(null)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                  selectedFolderId === null
-                    ? 'bg-primary/20 border-primary border'
-                    : 'bg-white/5 hover:bg-white/10 border border-white/10'
-                }`}
-              >
-                <span className="text-lg">📄</span>
-                <div className="text-left">
-                  <p className="font-medium">No Folder</p>
-                  <p className="text-xs text-white/60">Move to root level</p>
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {/* Primary Folders Section */}
+              <div>
+                <h4 className="text-sm font-medium text-white/80 mb-2">Primary Categories</h4>
+                <div className="space-y-2">
+                  {primaryFolders.map((primaryFolder) => (
+                    <button
+                      key={`primary-${primaryFolder.id}`}
+                      onClick={() => {
+                        setSelectedPrimaryFolderId(primaryFolder.id);
+                        setSelectedFolderId(null); // Clear sub-folder selection when selecting primary folder
+                      }}
+                      disabled={primaryFolder.id === currentPrimaryFolderId && !currentFolderId}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                        selectedPrimaryFolderId === primaryFolder.id && selectedFolderId === null
+                          ? 'bg-primary/20 border-primary border'
+                          : primaryFolder.id === currentPrimaryFolderId && !currentFolderId
+                          ? 'bg-gray-500/20 border-gray-500/50 border cursor-not-allowed opacity-50'
+                          : 'bg-white/5 hover:bg-white/10 border border-white/10'
+                      }`}
+                    >
+                      <div 
+                        className="w-5 h-5 rounded flex items-center justify-center text-sm"
+                        style={{ backgroundColor: `${primaryFolder.color}40`, color: primaryFolder.color }}
+                      >
+                        📁
+                      </div>
+                      <div className="text-left">
+                        <p className="font-medium">{primaryFolder.name}</p>
+                        <p className="text-xs text-white/60">
+                          {primaryFolder.id === currentPrimaryFolderId && !currentFolderId 
+                            ? 'Current location' 
+                            : `${primaryFolder.subFolderCount} sub-folders`}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </button>
+              </div>
 
-              {/* Folder Options */}
-              {folders.map((folder) => (
-                <button
-                  key={folder.id}
-                  onClick={() => setSelectedFolderId(folder.id)}
-                  disabled={folder.id === currentFolderId}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                    selectedFolderId === folder.id
-                      ? 'bg-primary/20 border-primary border'
-                      : folder.id === currentFolderId
-                      ? 'bg-gray-500/20 border-gray-500/50 border cursor-not-allowed opacity-50'
-                      : 'bg-white/5 hover:bg-white/10 border border-white/10'
-                  }`}
-                >
-                  <Folder size={18} className="text-primary" />
-                  <div className="text-left">
-                    <p className="font-medium">{folder.name}</p>
-                    <p className="text-xs text-white/60">
-                      {folder.id === currentFolderId ? 'Current location' : `${folder.documentCount} documents`}
-                    </p>
+              {/* Sub-Folders Section */}
+              {folders.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-white/80 mb-2">Sub-folders</h4>
+                  <div className="space-y-2">
+                    {folders.map((folder) => (
+                      <button
+                        key={folder.id}
+                        onClick={() => {
+                          setSelectedFolderId(folder.id);
+                          setSelectedPrimaryFolderId(folder.primaryFolderId || null); // Set primary folder if sub-folder belongs to one
+                        }}
+                        disabled={folder.id === currentFolderId}
+                        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                          selectedFolderId === folder.id
+                            ? 'bg-primary/20 border-primary border'
+                            : folder.id === currentFolderId
+                            ? 'bg-gray-500/20 border-gray-500/50 border cursor-not-allowed opacity-50'
+                            : 'bg-white/5 hover:bg-white/10 border border-white/10'
+                        }`}
+                      >
+                        <Folder size={18} className="text-primary" />
+                        <div className="text-left">
+                          <p className="font-medium">{folder.name}</p>
+                          <p className="text-xs text-white/60">
+                            {folder.id === currentFolderId ? 'Current location' : `${folder.documentCount} documents`}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </button>
-              ))}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 pt-4">
