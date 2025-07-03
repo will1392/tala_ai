@@ -675,16 +675,52 @@ export const Knowledge = () => {
   };
 
   const handleUploadComplete = async () => {
-    // Refresh documents and folders after upload
+    // Refresh documents, folders, and search results after upload
     try {
-      const apiSearchService = new ApiSearchService();
-      const result = await apiSearchService.getDocuments('admin-1', true, selectedFolder === 'all' ? undefined : selectedFolder, 50, 0, selectedPrimaryFolder?.id);
-      setAllDocuments(result.documents);
+      setLoadingDocuments(true);
       
+      // Always refresh folders first
       const userFolders = await folderService.getFolders('admin-1', true);
       setFolders(userFolders);
+      
+      // Refresh primary folders to update document counts
+      const primaryFoldersData = await primaryFolderService.getPrimaryFolders('admin-1', true);
+      setPrimaryFolders(primaryFoldersData);
+      
+      // If we're in search mode, re-run the search to include new documents
+      if (searchQuery && searchQuery.trim()) {
+        const filters = selectedFolder !== 'all' ? { category: 'all' as const } : undefined;
+        await search(searchQuery, filters);
+      } else {
+        // Otherwise, refresh the browsing documents
+        const apiSearchService = new ApiSearchService();
+        const result = await apiSearchService.getDocuments(
+          'admin-1', 
+          true, 
+          selectedFolder === 'all' ? undefined : selectedFolder, 
+          50, 
+          0, 
+          selectedPrimaryFolder?.id
+        );
+        setAllDocuments(result.documents);
+      }
+      
+      // If we have active tag filters, refresh the tag-filtered results
+      if (activeTagFilter) {
+        const tagService = await import('../services/tagService');
+        const results = await tagService.tagService.searchByTags(activeTagFilter, 'admin-1');
+        const documents = results
+          .filter(result => result.item.type === 'document')
+          .map(result => result.item);
+        setTagFilteredDocuments(documents);
+      }
+      
+      console.log('✅ Documents and folders refreshed after upload');
+      
     } catch (error) {
       console.error('Failed to refresh after upload:', error);
+    } finally {
+      setLoadingDocuments(false);
     }
   };
 
@@ -1378,6 +1414,7 @@ export const Knowledge = () => {
         <EnhancedUploadZone 
           onClose={() => setShowUpload(false)}
           onUploadComplete={handleUploadComplete}
+          onFileUploaded={handleUploadComplete} // Refresh immediately after each file
           folders={folders}
           primaryFolderId={selectedPrimaryFolder?.id}
         />

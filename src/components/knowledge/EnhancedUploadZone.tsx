@@ -19,6 +19,7 @@ interface UploadZoneProps {
   folders: FolderType[];
   primaryFolderId?: string;
   onUploadComplete?: () => void;
+  onFileUploaded?: () => void; // New callback for individual file uploads
 }
 
 interface FileUploadStatus {
@@ -43,7 +44,7 @@ interface UploadStats {
   estimatedTimeRemaining?: number;
 }
 
-export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUploadComplete }: UploadZoneProps) => {
+export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUploadComplete, onFileUploaded }: UploadZoneProps) => {
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -277,6 +278,9 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
               : status
           )
         );
+        
+        // Trigger immediate refresh after each successful upload
+        onFileUploaded?.();
       } catch (error) {
         stopProgress();
         throw error;
