@@ -11,6 +11,18 @@
         "messageCount": 4,
         "lastMessage": "It's recommended that a passport be valid for at least **six months beyond the date of your return**..."
       }
+    ],
+    [
+      "conv_1751558976256_admin-1",
+      {
+        "id": "conv_1751558976256_admin-1",
+        "userId": "admin-1",
+        "title": "What should I know about Greece?",
+        "createdAt": "2025-07-03T16:09:36.256Z",
+        "lastActivity": "2025-07-03T16:12:29.595Z",
+        "messageCount": 4,
+        "lastMessage": "When traveling internationally, it's generally recommended that your passport be valid for at least ..."
+      }
     ]
   ],
   "messages": [
@@ -92,6 +104,81 @@
           ],
           "conversationId": "conv_1751335036270_admin-1",
           "tokensUsed": 13236
+        }
+      ]
+    ],
+    [
+      "conv_1751558976256_admin-1",
+      [
+        {
+          "id": "user_1751558976256",
+          "content": "What should I know about Greece?",
+          "sender": "user",
+          "timestamp": "2025-07-03T16:09:36.256Z",
+          "conversationId": "conv_1751558976256_admin-1"
+        },
+        {
+          "id": "ai_1751558976256",
+          "content": "Certainly! Here’s a brief overview of essential information for traveling to Greece, based on the **Kensington Greece Guide**:\n\n### 1. **A Land of Indulgence**\n- Greece is known for its stunning views, beautiful beaches, and rich history. You can explore ancient ruins, taste delicious Mediterranean cuisine, and enjoy the local culture.\n\n### 2. **Essential Travel Information**\n- **Passport Requirements**: You need an original, signed passport valid for at least 90 days beyond your intended return date.\n- **Visas**: American and Canadian citizens can visit Greece for up to 90 days without a visa. Citizens from other countries may need a visa—check with the Embassy of Greece for the latest information.\n- **Required Documents**: Ensure your name matches all travel documents and keep a photocopy of your passport's identification page.\n\n### 3. **Health and Safety**\n- **Insurance**: Medical and cancellation insurance are highly recommended.\n- **Emergency Services**: For medical assistance, dial 166 in Greece. General emergency assistance can be reached by dialing 112.\n\n### 4. **Traveling Like a Local**\n- **Currency**: The local currency is the Euro. While cards are widely accepted, having cash for smaller transactions is advisable.\n- **Tipping**: Tipping is not mandatory but appreciated. A 5-10% tip in restaurants is fair.\n  \n### 5. **Cultural Norms**\n- Respect local customs, like not putting toilet paper in toilets in some areas, as the sewage systems are not as advanced as in North America.\n\n### 6. **Health Precautions**\n- Stay updated on any necessary vaccinations before traveling.\n- Be cautious with food and drink. Tap water is drinkable in major cities, but bottled water is preferred in rural areas.\n\n### 7. **Packing Tips**\n- **Clothing**: Bring comfortable shoes for walking, layers for varying temperatures, swimwear for the beaches, and sunscreen.\n- **Electronics**: Greece uses 230V with plug types C and F, so a power adapter may be necessary.\n\n### 8. **Travel Apps**\n- Useful apps include the **Kensington Tours App** for itinerary access and **XE Currency Exchange** for currency rates.\n\n### 9. **Exploring Greece**\n- Whether you're visiting Athens, the islands, or the countryside, each location offers unique experiences, from historical sites to breathtaking landscapes.\n\nThis guide should give you a good starting point for your trip to Greece! If you have specific questions or need more detailed information, feel free to ask!",
+          "sender": "tala",
+          "timestamp": "2025-07-03T16:09:36.256Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.6492857,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.3806747,
+              "documentId": "5bcbd9c8-cc80-4b08-b066-469b75af6a9b"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.38064784,
+              "documentId": "3f0aad31-a2c4-4451-b861-e40e4ee9d057"
+            },
+            {
+              "title": "Kensington Portugal Guide.pdf",
+              "type": "document",
+              "score": 0.35658237,
+              "documentId": "3f8a3e94-6e84-4482-871c-49b1d91cc359"
+            },
+            {
+              "title": "Kensington England Guide.pdf",
+              "type": "document",
+              "score": 0.33287463,
+              "documentId": "2fab42a2-04dc-43c6-a45d-48abdddb830b"
+            }
+          ],
+          "conversationId": "conv_1751558976256_admin-1",
+          "tokensUsed": 52646
+        },
+        {
+          "id": "user_1751559149596",
+          "content": "my passport expires on march 3rd, but I travel in January, will I be okay?",
+          "sender": "user",
+          "timestamp": "2025-07-03T16:12:29.596Z",
+          "conversationId": "conv_1751558976256_admin-1"
+        },
+        {
+          "id": "ai_1751559149596",
+          "content": "When traveling internationally, it's generally recommended that your passport be valid for at least **six months** beyond your intended return date. Since your passport expires on March 3rd and you are traveling in January, you may not meet this requirement depending on your destination.\n\nTo ensure a hassle-free travel experience, I recommend renewing your passport before your trip. Always check the specific entry and exit requirements for the country you'll be visiting, as they can vary. For the most accurate and up-to-date information, you can refer to the U.S. Department of State's travel website: [travel.state.gov](https://travel.state.gov/content/travel/en/international-travel.html).\n\nIf you need further assistance or have questions about the renewal process, feel free to ask! Safe travels! ✈️",
+          "sender": "tala",
+          "timestamp": "2025-07-03T16:12:29.596Z",
+          "sources": [
+            {
+              "title": "Travel agent training_ June 19, 2025.docx",
+              "type": "document",
+              "score": 0.3159263,
+              "documentId": "8ad87a08-025a-48e1-a7be-01869a189d8f"
+            }
+          ],
+          "conversationId": "conv_1751558976256_admin-1",
+          "tokensUsed": 10232
         }
       ]
     ]
