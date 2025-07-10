@@ -23,6 +23,42 @@
         "messageCount": 4,
         "lastMessage": "When traveling internationally, it's generally recommended that your passport be valid for at least ..."
       }
+    ],
+    [
+      "conv_1751582500654_admin-1",
+      {
+        "id": "conv_1751582500654_admin-1",
+        "userId": "admin-1",
+        "title": "what can you tell me about Greece?",
+        "createdAt": "2025-07-03T22:41:40.654Z",
+        "lastActivity": "2025-07-03T22:44:33.231Z",
+        "messageCount": 8,
+        "lastMessage": "Certainly! To enter Greece, your passport must be valid for at least **90 days beyond your intended ..."
+      }
+    ],
+    [
+      "conv_1752104581090_admin-1",
+      {
+        "id": "conv_1752104581090_admin-1",
+        "userId": "admin-1",
+        "title": "Flight baggage policies",
+        "createdAt": "2025-07-09T23:43:01.090Z",
+        "lastActivity": "2025-07-09T23:43:01.090Z",
+        "messageCount": 2,
+        "lastMessage": "Here's a clear summary of the baggage policies for major airlines as of mid-2025, focusing on typica..."
+      }
+    ],
+    [
+      "conv_1752106335329_admin-1",
+      {
+        "id": "conv_1752106335329_admin-1",
+        "userId": "admin-1",
+        "title": "what can you tell me about Greece",
+        "createdAt": "2025-07-10T00:12:15.329Z",
+        "lastActivity": "2025-07-10T00:20:16.756Z",
+        "messageCount": 6,
+        "lastMessage": "It looks like you might be testing the response. If you have any specific questions about your upcom..."
+      }
     ]
   ],
   "messages": [
@@ -179,6 +215,265 @@
           ],
           "conversationId": "conv_1751558976256_admin-1",
           "tokensUsed": 10232
+        }
+      ]
+    ],
+    [
+      "conv_1751582500654_admin-1",
+      [
+        {
+          "id": "user_1751582500654",
+          "content": "what can you tell me about Greece?",
+          "sender": "user",
+          "timestamp": "2025-07-03T22:41:40.654Z",
+          "conversationId": "conv_1751582500654_admin-1"
+        },
+        {
+          "id": "ai_1751582500654",
+          "content": "Greece is a captivating destination known for its rich history, stunning landscapes, and vibrant culture. Here are some highlights about Greece:\n\n### A Land of Indulgence\n- **Scenic Beauty**: Greece boasts awe-inspiring views, exotic beaches, and charming villages. The country has the longest cumulative coastline in southern Europe, with over 1,400 islands offering diverse terrains.\n- **Cultural Heritage**: Visitors can explore sun-bleached ruins from the ancient world, including famous sites like the Acropolis in Athens and the Palace of Knossos in Crete.\n\n### Essential Travel Information\n- **Passport Requirements**: Travelers must have a passport valid for at least 90 days beyond their intended return date. It's also advisable to have proof of return or onward travel.\n- **Visas**: American and Canadian citizens can visit Greece for up to 90 days without a visa. Citizens from other countries should check with the Embassy of Greece for entry requirements.\n- **Insurance**: Medical and cancellation insurance are highly recommended to protect against unexpected events before or during your travel.\n\n### Local Customs and Culture\n- **Language**: The official language is Greek, but many locals speak English, especially in tourist areas.\n- **Cuisine**: Greek cuisine is celebrated worldwide. Must-try dishes include moussaka, souvlaki, gyros, and baklava. Local wines and olive oils are also noteworthy.\n- **Tipping**: Tipping is not mandatory but appreciated; a tip of 5% to 10% is customary in restaurants.\n\n### Practical Tips\n- **Currency**: The local currency is the Euro (EUR). Debit and credit cards are widely accepted, although it's advisable to carry cash for small transactions.\n- **Transportation**: Taxis, buses, and ferries are common modes of transport. Renting a car is also a popular option for exploring the islands.\n- **Climate**: Greece has a Mediterranean climate, with hot, dry summers and mild winters, making spring and fall ideal for visiting.\n\n### Insider Tips\n- **Respect Local Customs**: When visiting religious sites, dress conservatively and be mindful of local customs.\n- **Stay Hydrated**: Tap water is safe to drink in major cities, but bottled water is recommended on many islands.\n\nGreece offers a unique blend of history, natural beauty, and culinary delights, ensuring a memorable travel experience. If you have specific questions or areas of interest, feel free to ask!",
+          "sender": "tala",
+          "timestamp": "2025-07-03T22:41:40.654Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.5916933,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.30874518,
+              "documentId": "5bcbd9c8-cc80-4b08-b066-469b75af6a9b"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.3086865,
+              "documentId": "3f0aad31-a2c4-4451-b861-e40e4ee9d057"
+            }
+          ],
+          "conversationId": "conv_1751582500654_admin-1",
+          "tokensUsed": 33118
+        },
+        {
+          "id": "user_1751582532119",
+          "content": "if my passport expires on March 3, and I return back from Greece, on Feb 2, will I be okay?",
+          "sender": "user",
+          "timestamp": "2025-07-03T22:42:12.119Z",
+          "conversationId": "conv_1751582500654_admin-1"
+        },
+        {
+          "id": "ai_1751582532119",
+          "content": "Yes, you will be okay! According to the travel information for Greece, you need a passport that is valid for a minimum of **90 days beyond your intended return date**. Since you are returning on February 2 and your passport expires on March 3, you will have a validity of **31 days** beyond your return date, which meets the requirement.\n\nHowever, please ensure that your name on your passport matches all travel documents you have issued. If you have any further questions or need assistance, feel free to ask! Safe travels!",
+          "sender": "tala",
+          "timestamp": "2025-07-03T22:42:12.119Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.31673312,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            }
+          ],
+          "conversationId": "conv_1751582500654_admin-1",
+          "tokensUsed": 11967
+        },
+        {
+          "id": "user_1751582635709",
+          "content": "ah okay, so what would be the cut off for my passport?",
+          "sender": "user",
+          "timestamp": "2025-07-03T22:43:55.709Z",
+          "conversationId": "conv_1751582500654_admin-1"
+        },
+        {
+          "id": "ai_1751582635709",
+          "content": "The cutoff for your passport typically refers to the validity period required for international travel. Most countries require that your passport be valid for at least **six months beyond your date of entry**. This is a common rule, but the specific requirements can vary by destination.\n\nHere are a few general steps to ensure your passport is valid for travel:\n\n1. **Check the Expiration Date**: Ensure your passport is not expiring soon. If your trip is in six months, your passport should ideally be valid for more than six months from your entry date.\n\n2. **Renew if Necessary**: If your passport is close to expiring, consider renewing it before your trip. Passport renewal processes can take time, so it's wise to start this as soon as possible.\n\n3. **Research Specific Requirements**: Check the entry requirements for the country you plan to visit. You can usually find this information on the official government website or through the embassy of your destination.\n\nIf you have a specific destination in mind, I can help you find more tailored information!",
+          "sender": "tala",
+          "timestamp": "2025-07-03T22:43:55.709Z",
+          "sources": [],
+          "conversationId": "conv_1751582500654_admin-1",
+          "tokensUsed": 335
+        },
+        {
+          "id": "user_1751582673231",
+          "content": "yea but can you give me a specific date that my passport would give me problems if I travel to Greece in this scenario?",
+          "sender": "user",
+          "timestamp": "2025-07-03T22:44:33.231Z",
+          "conversationId": "conv_1751582500654_admin-1"
+        },
+        {
+          "id": "ai_1751582673231",
+          "content": "Certainly! To enter Greece, your passport must be valid for at least **90 days beyond your intended departure date**. \n\nFor example, if you plan to travel to Greece and return on **August 1, 2025**, your passport should be valid until at least **November 1, 2025**. If your passport expires before that date, you may have issues entering Greece.\n\nIt's also wise to check the entry/exit requirements of any other countries you might be visiting during your trip, as some may have longer validity requirements. Always ensure your passport is up-to-date well in advance of your travels!",
+          "sender": "tala",
+          "timestamp": "2025-07-03T22:44:33.231Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.37904808,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            },
+            {
+              "title": "Travel agent training_ June 19, 2025.docx",
+              "type": "document",
+              "score": 0.31977087,
+              "documentId": "8ad87a08-025a-48e1-a7be-01869a189d8f"
+            }
+          ],
+          "conversationId": "conv_1751582500654_admin-1",
+          "tokensUsed": 21936
+        }
+      ]
+    ],
+    [
+      "conv_1752104581090_admin-1",
+      [
+        {
+          "id": "user_1752104581090",
+          "content": "Flight baggage policies",
+          "sender": "user",
+          "timestamp": "2025-07-09T23:43:01.090Z",
+          "conversationId": "conv_1752104581090_admin-1"
+        },
+        {
+          "id": "ai_1752104581091",
+          "content": "Here's a clear summary of the baggage policies for major airlines as of mid-2025, focusing on typical economy class fares for U.S. domestic and international travel:\n\n| Airline               | Checked Bags                                   | Carry-On Bag                                  | Personal Item                               |\n|----------------------|------------------------------------------------|-----------------------------------------------|--------------------------------------------|\n| **Delta Air Lines**  | Domestic: $35 each way (1st bag)              | Free (22\" x 14\" x 9\")                        | Free (fits under seat)                     |\n|                      | Int'l (Transatlantic): 1 free                  |                                               |                                            |\n|                      | Transpacific/Australia: 1–2 free               |                                               |                                            |\n|                      | Mexico/Caribbean: $35 each way                 |                                               |                                            |\n| **American Airlines**| Domestic: $35 each way (1st bag)              | Free                                         | Free                                       |\n|                      | Int'l (Transatlantic): 1 free                  |                                               |                                            |\n|                      | Transpacific/South America: 1–2 free           |                                               |                                            |\n|                      | Mexico/Caribbean: $35 each way                 |                                               |                                            |\n| **United Airlines**  | Domestic: $40 each way (1st bag)               | Free                                         | Free                                       |\n|                      | (or $35 each way if paid in advance)           |                                               |                                            |\n|                      | Int'l (Transatlantic): 1 free                  |                                               |                                            |\n|                      | Transpacific/Australia: 1–2 free               |                                               |                                            |\n|                      | Mexico/Caribbean: $40 each way                 |                                               |                                            |\n| **Southwest Airlines**| Depends on which fare you buy                  | Free                                         | Free                                       |\n| (Updated May 28, 2025)|                                                  |                                               |                                            |\n| **JetBlue Airways**  | Blue Basic: No free checked bag                | Blue Basic: No carry-on                       | Free                                       |\n|                      | Standard Blue: $40 1st bag (domestic)         | Standard Blue: Free                          |                                            |\n| **Alaska Airlines**  | Domestic: $35–$40 per bag                      | Free                                         | Free                                       |\n|                      | Int’l (Mexico): usually 1 free                 |                                               |                                            |\n| **Spirit Airlines**  | Fees vary (~$40–$70+)                          | Paid only – based on route/time              | Free (small backpack size)                 |\n| **Frontier Airlines**| Fees vary (~$40–$70+)                          | Paid only – based on route/time              | Free (small item under seat)               |\n| **Air Canada**       | Domestic: $30–$40 per bag (within Canada)     | Free                                         | Free                                       |\n|                      | U.S.–Canada: usually 1 free                    |                                               |                                            |\n| **Lufthansa**        | Int’l (to/from US): 1 free                     | Free                                         | Free                                       |\n| **Korean Air**       | Int’l: 2 free bags (50 lbs each)               | Free                                         | Free                                       |\n| **LATAM**            | Int’l (US to South America): 1 free            | Free                                         | Free                                       |\n| **Hawaiian Airlines**| Domestic: $25–$40 per bag                      | Free                                         | Free                                       |\n\n### Notes:\n- Carry-on size limits are typically 22 x 14 x 9 inches.\n- Checked bag weight limit is usually 50 lbs (23 kg) per bag.\n- Budget carriers (Spirit, Frontier, etc.) charge for carry-ons unless upgraded.\n- International baggage policies may vary based on fare type, route, and class.\n\nAlways double-check with the airline directly for the most current and specific baggage policies for your flight! If you need more detailed information about a particular airline or specific routes, feel free to ask!",
+          "sender": "tala",
+          "timestamp": "2025-07-09T23:43:01.091Z",
+          "sources": [
+            {
+              "title": "July 22 London Cleveland Flights.pdf",
+              "type": "document",
+              "score": 0.3903498,
+              "documentId": "9c5d2187-7789-4ea0-b7f6-cb3577f73dce"
+            },
+            {
+              "title": "Travel agent training_ June 19, 2025.docx",
+              "type": "document",
+              "score": 0.34506562,
+              "documentId": "8ad87a08-025a-48e1-a7be-01869a189d8f"
+            }
+          ],
+          "conversationId": "conv_1752104581090_admin-1",
+          "tokensUsed": 12249
+        }
+      ]
+    ],
+    [
+      "conv_1752106335329_admin-1",
+      [
+        {
+          "id": "user_1752106335329",
+          "content": "what can you tell me about Greece",
+          "sender": "user",
+          "timestamp": "2025-07-10T00:12:15.329Z",
+          "conversationId": "conv_1752106335329_admin-1",
+          "entities": []
+        },
+        {
+          "id": "ai_1752106335330",
+          "content": "Greece is a stunning Mediterranean destination known for its rich history, beautiful landscapes, and vibrant culture. Here are some highlights:\n\n### A Land of Indulgence\nUpon arriving in Greece, you’ll instantly feel at home amidst the awe-inspiring views, exotic beaches, and charming villages. With over 1,400 islands, each offers unique terrains—from volcanic landscapes to dense forests.\n\n### Essential Travel Information\n- **Passport Requirements**: An original, signed passport valid for at least **90 days beyond your intended return date** is required to enter Greece. Make sure your name on your passport matches all travel documents.\n- **Visa Requirements**: American and Canadian citizens can visit Greece for up to **90 days** without a visa. Citizens from other countries may need a visa, so it’s advisable to check with the Embassy of Greece for the latest information.\n\n### Things to Do\n- Explore ancient ruins, indulge in Mediterranean cuisine, or take part in a cooking class.\n- Enjoy breathtaking sunsets while sipping on a glass of chilled **Assyrtiko** wine.\n- Experience the diverse landscapes, from the beaches of the **Peloponnese** to the cliffs of **Kalambaka**.\n\n### Local Culture\n- **Cuisine**: Don’t miss the local dishes such as **Moussaka**, **Souvlaki**, and **Baklava**.\n- **Language**: The official language is Greek, but many locals speak English.\n- **Tipping**: Tipping is appreciated but not mandatory. A tip of **5-10%** is common in restaurants.\n\n### Practical Tips\n- **Currency**: The local currency is the **euro**. While cards are widely accepted, carry cash for smaller transactions.\n- **Transportation**: Taxis can accommodate up to four people, and ferries are a popular way to travel between islands.\n\n### Health and Safety\n- Medical facilities are good in urban areas, but may be limited in remote regions. It's advisable to have travel insurance covering medical emergencies.\n\nGreece offers a plethora of experiences that cater to all types of travelers. Whether you're interested in history, gastronomy, or simply enjoying the sun, Greece is a fantastic destination! If you have specific questions or need more details, feel free to ask!",
+          "sender": "tala",
+          "timestamp": "2025-07-10T00:12:15.330Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.5882782,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            }
+          ],
+          "conversationId": "conv_1752106335329_admin-1",
+          "tokensUsed": 12489
+        },
+        {
+          "id": "user_1752106384128",
+          "content": "can you give me some suggestions for hotels in Athens?",
+          "sender": "user",
+          "timestamp": "2025-07-10T00:13:04.128Z",
+          "conversationId": "conv_1752106335329_admin-1",
+          "entities": [
+            {
+              "id": "city_athens_1752106373933",
+              "type": "city",
+              "value": "Athens",
+              "normalizedValue": "athens",
+              "confidence": 1,
+              "firstMentioned": "2025-07-10T00:12:53.933Z",
+              "lastReferenced": "2025-07-10T00:12:53.933Z",
+              "referenceCount": 1,
+              "context": "can you give me some suggestions for hotels in Athens?"
+            },
+            {
+              "id": "country_greece_1752106373933",
+              "type": "country",
+              "value": "Greece",
+              "normalizedValue": "greece",
+              "confidence": 1,
+              "firstMentioned": "2025-07-10T00:12:53.933Z",
+              "lastReferenced": "2025-07-10T00:12:53.933Z",
+              "referenceCount": 1,
+              "context": "can you give me some suggestions for hotels in Athens?"
+            },
+            {
+              "id": "custom_hotels_1752106373933",
+              "type": "custom",
+              "value": "hotels",
+              "normalizedValue": "hotels",
+              "confidence": 1,
+              "firstMentioned": "2025-07-10T00:12:53.933Z",
+              "lastReferenced": "2025-07-10T00:12:53.933Z",
+              "referenceCount": 1,
+              "context": "can you give me some suggestions for hotels in Athens?"
+            }
+          ]
+        },
+        {
+          "id": "ai_1752106384128",
+          "content": "Certainly! Here are some excellent hotel options in Athens, catering to various preferences and budgets:\n\n### Luxury Hotels\n1. **Hotel Grande Bretagne**\n   - **Location**: Syntagma Square\n   - **Highlights**: Luxurious accommodations, rooftop restaurant with views of the Acropolis, spa services.\n\n2. **King George, a Luxury Collection Hotel**\n   - **Location**: Syntagma Square\n   - **Highlights**: Elegant rooms, fine dining, and a central location ideal for sightseeing.\n\n### Mid-Range Hotels\n3. **Electra Metropolis Athens**\n   - **Location**: Metropolis Square\n   - **Highlights**: Modern design, rooftop pool, and excellent dining options.\n\n4. **Herodion Hotel**\n   - **Location**: Near the Acropolis\n   - **Highlights**: Comfortable rooms, close to major attractions, and a great view of the Acropolis.\n\n### Budget Hotels\n5. **Athens Center Square Hotel**\n   - **Location**: Near Monastiraki\n   - **Highlights**: Affordable rates, rooftop terrace, and convenient access to public transport.\n\n6. **Zappion Hotel**\n   - **Location**: Near the National Garden\n   - **Highlights**: Cozy atmosphere, reasonable prices, and a short walk to historical sites.\n\n### Boutique Hotels\n7. **Acropolis Museum Boutique Hotel**\n   - **Location**: Close to the Acropolis Museum\n   - **Highlights**: Unique design, personalized service, and a fantastic breakfast.\n\n8. **Kimon Athens Hotel**\n   - **Location**: Plaka\n   - **Highlights**: Charming atmosphere, friendly staff, and near local attractions.\n\nThese hotels offer a range of experiences, whether you’re looking for luxury, comfort, or budget-friendly options. Since you mentioned planning to travel to Greece, I recommend checking availability and booking in advance, especially during peak tourist seasons. If you have specific preferences or needs, let me know, and I can provide more tailored recommendations!",
+          "sender": "tala",
+          "timestamp": "2025-07-10T00:13:04.128Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.48082218,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            },
+            {
+              "title": "Travel agent training_ June 19, 2025.docx",
+              "type": "document",
+              "score": 0.30038166,
+              "documentId": "8ad87a08-025a-48e1-a7be-01869a189d8f"
+            }
+          ],
+          "conversationId": "conv_1752106335329_admin-1",
+          "tokensUsed": 22953
+        },
+        {
+          "id": "user_1752106816756",
+          "content": "test",
+          "sender": "user",
+          "timestamp": "2025-07-10T00:20:16.756Z",
+          "conversationId": "conv_1752106335329_admin-1",
+          "entities": []
+        },
+        {
+          "id": "ai_1752106816756",
+          "content": "It looks like you might be testing the response. If you have any specific questions about your upcoming trip to Greece or if there's anything else you'd like assistance with, feel free to ask! I'm here to help with travel advice, hotel recommendations, visa information, or anything else you need.",
+          "sender": "tala",
+          "timestamp": "2025-07-10T00:20:16.756Z",
+          "sources": [
+            {
+              "title": "test-document.txt",
+              "type": "document",
+              "score": 0.38272247,
+              "documentId": "aa043693-d72f-4336-a6f7-a14cc238ca00"
+            }
+          ],
+          "conversationId": "conv_1752106335329_admin-1",
+          "tokensUsed": 1323
         }
       ]
     ]

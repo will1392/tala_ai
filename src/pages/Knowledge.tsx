@@ -858,8 +858,8 @@ export const Knowledge = () => {
               className="flex items-center gap-2 text-primary hover:text-primary-light transition-colors text-sm bg-white/5 px-3 py-2 rounded-lg border border-white/10"
             >
               <ArrowLeft size={14} />
-              <span className="hidden xs:inline">Categories</span>
-              <span className="xs:hidden">Back</span>
+              <span className="hidden xs:inline">Home</span>
+              <span className="xs:hidden">Home</span>
             </button>
             <div className="flex items-center gap-2 text-sm overflow-hidden">
               <span className="text-white/30">/</span>
@@ -925,6 +925,18 @@ export const Knowledge = () => {
             </>
           )}
           
+          {currentView === 'primary-folders' && (
+            <Button 
+              variant="ghost"
+              onClick={() => setShowCreatePrimaryFolder(true)}
+              className="flex items-center gap-2 justify-center py-3 sm:py-2"
+              disabled={!isInitialized}
+            >
+              <Plus size={18} />
+              <span className="text-sm sm:text-base">Create Category</span>
+            </Button>
+          )}
+          
           {/* Tag Manager Button - Available in all views */}
           <Button 
             variant="glass"
@@ -936,17 +948,9 @@ export const Knowledge = () => {
             <span className="text-sm sm:text-base hidden sm:inline">Tag Manager</span>
             <span className="text-sm sm:text-base sm:hidden">Tags</span>
           </Button>
+          
           {currentView === 'primary-folders' && (
             <>
-              <Button 
-                variant="ghost"
-                onClick={() => setShowCreatePrimaryFolder(true)}
-                className="flex items-center gap-2 justify-center py-3 sm:py-2"
-                disabled={!isInitialized}
-              >
-                <Plus size={18} />
-                <span className="text-sm sm:text-base">Create Category</span>
-              </Button>
               <Button 
                 variant="glass" 
                 onClick={() => setCurrentView('folder-contents')}
@@ -955,6 +959,15 @@ export const Knowledge = () => {
               >
                 <Folder size={18} />
                 <span className="text-sm sm:text-base">Browse All Documents</span>
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={() => setShowUpload(true)}
+                className="flex items-center gap-2 justify-center glow-on-hover brightness-110 py-3 sm:py-2"
+                disabled={!isInitialized}
+              >
+                <Upload size={18} />
+                <span className="text-sm sm:text-base">Upload Document</span>
               </Button>
             </>
           )}

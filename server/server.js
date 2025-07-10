@@ -918,6 +918,144 @@ app.get('/api/primary-folders/:id/hierarchy', async (req, res) => {
   }
 });
 
+// Extract data from documents without storing
+app.post('/api/documents/extract', upload.array('document', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const { extractType = 'summary', userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    console.log(`🔍 Extracting data from ${req.files.length} files for user ${userId}, type: ${extractType}`);
+    
+    const results = {
+      success: true,
+      data: {
+        metadata: {},
+        summary: '',
+        keyData: [],
+        fullText: ''
+      }
+    };
+
+    // Process each file
+    for (const file of req.files) {
+      try {
+        let content = '';
+        
+        // Extract text based on file type
+        if (file.mimetype === 'application/pdf') {
+          const pdfData = await PDFParse(file.buffer);
+          content = pdfData.text;
+          
+          // Add metadata for PDF
+          results.data.metadata = {
+            ...results.data.metadata,
+            title: pdfData.info?.Title || file.originalname,
+            author: pdfData.info?.Author,
+            pages: pdfData.numpages,
+            fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+            type: 'PDF'
+          };
+        } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          const docxResult = await mammoth.extractRawText({ buffer: file.buffer });
+          content = docxResult.value;
+          
+          results.data.metadata = {
+            ...results.data.metadata,
+            title: file.originalname,
+            fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+            type: 'DOCX'
+          };
+        } else if (file.mimetype === 'text/plain') {
+          content = file.buffer.toString('utf-8');
+          
+          results.data.metadata = {
+            ...results.data.metadata,
+            title: file.originalname,
+            fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+            type: 'Text'
+          };
+        } else {
+          console.log(`⚠️ Unsupported file type for extraction: ${file.mimetype}`);
+          continue;
+        }
+
+        // Process content based on extraction type
+        if (extractType === 'full-text') {
+          results.data.fullText += content + '\n\n';
+        } else {
+          // Use OpenAI to extract summary or key data
+          let prompt = '';
+          if (extractType === 'summary') {
+            prompt = `Please provide a concise summary of the following document content:\n\n${content.substring(0, 4000)}`;
+          } else if (extractType === 'key-data') {
+            prompt = `Please extract the key data points, important facts, and figures from the following document content. Format as structured data:\n\n${content.substring(0, 4000)}`;
+          }
+
+          try {
+            const completion = await openai.chat.completions.create({
+              model: 'gpt-3.5-turbo',
+              messages: [{ role: 'user', content: prompt }],
+              max_tokens: 1000,
+              temperature: 0.3,
+            });
+
+            const extractedContent = completion.choices[0]?.message?.content || '';
+            
+            if (extractType === 'summary') {
+              results.data.summary += extractedContent + '\n\n';
+            } else if (extractType === 'key-data') {
+              // Try to parse key data into structured format
+              const lines = extractedContent.split('\n').filter(line => line.trim());
+              lines.forEach(line => {
+                const match = line.match(/(.+?):\s*(.+)/);
+                if (match) {
+                  results.data.keyData.push({
+                    label: match[1].trim().replace(/^\*\*|\*\*$/g, '').replace(/^•\s*/, ''),
+                    value: match[2].trim()
+                  });
+                }
+              });
+            }
+          } catch (aiError) {
+            console.error('AI extraction error:', aiError);
+            // Fallback to raw content
+            if (extractType === 'summary') {
+              results.data.summary += content.substring(0, 500) + '...\n\n';
+            }
+          }
+        }
+
+      } catch (fileError) {
+        console.error(`Error processing file ${file.originalname}:`, fileError);
+        continue;
+      }
+    }
+
+    // Clean up results
+    results.data.summary = results.data.summary.trim();
+    results.data.fullText = results.data.fullText.trim();
+
+    console.log(`✅ Extracted data from ${req.files.length} files for user ${userId}`);
+    res.json(results);
+
+  } catch (error) {
+    console.error('🔍 Document extraction error:', error);
+    res.status(500).json({
+      success: false,
+      data: {},
+      error: 'Failed to extract document data',
+      details: error.message
+    });
+  }
+});
+
 // Upload document
 app.post('/api/documents/upload', upload.single('document'), async (req, res) => {
   try {
@@ -925,7 +1063,7 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { userId, isAdmin = 'false', folderId, primaryFolderId } = req.body;
+    const { userId, isAdmin = 'false', folderId, primaryFolderId, category, tags } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
@@ -1070,7 +1208,7 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
             content: chunk.content,
             metadata: {
               title: file.originalname,
-              category: primaryFolder?.slug || 'general',
+              category: category || primaryFolder?.slug || 'general',
               chunkIndex: chunk.metadata.chunkIndex,
               wordCount: chunk.metadata.wordCount,
               headings: [], // Could be enhanced with heading extraction
@@ -1078,7 +1216,8 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
               folderName: folderId ? folders.get(folderId)?.name : null,
               primaryFolderId: primaryFolderId || null,
               primaryFolderName: primaryFolder?.name || null,
-              primaryFolderSlug: primaryFolder?.slug || null
+              primaryFolderSlug: primaryFolder?.slug || null,
+              tags: tags ? JSON.parse(tags) : []
             },
             document: {
               originalName: file.originalname,
@@ -1142,6 +1281,48 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
   }
 });
 
+// Helper function to build conversation state from message history
+function buildConversationState(messages) {
+  const state = {
+    passportInfo: null,
+    travelDestination: null,
+    travelDates: null,
+    visaInquiry: null,
+    previousQuestions: []
+  };
+  
+  // Analyze messages to extract state
+  messages.forEach(msg => {
+    const content = msg.content.toLowerCase();
+    
+    // Check for passport expiry mentions
+    const passportExpiryMatch = content.match(/passport.*expir.*?(\d{4}|\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+    if (passportExpiryMatch) {
+      state.passportInfo = { expiry: passportExpiryMatch[1] };
+    }
+    
+    // Check for destination mentions (common travel destinations)
+    const destinations = ['greece', 'spain', 'italy', 'france', 'germany', 'japan', 'thailand', 'australia'];
+    destinations.forEach(dest => {
+      if (content.includes(dest)) {
+        state.travelDestination = dest.charAt(0).toUpperCase() + dest.slice(1);
+      }
+    });
+    
+    // Check for visa mentions
+    if (content.includes('visa')) {
+      state.visaInquiry = true;
+    }
+    
+    // Track questions asked
+    if (msg.sender === 'user' && content.includes('?')) {
+      state.previousQuestions.push(content.substring(0, 100));
+    }
+  });
+  
+  return state;
+}
+
 // Tala AI Chat endpoint
 app.post('/api/chat', async (req, res) => {
   try {
@@ -1179,15 +1360,112 @@ app.post('/api/chat', async (req, res) => {
       .map(chunk => `Document: ${chunk.title}\nContent: ${chunk.content}`)
       .join('\n\n---\n\n');
     
-    // Step 3: Generate AI response using Tala AI
+    // Step 3: Get conversation history and enhanced context
+    let conversationHistory = '';
+    let conversationContext = '';
+    let extractedEntities = [];
+    let conversationState = {};
+    
+    if (conversationId) {
+      // Check if context persistence is enabled for this conversation
+      const conversation = conversations.get(conversationId);
+      const persistContext = conversation?.persistContext !== false; // Default to true
+      
+      if (persistContext && !conversation?.contextReset) {
+        // Get previous messages for context
+        const existingMessages = conversationMessages.get(conversationId) || [];
+        if (existingMessages.length > 0) {
+          // Include last 10 messages for better context (increase from 5)
+          const recentMessages = existingMessages.slice(-10);
+          conversationHistory = recentMessages
+            .map(msg => `${msg.sender === 'user' ? 'User' : 'Tala'}: ${msg.content}`)
+            .join('\n');
+          
+          // Extract entities from previous messages to build conversation state
+          const previousEntities = [];
+          recentMessages.forEach(msg => {
+            if (msg.entities) {
+              previousEntities.push(...msg.entities);
+            }
+          });
+          
+          // Build conversation state from previous messages
+          conversationState = buildConversationState(recentMessages);
+        }
+      } else if (conversation?.contextReset) {
+        // If context was reset, clear the reset flag for future messages
+        conversation.contextReset = false;
+        conversations.set(conversationId, conversation);
+      }
+      
+      // Try to extract context from current message with enhanced history
+      try {
+        const contextResponse = await fetch('http://localhost:3001/api/chat/extract-context', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            contextSummary: conversationHistory ? `Recent conversation:\n${conversationHistory}` : '',
+            existingEntities: extractedEntities,
+            conversationState
+          })
+        });
+        
+        if (contextResponse.ok) {
+          const contextData = await contextResponse.json();
+          extractedEntities = contextData.entities || [];
+          
+          if (contextData.entities?.length > 0 || contextData.contextUpdates) {
+            const entities = contextData.entities.map(e => `${e.type}: ${e.value}`).join(', ');
+            const updates = Object.entries(contextData.contextUpdates || {})
+              .map(([key, value]) => `${key}: ${value}`)
+              .join(', ');
+            
+            conversationContext = `\n\nConversation Context:\n`;
+            if (entities) conversationContext += `Entities discussed: ${entities}\n`;
+            if (updates) conversationContext += `Current context: ${updates}\n`;
+            
+            // Add specific context based on conversation state
+            if (conversationState.passportInfo) {
+              conversationContext += `User's passport expires: ${conversationState.passportInfo.expiry}\n`;
+            }
+            if (conversationState.travelDestination) {
+              conversationContext += `Planning travel to: ${conversationState.travelDestination}\n`;
+            }
+            if (conversationState.travelDates) {
+              conversationContext += `Travel dates: ${conversationState.travelDates}\n`;
+            }
+            
+            conversationContext += `\nIMPORTANT: Use this context to understand references like "there", "it", "the place", "my passport", etc. When the user asks follow-up questions, refer back to the conversation history.`;
+          }
+        }
+      } catch (contextError) {
+        console.warn('Context extraction failed, continuing without context:', contextError.message);
+      }
+    }
+
+    // Step 4: Generate AI response using Tala AI with conversation awareness
     const systemPrompt = `You are Tala, an AI travel assistant with access to a comprehensive knowledge base of travel documents, visa requirements, airline policies, and destination information.
 
 Your role:
 - Provide helpful, accurate travel advice based on the provided context
+- CRITICAL: Use conversation history to understand references and maintain continuity across multiple turns
+- When users ask follow-up questions, refer back to previous information discussed
+- Understand references like "there", "it", "the place", "my passport" based on conversation context
+- If the user mentions something discussed earlier (like passport expiry), acknowledge and use that information
 - If the context doesn't contain relevant information, acknowledge this and provide general guidance
 - Always be friendly, professional, and travel-focused
 - Cite specific documents when possible
 - Use markdown formatting for better readability
+
+IMPORTANT CONTEXT AWARENESS RULES:
+1. When the user says "there" or "that place", refer to the most recently discussed location
+2. When the user asks about "it", refer to the most recent travel document, visa, or item discussed
+3. When the user mentions "my passport", use any previously mentioned passport expiry information
+4. For follow-up questions, always consider what was discussed in previous messages
+5. If passport expiry was mentioned earlier and the user asks about visa requirements, proactively consider if their passport validity meets the requirements
+
+${conversationHistory ? `Recent Conversation History:\n${conversationHistory}\n` : ''}${conversationContext}
 
 Context from knowledge base:
 ${context || 'No relevant documents found in the knowledge base.'}`;
@@ -1236,13 +1514,14 @@ ${context || 'No relevant documents found in the knowledge base.'}`;
     // Store messages
     const messages = conversationMessages.get(finalConversationId) || [];
     
-    // Add user message
+    // Add user message with extracted entities
     messages.push({
       id: `user_${Date.now()}`,
       content: message,
       sender: 'user',
       timestamp: new Date().toISOString(),
-      conversationId: finalConversationId
+      conversationId: finalConversationId,
+      entities: extractedEntities // Store extracted entities for future reference
     });
     
     // Add AI response
@@ -1277,6 +1556,175 @@ ${context || 'No relevant documents found in the knowledge base.'}`;
     console.error('💬 Chat error:', error);
     res.status(500).json({
       error: 'Failed to process chat message',
+      details: error.message
+    });
+  }
+});
+
+// Entity extraction endpoint for conversation context
+app.post('/api/chat/extract-context', async (req, res) => {
+  try {
+    const { message, contextSummary, existingEntities } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    console.log('🧠 Extracting context from message:', message.substring(0, 100));
+    
+    // Define extraction functions for OpenAI
+    const functions = [
+      {
+        name: 'extract_entities_and_intents',
+        description: 'Extract travel-related entities and intents from user message',
+        parameters: {
+          type: 'object',
+          properties: {
+            entities: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: {
+                    type: 'string',
+                    enum: ['country', 'city', 'date', 'passport_expiry', 'travel_date', 'person_name', 'airline', 'hotel', 'visa_type', 'duration', 'currency', 'document_type', 'restaurant', 'activity', 'transportation', 'custom']
+                  },
+                  value: { type: 'string' },
+                  confidence: { type: 'number', minimum: 0, maximum: 1 }
+                },
+                required: ['type', 'value', 'confidence']
+              }
+            },
+            intents: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: {
+                    type: 'string',
+                    enum: ['visa_inquiry', 'passport_check', 'travel_planning', 'restaurant_search', 'hotel_search', 'flight_inquiry', 'document_request', 'general_info', 'itinerary_planning', 'booking_assistance', 'travel_requirements', 'emergency_info', 'cost_inquiry', 'weather_inquiry', 'cultural_info', 'language_help', 'currency_exchange', 'transportation_info', 'activity_search']
+                  },
+                  confidence: { type: 'number', minimum: 0, maximum: 1 }
+                },
+                required: ['type', 'confidence']
+              }
+            },
+            references: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: {
+                    type: 'string',
+                    enum: ['pronoun', 'demonstrative', 'implicit', 'ellipsis']
+                  },
+                  referenceText: { type: 'string' },
+                  resolvedEntityId: { type: 'string' },
+                  confidence: { type: 'number', minimum: 0, maximum: 1 },
+                  clarificationNeeded: { type: 'boolean' }
+                },
+                required: ['type', 'referenceText', 'confidence']
+              }
+            },
+            contextUpdates: {
+              type: 'object',
+              properties: {
+                currentCountry: { type: 'string' },
+                currentCity: { type: 'string' },
+                clientInfo: {
+                  type: 'object',
+                  properties: {
+                    passportExpiry: { type: 'string' },
+                    nationality: { type: 'string' }
+                  }
+                }
+              }
+            },
+            overallConfidence: { type: 'number', minimum: 0, maximum: 1 }
+          },
+          required: ['entities', 'intents', 'references', 'overallConfidence']
+        }
+      }
+    ];
+
+    const systemPrompt = `You are an expert at extracting travel-related entities and intents from conversational messages.
+
+Context Summary: ${contextSummary || 'No previous context'}
+Existing Entities: ${JSON.stringify(existingEntities || [])}
+${req.body.conversationState ? `Conversation State: ${JSON.stringify(req.body.conversationState)}` : ''}
+
+Extract entities, intents, and resolve references like "there", "it", "the place", "my passport" using the context.
+
+CRITICAL REFERENCE RESOLUTION RULES:
+1. "there" or "that place" → refers to the most recently mentioned location (country or city)
+2. "it" → refers to the most recent document, visa, or travel item
+3. "my passport" → if passport expiry was mentioned before, include that information
+4. "the visa" → refers to the visa type most recently discussed
+5. When someone asks "What about if my passport expires in [date]?" → extract passport_expiry entity
+6. For follow-up questions without explicit entity mentions, infer from conversation context
+
+Examples:
+- If user previously asked about Greece visa and then asks "What documents do I need for it?" → "it" = Greece visa
+- If user mentioned passport expiry and asks about visa requirements → include passport validity in context updates
+
+Be precise and extract all relevant entities, including implicit ones from the conversation context.`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Extract entities and intents from: "${message}"` }
+      ],
+      functions,
+      function_call: { name: 'extract_entities_and_intents' },
+      temperature: 0.1
+    });
+
+    const functionCall = completion.choices[0].message.function_call;
+    if (!functionCall || !functionCall.arguments) {
+      throw new Error('No function call result');
+    }
+
+    const extractedData = JSON.parse(functionCall.arguments);
+    
+    // Process and format the extracted data
+    const processedEntities = extractedData.entities.map(entity => ({
+      id: `${entity.type}_${entity.value.replace(/\\s+/g, '_').toLowerCase()}_${Date.now()}`,
+      type: entity.type,
+      value: entity.value,
+      normalizedValue: entity.value.toLowerCase().trim(),
+      confidence: entity.confidence,
+      firstMentioned: new Date(),
+      lastReferenced: new Date(),
+      referenceCount: 1,
+      context: message.substring(0, 200)
+    }));
+
+    const processedIntents = extractedData.intents.map(intent => ({
+      id: `${intent.type}_${Date.now()}`,
+      type: intent.type,
+      confidence: intent.confidence,
+      detectedAt: new Date(),
+      relatedEntities: [],
+      isActive: true
+    }));
+
+    const result = {
+      entities: processedEntities,
+      intents: processedIntents,
+      references: extractedData.references || [],
+      confidence: extractedData.overallConfidence || 0.5,
+      contextUpdates: extractedData.contextUpdates || {}
+    };
+
+    console.log(`✅ Extracted ${result.entities.length} entities and ${result.intents.length} intents`);
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('🧠 Context extraction error:', error);
+    res.status(500).json({
+      error: 'Failed to extract context',
       details: error.message
     });
   }
@@ -1380,6 +1828,219 @@ app.delete('/api/chat/conversations/:conversationId', async (req, res) => {
     console.error('🗑️ Delete conversation error:', error);
     res.status(500).json({
       error: 'Failed to delete conversation',
+      details: error.message
+    });
+  }
+});
+
+// Reset conversation context
+app.post('/api/chat/context/reset', async (req, res) => {
+  try {
+    const { conversationId, userId } = req.body;
+    
+    if (!conversationId || !userId) {
+      return res.status(400).json({ error: 'conversationId and userId are required' });
+    }
+    
+    // Verify conversation belongs to user
+    const conversation = conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Reset conversation context by clearing stored entities
+    const messages = conversationMessages.get(conversationId) || [];
+    messages.forEach(msg => {
+      if (msg.entities) {
+        delete msg.entities;
+      }
+    });
+    
+    // Update conversation metadata
+    conversation.contextReset = true;
+    conversation.lastContextReset = new Date().toISOString();
+    conversations.set(conversationId, conversation);
+    
+    // Save changes
+    saveConversations();
+    
+    console.log(`🔄 Reset context for conversation ${conversationId}`);
+    
+    res.json({ 
+      success: true,
+      message: 'Conversation context has been reset'
+    });
+    
+  } catch (error) {
+    console.error('🔄 Context reset error:', error);
+    res.status(500).json({
+      error: 'Failed to reset conversation context',
+      details: error.message
+    });
+  }
+});
+
+// Toggle context persistence for a conversation
+app.post('/api/chat/context/toggle', async (req, res) => {
+  try {
+    const { conversationId, userId, persistContext } = req.body;
+    
+    if (!conversationId || !userId || persistContext === undefined) {
+      return res.status(400).json({ error: 'conversationId, userId, and persistContext are required' });
+    }
+    
+    // Verify conversation belongs to user
+    const conversation = conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Update context persistence setting
+    conversation.persistContext = persistContext;
+    conversation.contextSettingsUpdated = new Date().toISOString();
+    conversations.set(conversationId, conversation);
+    
+    // Save changes
+    saveConversations();
+    
+    console.log(`🔧 Set context persistence to ${persistContext} for conversation ${conversationId}`);
+    
+    res.json({ 
+      success: true,
+      persistContext,
+      message: `Context persistence ${persistContext ? 'enabled' : 'disabled'}`
+    });
+    
+  } catch (error) {
+    console.error('🔧 Context toggle error:', error);
+    res.status(500).json({
+      error: 'Failed to toggle context persistence',
+      details: error.message
+    });
+  }
+});
+
+// Get conversation context status
+app.get('/api/chat/context/status/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Get conversation
+    const conversation = conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Get messages to analyze context
+    const messages = conversationMessages.get(conversationId) || [];
+    const entitiesCount = messages.reduce((count, msg) => {
+      return count + (msg.entities?.length || 0);
+    }, 0);
+    
+    res.json({
+      conversationId,
+      persistContext: conversation.persistContext !== false, // Default to true
+      contextReset: conversation.contextReset || false,
+      lastContextReset: conversation.lastContextReset || null,
+      entitiesTracked: entitiesCount,
+      messageCount: messages.length
+    });
+    
+  } catch (error) {
+    console.error('📊 Context status error:', error);
+    res.status(500).json({
+      error: 'Failed to get context status',
+      details: error.message
+    });
+  }
+});
+
+// Store voice input in knowledge base
+app.post('/api/voice/store', async (req, res) => {
+  try {
+    const { content, userId, title, primaryFolderId, category } = req.body;
+    
+    if (!content || !userId) {
+      return res.status(400).json({ error: 'Content and userId are required' });
+    }
+    
+    console.log(`🎤 Storing voice input from user ${userId} in category "${category || 'auto-detect'}": "${content.substring(0, 100)}..."`);
+    
+    // Create a text file from the voice input
+    const filename = title || `voice-input-${Date.now()}.txt`;
+    const buffer = Buffer.from(content, 'utf-8');
+    
+    // Create a mock file object for processing
+    const mockFile = {
+      originalname: filename,
+      buffer: buffer,
+      mimetype: 'text/plain',
+      size: buffer.length
+    };
+    
+    // Generate document ID
+    const documentId = uuidv4();
+    
+    // Process the content for vector storage
+    const textChunks = content.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 0);
+    const points = [];
+    
+    for (let i = 0; i < textChunks.length; i++) {
+      const chunk = textChunks[i].trim();
+      if (chunk.length > 0) {
+        const embedding = await generateEmbedding(chunk);
+        
+        points.push({
+          id: uuidv4(),
+          vector: embedding,
+          payload: {
+            content: chunk,
+            chunkIndex: i,
+            documentId: documentId,
+            metadata: {
+              title: filename,
+              type: 'voice-input',
+              uploadedAt: new Date().toISOString(),
+              userId: userId,
+              isAdmin: false,
+              primaryFolderId: primaryFolderId,
+              category: category
+            }
+          }
+        });
+      }
+    }
+    
+    // Store in user's collection
+    const collectionName = getCollectionName(userId, false);
+    await ensureCollectionExists(collectionName);
+    
+    if (points.length > 0) {
+      await qdrant.upsert(collectionName, {
+        wait: true,
+        points: points
+      });
+    }
+    
+    console.log(`✅ Stored voice input with ${points.length} chunks for user ${userId}`);
+    
+    res.json({
+      success: true,
+      documentId,
+      chunksStored: points.length,
+      filename,
+      message: 'Voice input stored successfully in knowledge base'
+    });
+    
+  } catch (error) {
+    console.error('🎤 Voice storage error:', error);
+    res.status(500).json({
+      error: 'Failed to store voice input',
       details: error.message
     });
   }
