@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Database, FolderOpen, Tag, Extract, Upload, X, ChevronDown } from 'lucide-react';
+import { FileText, Database, FolderOpen, Tag, FileSearch, Upload, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../utils/cn';
 import { VoiceCategorySelector } from './VoiceCategorySelector';
@@ -142,7 +142,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
               onChange={(e) => setSelectedAction(e.target.value as any)}
               className="sr-only"
             />
-            <Extract size={16} className="text-green-400" />
+            <FileSearch size={16} className="text-green-400" />
             <div className="flex-1">
               <div className="text-sm font-medium text-white">Extract Data Only</div>
               <div className="text-xs text-white/60">Process document content and show key information</div>
@@ -183,7 +183,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
               className="sr-only"
             />
             <div className="flex items-center gap-1">
-              <Extract size={14} className="text-purple-400" />
+              <FileSearch size={14} className="text-purple-400" />
               <Database size={14} className="text-purple-400" />
             </div>
             <div className="flex-1">
