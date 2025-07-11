@@ -82,7 +82,7 @@ export const PrimaryFolderCard = ({
     >
       <GlassCard 
         className={cn(
-          'p-6 cursor-pointer transition-all duration-300 hover:shadow-xl relative overflow-hidden',
+          'p-6 cursor-pointer transition-all duration-300 hover:shadow-xl relative overflow-hidden h-full flex flex-col',
           'hover:bg-white/10 border-2 border-transparent',
           `hover:border-[${primaryFolder.color}]/30`
         )}
@@ -97,7 +97,7 @@ export const PrimaryFolderCard = ({
         />
         
         {/* Content */}
-        <div className="relative z-10">
+        <div className="relative z-10 flex flex-col h-full">
           {/* Header */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -111,22 +111,6 @@ export const PrimaryFolderCard = ({
                 <h3 className="font-semibold text-lg text-white mb-1">
                   {primaryFolder.name}
                 </h3>
-                <div className="flex items-center gap-2 text-xs text-white/50">
-                  <span className="px-2 py-1 bg-white/10 rounded-full">
-                    {primaryFolder.slug}
-                  </span>
-                  {primaryFolder.isSystem && (
-                    <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded-full">
-                      System
-                    </span>
-                  )}
-                  {primaryFolder.permissions.visibility === 'admin-only' && (
-                    <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded-full flex items-center gap-1">
-                      <EyeOff size={10} />
-                      Admin Only
-                    </span>
-                  )}
-                </div>
               </div>
             </div>
             
@@ -147,13 +131,13 @@ export const PrimaryFolderCard = ({
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="absolute right-0 top-full mt-2 w-48 glass-dark rounded-lg border border-white/10 shadow-xl z-50"
+                    className="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-lg border border-gray-600 shadow-xl z-[60]"
                   >
                     <div className="p-2">
                       {onEdit && (
                         <button
                           onClick={handleEdit}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-white/10 rounded-lg flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 rounded-lg flex items-center gap-2 text-white"
                         >
                           <Edit size={14} />
                           Edit Category
@@ -163,7 +147,7 @@ export const PrimaryFolderCard = ({
                         <button
                           onClick={handleDelete}
                           disabled={primaryFolder.isSystem}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-white/10 rounded-lg flex items-center gap-2 text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 rounded-lg flex items-center gap-2 text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 size={14} />
                           {primaryFolder.isSystem ? 'Protected' : 'Delete Category'}
@@ -177,11 +161,13 @@ export const PrimaryFolderCard = ({
           </div>
           
           {/* Description */}
-          {primaryFolder.description && (
-            <p className="text-sm text-white/70 mb-4 line-clamp-2">
-              {primaryFolder.description}
-            </p>
-          )}
+          <div className="flex-1 mb-4">
+            {primaryFolder.description && (
+              <p className="text-sm text-white/70 line-clamp-2">
+                {primaryFolder.description}
+              </p>
+            )}
+          </div>
           
           {/* Stats */}
           <div className="grid grid-cols-2 gap-4 mb-4">
@@ -210,7 +196,7 @@ export const PrimaryFolderCard = ({
           )}
           
           {/* Permissions indicators */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+          <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/10">
             <div className="flex items-center gap-2 text-xs text-white/50">
               {primaryFolder.permissions.canUpload && (
                 <span className="flex items-center gap-1">
@@ -254,7 +240,7 @@ export const PrimaryFolderCard = ({
       {/* Click outside to close menu */}
       {showMenu && (
         <div 
-          className="fixed inset-0 z-40" 
+          className="fixed inset-0 z-50" 
           onClick={() => setShowMenu(false)}
         />
       )}
