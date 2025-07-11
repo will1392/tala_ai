@@ -1,16 +1,23 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bot, Copy, ThumbsUp, ThumbsDown, FileText, ExternalLink } from 'lucide-react';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { cn } from '../../utils/cn';
 import ReactMarkdown from 'react-markdown';
+import { ReferenceDocumentModal } from './ReferenceDocumentModal';
 
 interface Message {
   id: string;
   content: string;
   sender: 'user' | 'tala';
   timestamp: Date;
-  sources?: Array<{ title: string; type: 'document' | 'website' }>;
+  sources?: Array<{ 
+    title: string; 
+    type: 'document' | 'website';
+    score?: number;
+    documentId?: string;
+  }>;
   attachments?: Array<{ name: string; size: string; type: string }>;
 }
 
@@ -20,6 +27,23 @@ interface ChatMessageProps {
 
 export const ChatMessage = ({ message }: ChatMessageProps) => {
   const isUser = message.sender === 'user';
+  const [selectedReference, setSelectedReference] = useState<{ 
+    title: string; 
+    type: 'document' | 'website';
+    score?: number;
+    documentId?: string;
+  } | null>(null);
+  const [showReferenceModal, setShowReferenceModal] = useState(false);
+
+  const handleReferenceClick = (source: typeof selectedReference) => {
+    setSelectedReference(source);
+    setShowReferenceModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowReferenceModal(false);
+    setSelectedReference(null);
+  };
 
   return (
     <motion.div
@@ -113,14 +137,20 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
                   {message.sources.map((source, index) => (
                     <button
                       key={index}
-                      className="flex items-center gap-2 text-xs text-primary hover:text-primary-light transition-colors"
+                      onClick={() => handleReferenceClick(source)}
+                      className="flex items-center gap-2 text-xs text-primary hover:text-primary-light transition-colors hover:bg-white/5 rounded px-2 py-1 -mx-2"
                     >
                       {source.type === 'document' ? (
                         <FileText size={14} />
                       ) : (
                         <ExternalLink size={14} />
                       )}
-                      {source.title}
+                      <span className="truncate flex-1 text-left">{source.title}</span>
+                      {source.score && (
+                        <span className="text-xs text-white/40 ml-auto" title="Relevance score">
+                          {Math.round(source.score * 100)}%
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -144,6 +174,13 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
           )}
         </div>
       </div>
+
+      {/* Reference Document Modal */}
+      <ReferenceDocumentModal
+        isOpen={showReferenceModal}
+        onClose={handleCloseModal}
+        reference={selectedReference}
+      />
     </motion.div>
   );
 };

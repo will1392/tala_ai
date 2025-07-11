@@ -143,9 +143,103 @@ tala-ui/
 - ✅ **Real-time messaging** - Smooth chat experience with typing indicators
 - ✅ **Error handling** - Comprehensive error management and user feedback
 
-## 🎉 Latest Updates (January 3, 2025)
+## 🎉 Latest Updates (January 10, 2025)
 
-### 🚀 Document Management System & Cloud Storage (NEW!)
+### 🎙️ Voice Input & Speech Categorization System (NEW!)
+
+#### **🗣️ Advanced Speech-to-Text Integration**
+1. **Web Speech API Implementation**
+   - ✅ **Real-time Voice Recognition** - Browser-native speech recognition with live transcription
+   - ✅ **Multi-language Support** - Configurable language selection (English, Spanish, French, etc.)
+   - ✅ **Visual Feedback** - Animated microphone indicators and listening states
+   - ✅ **Error Handling** - Comprehensive error management with user-friendly messages
+   - ✅ **Browser Compatibility** - Automatic detection and graceful fallbacks
+
+2. **Intelligent Voice Categorization**
+   - ✅ **Smart Category Detection** - AI-powered analysis of voice content for automatic categorization
+   - ✅ **Category Options** - Destinations, Suppliers, and Miscellaneous with custom icons and colors
+   - ✅ **Manual Override** - Users can override AI suggestions or manually select categories
+   - ✅ **Confidence Scoring** - AI confidence levels for category suggestions
+   - ✅ **Keyword Analysis** - Advanced pattern matching for travel-related content
+
+3. **Voice Storage & Knowledge Base Integration**
+   - ✅ **Voice-to-Text Storage** - Convert voice input to searchable text documents
+   - ✅ **Category Assignment** - Store voice artifacts in appropriate primary folders
+   - ✅ **Metadata Tagging** - Full integration with existing tagging system
+   - ✅ **Vector Embedding** - Voice content becomes searchable through AI chat
+   - ✅ **Storage Prompt** - Optional user prompt to store voice input in knowledge base
+
+#### **📄 Enhanced Document Upload Experience**
+1. **Comprehensive Document Processing Options**
+   - ✅ **Extract Data Only** - Process documents and display key information without storage
+   - ✅ **Store in Knowledge Base** - Save documents for future AI reference with full organization
+   - ✅ **Extract & Store** - Combined operation for immediate insights and future access
+   - ✅ **Processing Options** - Summary, Key Data, or Full Text extraction modes
+   - ✅ **Smart Category Detection** - Automatic category suggestions based on document content
+
+2. **Advanced Data Extraction Engine**
+   - ✅ **AI-Powered Extraction** - OpenAI GPT-3.5-turbo for intelligent content analysis
+   - ✅ **Multi-Format Support** - PDF, DOCX, TXT with metadata extraction
+   - ✅ **Structured Data Output** - Key-value pairs for important facts and figures
+   - ✅ **Document Metadata** - Title, author, pages, file size, and type information
+   - ✅ **Formatted Results** - Beautiful markdown output in chat interface
+
+3. **Enhanced Storage & Organization**
+   - ✅ **Category & Tag Support** - Full integration with existing folder and tag systems
+   - ✅ **Batch Processing** - Handle multiple documents simultaneously
+   - ✅ **Progress Indicators** - Real-time feedback during document processing
+   - ✅ **Error Recovery** - Graceful handling of processing failures with detailed feedback
+
+#### **🧠 Multi-Turn Conversation Intelligence**
+1. **Advanced Context Management**
+   - ✅ **Entity Extraction** - Automatic detection of travel-related entities (countries, dates, passport info)
+   - ✅ **Reference Resolution** - Smart understanding of "there," "it," "my passport" based on context
+   - ✅ **Conversation State Tracking** - Persistent tracking of passport expiry, destinations, visa inquiries
+   - ✅ **Context-Aware Responses** - AI uses conversation history for better understanding
+   - ✅ **10-Message History** - Increased context window for better continuity
+
+2. **Context Control Features**
+   - ✅ **Reset Context** - Users can clear conversation context when needed
+   - ✅ **Toggle Persistence** - Enable/disable context tracking per conversation
+   - ✅ **Context Status** - Visual indicators showing context state and entity count
+   - ✅ **Smart Prompting** - Enhanced system prompts with context awareness rules
+
+#### **🎨 UI/UX Enhancements**
+1. **Streamlined Chat Interface**
+   - ✅ **Full-Screen Chat** - Maximized chat area with minimal sidebar
+   - ✅ **Fixed Layout** - Input always at bottom, scrollable message area
+   - ✅ **Auto-Scroll** - Automatic scrolling to new messages with scroll-to-bottom button
+   - ✅ **Conversation History Only** - Simplified sidebar showing only conversation list
+   - ✅ **Clean Design** - Removed clutter for focused chat experience
+
+2. **Voice & Document UI Components**
+   - ✅ **VoiceCategorySelector** - Beautiful category selection with AI suggestions
+   - ✅ **DocumentUploadOptions** - Comprehensive options dialog for document processing
+   - ✅ **VoiceSettings** - Language selection and microphone testing interface
+   - ✅ **Processing Indicators** - Visual feedback for all async operations
+
+#### **🔧 Technical Infrastructure**
+1. **New Backend APIs**
+   - ✅ **`/api/documents/extract`** - Document data extraction without storage
+   - ✅ **`/api/voice/store`** - Voice input storage with categorization
+   - ✅ **`/api/chat/extract-context`** - Advanced entity and intent extraction
+   - ✅ **`/api/chat/context/*`** - Context management endpoints (reset, toggle, status)
+
+2. **Enhanced Services**
+   - ✅ **`speechService.ts`** - Complete Web Speech API integration
+   - ✅ **`documentExtractionService.ts`** - Document processing and API communication
+   - ✅ **`categoryDetectionService.ts`** - AI-powered content categorization
+   - ✅ **`conversationContextService.ts`** - Context management and entity tracking
+   - ✅ **Enhanced conversation context tracking** - Passport info, destinations, visa inquiries
+
+3. **New React Components & Hooks**
+   - ✅ **`useSpeechRecognition.ts`** - Speech recognition state management
+   - ✅ **`useConversationContext.ts`** - Conversation context management
+   - ✅ **`DocumentUploadOptions.tsx`** - Comprehensive upload options interface
+   - ✅ **`VoiceCategorySelector.tsx`** - Category selection with AI suggestions
+   - ✅ **`ConversationContextIndicator.tsx`** - Context status visualization
+
+### 🚀 Document Management System & Cloud Storage (Previous Update)
 
 #### **☁️ Enterprise Cloud Storage Implementation**
 1. **Multi-Provider Storage Support**
@@ -539,10 +633,13 @@ tala-ui/
 - **Folder System**: Complete CRUD operations with real-time synchronization
 
 #### **Complete Tala AI Chat System**
-- **Intelligent Chat**: AI-powered responses using your knowledge base
+- **Intelligent Chat**: AI-powered responses using your knowledge base with multi-turn context awareness
+- **Voice Input**: Speech-to-text integration with smart categorization and knowledge base storage
+- **Document Processing**: Upload documents for immediate data extraction or knowledge base storage
 - **Conversation History**: Persistent chat history with last 15 conversations
 - **Source Citations**: Clear attribution of documents used in responses
-- **Real-time Messaging**: Smooth chat experience with typing indicators
+- **Context Management**: Smart entity tracking with reference resolution ("there", "it", "my passport")
+- **Real-time Messaging**: Smooth chat experience with typing indicators and auto-scroll
 - **Error Handling**: Comprehensive error management and recovery
 
 #### **Beautiful User Interface**

@@ -1960,6 +1960,117 @@ app.get('/api/chat/context/status/:conversationId', async (req, res) => {
   }
 });
 
+// Get document content by ID
+app.get('/api/documents/:documentId', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { userId } = req.query;
+    
+    if (!documentId) {
+      return res.status(400).json({ error: 'Document ID is required' });
+    }
+    
+    console.log(`📄 Fetching document content for ID: ${documentId}`);
+    
+    // Determine which collections to search
+    const collections = ['tala_admin_knowledge'];
+    if (userId) {
+      const userCollection = getCollectionName(userId, false);
+      collections.push(userCollection);
+    }
+    
+    let documentContent = null;
+    let documentMetadata = null;
+    
+    // Search in all available collections
+    for (const collectionName of collections) {
+      try {
+        // Check if collection exists
+        const collectionInfo = await qdrant.getCollection(collectionName);
+        if (!collectionInfo) continue;
+        
+        // Search for document chunks with this documentId
+        const scrollResult = await qdrant.scroll(collectionName, {
+          filter: {
+            must: [
+              {
+                key: 'documentId',
+                match: { value: documentId }
+              }
+            ]
+          },
+          limit: 1000, // Get all chunks for this document
+          with_payload: true,
+          with_vector: false
+        });
+        
+        if (scrollResult.points && scrollResult.points.length > 0) {
+          // Sort chunks by index and combine content
+          const chunks = scrollResult.points
+            .map(point => ({
+              content: point.payload.content,
+              chunkIndex: point.payload.metadata?.chunkIndex || 0,
+              metadata: point.payload.metadata,
+              document: point.payload.document
+            }))
+            .sort((a, b) => a.chunkIndex - b.chunkIndex);
+          
+          // Combine all chunks into full document content
+          documentContent = chunks.map(chunk => chunk.content).join('\n\n');
+          
+          // Get metadata from first chunk
+          const firstChunk = chunks[0];
+          documentMetadata = {
+            title: firstChunk.metadata?.title || firstChunk.document?.originalName || 'Unknown Document',
+            fileType: firstChunk.document?.fileType || 'unknown',
+            fileSize: firstChunk.document?.fileSize || 0,
+            uploadedAt: firstChunk.document?.uploadedAt,
+            pages: firstChunk.metadata?.pages,
+            author: firstChunk.metadata?.author,
+            category: firstChunk.metadata?.category,
+            tags: firstChunk.metadata?.tags || []
+          };
+          
+          // Format file size
+          if (typeof documentMetadata.fileSize === 'number') {
+            if (documentMetadata.fileSize > 1024 * 1024) {
+              documentMetadata.fileSize = `${(documentMetadata.fileSize / (1024 * 1024)).toFixed(2)} MB`;
+            } else if (documentMetadata.fileSize > 1024) {
+              documentMetadata.fileSize = `${(documentMetadata.fileSize / 1024).toFixed(2)} KB`;
+            } else {
+              documentMetadata.fileSize = `${documentMetadata.fileSize} bytes`;
+            }
+          }
+          
+          break; // Found the document, stop searching
+        }
+      } catch (collectionError) {
+        console.warn(`Could not search collection ${collectionName}:`, collectionError.message);
+        continue;
+      }
+    }
+    
+    if (!documentContent) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    console.log(`✅ Found document: ${documentMetadata.title} (${documentContent.length} chars)`);
+    
+    res.json({
+      title: documentMetadata.title,
+      content: documentContent,
+      metadata: documentMetadata
+    });
+    
+  } catch (error) {
+    console.error('📄 Document fetch error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch document',
+      details: error.message
+    });
+  }
+});
+
 // Store voice input in knowledge base
 app.post('/api/voice/store', async (req, res) => {
   try {
