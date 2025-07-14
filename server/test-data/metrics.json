@@ -1,0 +1,332 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-07-13T15:28:09.945Z",
+    "lastUpdated": "2025-07-13T15:28:09.992Z"
+  },
+  "metrics": [
+    {
+      "modelId": "gpt-4o-mini-2024-07-18",
+      "queryType": "factual",
+      "responseTime": 1200,
+      "tokensUsed": 1000,
+      "cost": 2.8499999999999997e-7,
+      "success": true,
+      "timestamp": 1752420489958,
+      "id": "1752420489958-15ram2tyd"
+    },
+    {
+      "modelId": "claude-sonnet-4-20250514",
+      "queryType": "complexPlanning",
+      "responseTime": 800,
+      "tokensUsed": 500,
+      "cost": 0.0000032999999999999997,
+      "success": true,
+      "timestamp": 1752420489969,
+      "id": "1752420489969-zuzyj2lyk"
+    },
+    {
+      "modelId": "gemini-2.5-flash",
+      "queryType": "realTime",
+      "responseTime": 1500,
+      "tokensUsed": 1500,
+      "cost": 2.1374999999999997e-7,
+      "success": true,
+      "timestamp": 1752420489980,
+      "id": "1752420489980-tjx6skt3p"
+    },
+    {
+      "modelId": "gpt-4o-mini-2024-07-18",
+      "queryType": "factual",
+      "responseTime": 2000,
+      "tokensUsed": 2000,
+      "cost": 5.699999999999999e-7,
+      "success": false,
+      "timestamp": 1752420489992,
+      "id": "1752420489992-oy8fwafzd"
+    }
+  ],
+  "aggregations": {
+    "hourly": {
+      "486783": {
+        "period": "hour",
+        "key": 486783,
+        "timestamp": 1752420489958,
+        "requests": 4,
+        "successfulRequests": 3,
+        "totalResponseTime": 5500,
+        "totalCost": 0.0000043687499999999995,
+        "totalTokens": 5000,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    },
+    "daily": {
+      "20282": {
+        "period": "day",
+        "key": 20282,
+        "timestamp": 1752420489958,
+        "requests": 4,
+        "successfulRequests": 3,
+        "totalResponseTime": 5500,
+        "totalCost": 0.0000043687499999999995,
+        "totalTokens": 5000,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    },
+    "weekly": {
+      "2896": {
+        "period": "week",
+        "key": 2896,
+        "timestamp": 1752420489958,
+        "requests": 4,
+        "successfulRequests": 3,
+        "totalResponseTime": 5500,
+        "totalCost": 0.0000043687499999999995,
+        "totalTokens": 5000,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    },
+    "monthly": {
+      "2025-07": {
+        "period": "month",
+        "key": "2025-07",
+        "timestamp": 1752420489958,
+        "requests": 4,
+        "successfulRequests": 3,
+        "totalResponseTime": 5500,
+        "totalCost": 0.0000043687499999999995,
+        "totalTokens": 5000,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    }
+  },
+  "patterns": {
+    "queryTypes": {
+      "factual": {
+        "queryType": "factual",
+        "totalQueries": 2,
+        "avgResponseTime": 1600,
+        "avgCost": 4.2749999999999993e-7,
+        "avgTokens": 1500,
+        "preferredModels": {
+          "gpt-4o-mini-2024-07-18": 2
+        },
+        "timeOfDayDistribution": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "dayOfWeekDistribution": [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "successRate": 200
+      },
+      "complexPlanning": {
+        "queryType": "complexPlanning",
+        "totalQueries": 1,
+        "avgResponseTime": 800,
+        "avgCost": 0.0000032999999999999997,
+        "avgTokens": 500,
+        "preferredModels": {
+          "claude-sonnet-4-20250514": 1
+        },
+        "timeOfDayDistribution": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "dayOfWeekDistribution": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "successRate": 200
+      },
+      "realTime": {
+        "queryType": "realTime",
+        "totalQueries": 1,
+        "avgResponseTime": 1500,
+        "avgCost": 2.1374999999999997e-7,
+        "avgTokens": 1500,
+        "preferredModels": {
+          "gemini-2.5-flash": 1
+        },
+        "timeOfDayDistribution": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "dayOfWeekDistribution": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "successRate": 200
+      }
+    },
+    "userBehavior": {},
+    "modelPerformance": {
+      "gpt-4o-mini-2024-07-18": {
+        "modelId": "gpt-4o-mini-2024-07-18",
+        "totalQueries": 2,
+        "avgResponseTime": 1600,
+        "avgCost": 4.2749999999999993e-7,
+        "successRate": 200,
+        "performanceTrend": [
+          {
+            "timestamp": 1752420489958,
+            "responseTime": 1200,
+            "success": true
+          },
+          {
+            "timestamp": 1752420489992,
+            "responseTime": 2000,
+            "success": false
+          }
+        ],
+        "costEfficiency": 2.1374999999999997e-7,
+        "reliabilityScore": 100
+      },
+      "claude-sonnet-4-20250514": {
+        "modelId": "claude-sonnet-4-20250514",
+        "totalQueries": 1,
+        "avgResponseTime": 800,
+        "avgCost": 0.0000032999999999999997,
+        "successRate": 200,
+        "performanceTrend": [
+          {
+            "timestamp": 1752420489969,
+            "responseTime": 800,
+            "success": true
+          }
+        ],
+        "costEfficiency": 0.0000016499999999999999,
+        "reliabilityScore": 100
+      },
+      "gemini-2.5-flash": {
+        "modelId": "gemini-2.5-flash",
+        "totalQueries": 1,
+        "avgResponseTime": 1500,
+        "avgCost": 2.1374999999999997e-7,
+        "successRate": 200,
+        "performanceTrend": [
+          {
+            "timestamp": 1752420489980,
+            "responseTime": 1500,
+            "success": true
+          }
+        ],
+        "costEfficiency": 1.0687499999999998e-7,
+        "reliabilityScore": 100
+      }
+    },
+    "costTrends": {
+      "2025-07": {
+        "month": "2025-07",
+        "totalCost": 0.0000043687499999999995,
+        "queriesCount": 4,
+        "avgCostPerQuery": 0.0000010921874999999999,
+        "costByModel": {
+          "gpt-4o-mini-2024-07-18": 8.549999999999999e-7,
+          "claude-sonnet-4-20250514": 0.0000032999999999999997,
+          "gemini-2.5-flash": 2.1374999999999997e-7
+        },
+        "costByQueryType": {
+          "factual": 8.549999999999999e-7,
+          "complexPlanning": 0.0000032999999999999997,
+          "realTime": 2.1374999999999997e-7
+        },
+        "projectedMonthlyCost": 0.00001041778846153846
+      }
+    }
+  }
+}

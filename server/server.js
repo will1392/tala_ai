@@ -13,6 +13,26 @@ import mammoth from 'mammoth';
 import XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import CloudStorageService from './services/cloudStorage.js';
+import LLMRouter from './services/llm/LLMRouter.js';
+import metricsRoutes from './api-metrics-endpoint.js';
+import ChatService from './services/chatService.js';
+import { getSupabaseHealth } from './db/supabaseClient.js';
+import { logDatabaseStatus } from './config/database.js';
+
+// Import new database and middleware components
+import { initializeRedis } from './config/redis.js';
+import { initializeAuth, authenticate, optionalAuth } from './middleware/authentication.js';
+import { rateLimiter } from './middleware/rateLimiter.js';
+import { errorHandler, notFoundHandler, asyncHandler } from './utils/errorHandler.js';
+
+// Import authentication components
+import authManager from './auth/AuthManager.js';
+import { getAuthConfig } from './config/auth.js';
+
+// Import database services
+import { ConversationService } from './services/db/conversationService.js';
+import { DocumentService } from './services/db/documentService.js';
+import { FolderService } from './services/db/folderService.js';
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +52,75 @@ const openai = new OpenAI({
 
 // Initialize cloud storage service
 const cloudStorage = new CloudStorageService();
+
+// Initialize LLM Router with feature flag
+let llmRouter = null;
+const enableMultiLLM = process.env.ENABLE_MULTI_LLM === 'true';
+
+if (enableMultiLLM) {
+  console.log('🤖 Initializing Multi-LLM Router...');
+  llmRouter = new LLMRouter({
+    enableLogging: true,
+    enableMonitoring: true,
+    enableCostOptimization: true,
+    enableHealthChecks: true,
+    dailyBudget: parseFloat(process.env.DAILY_LLM_BUDGET) || 50.00,
+    monthlyBudget: parseFloat(process.env.MONTHLY_LLM_BUDGET) || 1000.00,
+    fallbackChain: (process.env.LLM_FALLBACK_CHAIN || 'gpt-4o-mini,claude-sonnet-4-20250514,gemini-2.5-flash,grok-3-latest').split(',')
+  });
+} else {
+  console.log('🔒 Multi-LLM routing disabled, using OpenAI only');
+}
+
+// Initialize Chat Service
+const chatService = new ChatService({
+  enableMultiLLM,
+  llmRouter,
+  openai,
+  enableLogging: true
+});
+
+// Initialize database services
+const conversationService = new ConversationService();
+const documentService = new DocumentService();
+const folderService = new FolderService();
+
+// Initialize database connection and supporting services
+(async () => {
+  try {
+    // Initialize Redis caching layer
+    console.log('🔴 Initializing Redis caching layer...');
+    const redisInfo = await initializeRedis();
+    if (redisInfo.isConnected) {
+      console.log('✅ Redis connected successfully');
+    } else {
+      console.log('⚠️  Redis not available - using in-memory fallback');
+    }
+
+    // Initialize authentication system
+    console.log('🔐 Initializing authentication system...');
+    await initializeAuth();
+    
+    // Initialize main AuthManager for routes
+    console.log('🔐 Initializing main AuthManager...');
+    const authConfig = getAuthConfig();
+    await authManager.initialize(authConfig);
+    console.log('✅ Main AuthManager initialized');
+    
+    // Test database connection
+    const dbHealth = await getSupabaseHealth();
+    if (dbHealth.status === 'healthy') {
+      console.log('✅ Database connection verified');
+      await logDatabaseStatus();
+    } else {
+      console.log('⚠️  Database not ready - using JSON fallback mode');
+      console.log('💡 Run: node test-database-setup.js to configure database');
+    }
+  } catch (error) {
+    console.log('⚠️  Database health check failed - using JSON fallback mode');
+    console.error('Details:', error.message);
+  }
+})();
 
 // Test cloud storage connection on startup
 (async () => {
@@ -85,6 +174,9 @@ app.use((req, res, next) => {
   req.startTime = Date.now();
   next();
 });
+
+// Add rate limiting middleware
+app.use(rateLimiter.middleware('api'));
 
 // Configure multer for file uploads
 const upload = multer({
@@ -160,17 +252,28 @@ function getCollectionName(userId, isAdmin = false) {
 }
 
 async function generateEmbedding(text) {
-  // Truncate text to ensure it fits within token limits
-  // Approximate 1 token = 4 characters for English text
-  const maxChars = 30000; // ~7500 tokens, well under 8192 limit
-  const truncatedText = text.length > maxChars ? text.substring(0, maxChars) : text;
-  
-  const response = await openai.embeddings.create({
-    model: 'text-embedding-3-small',
-    input: truncatedText,
-    encoding_format: 'float'
-  });
-  return response.data[0].embedding;
+  try {
+    // Check if OpenAI is configured
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn('⚠️  OpenAI API key not configured, skipping embedding generation');
+      return null;
+    }
+    
+    // Truncate text to ensure it fits within token limits
+    // Approximate 1 token = 4 characters for English text
+    const maxChars = 30000; // ~7500 tokens, well under 8192 limit
+    const truncatedText = text.length > maxChars ? text.substring(0, maxChars) : text;
+    
+    const response = await openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: truncatedText,
+      encoding_format: 'float'
+    });
+    return response.data[0].embedding;
+  } catch (error) {
+    console.error('❌ Failed to generate embedding:', error.message);
+    return null;
+  }
 }
 
 async function extractTextFromFile(buffer, mimetype, filename) {
@@ -342,72 +445,316 @@ const folders = loadFolders();
 
 // API Routes
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+// Comprehensive health check endpoint
+app.get('/api/health', async (req, res) => {
+  const startTime = Date.now();
+  const health = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime(),
+    services: {},
+    performance: {},
+    summary: {
+      healthy: 0,
+      degraded: 0,
+      unhealthy: 0
+    }
+  };
+
+  // Check Database (PostgreSQL via Supabase)
+  try {
+    const dbStartTime = Date.now();
+    const dbHealth = await getSupabaseHealth();
+    const dbResponseTime = Date.now() - dbStartTime;
+    
+    health.services.database = {
+      status: dbHealth.status,
+      provider: 'Supabase PostgreSQL',
+      responseTime: dbResponseTime,
+      details: {
+        url: process.env.SUPABASE_URL ? '✅ Configured' : '❌ Missing',
+        connection: dbHealth.status,
+        lastChecked: new Date().toISOString()
+      }
+    };
+    
+    if (dbHealth.status === 'healthy') {
+      health.summary.healthy++;
+    } else {
+      health.summary.unhealthy++;
+    }
+  } catch (error) {
+    health.services.database = {
+      status: 'error',
+      provider: 'Supabase PostgreSQL',
+      error: error.message,
+      responseTime: null
+    };
+    health.summary.unhealthy++;
+  }
+
+  // Check Redis Cache
+  try {
+    const redisStartTime = Date.now();
+    const { redisHealthCheck } = await import('./config/redis.js');
+    const redisHealth = await redisHealthCheck();
+    const redisResponseTime = Date.now() - redisStartTime;
+    
+    health.services.redis = {
+      status: redisHealth.status,
+      provider: 'Redis Cache',
+      responseTime: redisResponseTime,
+      details: {
+        connected: redisHealth.connected || false,
+        latency: redisHealth.latency,
+        fallbackMode: !redisHealth.connected,
+        lastChecked: new Date().toISOString()
+      }
+    };
+    
+    if (redisHealth.status === 'healthy') {
+      health.summary.healthy++;
+    } else if (redisHealth.status === 'degraded') {
+      health.summary.degraded++;
+    } else {
+      health.summary.unhealthy++;
+    }
+  } catch (error) {
+    health.services.redis = {
+      status: 'degraded',
+      provider: 'Redis Cache',
+      error: 'Fallback mode - Redis not available',
+      responseTime: null
+    };
+    health.summary.degraded++;
+  }
+
+  // Check Qdrant Vector Database
+  try {
+    const qdrantStartTime = Date.now();
+    const collections = await qdrant.getCollections();
+    const qdrantResponseTime = Date.now() - qdrantStartTime;
+    
+    health.services.qdrant = {
+      status: 'healthy',
+      provider: 'Qdrant Vector DB',
+      responseTime: qdrantResponseTime,
+      details: {
+        url: process.env.QDRANT_URL ? '✅ Configured' : '❌ Missing',
+        collections: collections.collections?.length || 0,
+        lastChecked: new Date().toISOString()
+      }
+    };
+    health.summary.healthy++;
+  } catch (error) {
+    health.services.qdrant = {
+      status: 'error',
+      provider: 'Qdrant Vector DB',
+      error: error.message,
+      responseTime: null
+    };
+    health.summary.unhealthy++;
+  }
+
+  // Check LLM Services
+  health.services.llm = {
+    multiLLMEnabled: enableMultiLLM,
+    providers: {
+      openai: !!process.env.OPENAI_API_KEY,
+      anthropic: !!process.env.ANTHROPIC_API_KEY,
+      google: !!process.env.GOOGLE_AI_API_KEY,
+      grok: !!process.env.GROK_API_KEY
+    }
+  };
+
+  if (enableMultiLLM && llmRouter) {
+    health.services.llm.router = {
+      status: 'healthy',
+      uptime: Date.now() - llmRouter.routingStats.uptime,
+      totalQueries: llmRouter.routingStats.totalQueries,
+      healthyServices: llmRouter.getHealthyServiceCount(),
+      totalServices: llmRouter.serviceHealth.size
+    };
+    health.summary.healthy++;
+  } else {
+    health.services.llm.router = {
+      status: 'basic',
+      provider: 'OpenAI only'
+    };
+    health.summary.healthy++;
+  }
+
+  // Check Chat Service
+  try {
+    const chatHealthStatus = chatService.getHealthStatus();
+    health.services.chat = {
+      status: 'healthy',
+      provider: 'Tala Chat Service',
+      details: chatHealthStatus
+    };
+    health.summary.healthy++;
+  } catch (error) {
+    health.services.chat = {
+      status: 'error',
+      provider: 'Tala Chat Service',
+      error: error.message
+    };
+    health.summary.unhealthy++;
+  }
+
+  // Check Authentication Service
+  try {
+    const { MOCK_AUTH_CONFIG } = await import('./middleware/authentication.js');
+    health.services.authentication = {
+      status: 'healthy',
+      provider: MOCK_AUTH_CONFIG.enabled ? 'Mock Auth (Development)' : 'Production Auth',
+      details: {
+        mockMode: MOCK_AUTH_CONFIG.enabled,
+        initialized: true
+      }
+    };
+    health.summary.healthy++;
+  } catch (error) {
+    health.services.authentication = {
+      status: 'error',
+      provider: 'Authentication Service',
+      error: error.message
+    };
+    health.summary.unhealthy++;
+  }
+
+  // Check File Storage
+  health.services.storage = {
+    status: 'healthy',
+    provider: process.env.STORAGE_TYPE || 'Local File System',
+    details: {
+      type: process.env.STORAGE_TYPE || 'local',
+      configured: process.env.STORAGE_TYPE ? '✅ Cloud Storage' : '📁 Local Storage'
+    }
+  };
+  health.summary.healthy++;
+
+  // Calculate overall health status
+  const totalServices = health.summary.healthy + health.summary.degraded + health.summary.unhealthy;
+  const healthPercentage = (health.summary.healthy / totalServices) * 100;
+  
+  if (health.summary.unhealthy > 0) {
+    health.status = 'unhealthy';
+  } else if (health.summary.degraded > 0) {
+    health.status = 'degraded';
+  } else {
+    health.status = 'healthy';
+  }
+
+  // Performance metrics
+  const totalResponseTime = Date.now() - startTime;
+  health.performance = {
+    healthCheckDuration: totalResponseTime,
+    memoryUsage: {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+      external: Math.round(process.memoryUsage().external / 1024 / 1024)
+    },
+    cpuUsage: process.cpuUsage(),
+    systemUptime: process.uptime()
+  };
+
+  // Add summary statistics
+  health.summary.healthPercentage = Math.round(healthPercentage);
+  health.summary.totalServices = totalServices;
+  health.summary.lastChecked = new Date().toISOString();
+
+  // Set appropriate HTTP status based on health
+  // Always return 200 if core services (qdrant, authentication, storage) are working
+  // Only return 503 if critical services that have no fallback are down
+  const coreServicesWorking = health.services.qdrant?.status === 'healthy' && 
+                             health.services.authentication?.status === 'healthy' &&
+                             health.services.storage?.status === 'healthy';
+  
+  const httpStatus = coreServicesWorking ? 200 : 503;
+
+  res.status(httpStatus).json(health);
 });
+
+// LLM Metrics endpoint (only available when multi-LLM is enabled)
+if (enableMultiLLM) {
+  app.use('/api/llm', metricsRoutes);
+}
+
+// Authentication Routes
+import authRouter from './routes/auth.js';
+app.use('/auth', authRouter);
+
+// API Key Management Routes
+import apiKeysRouter from './routes/apiKeys.js';
+app.use('/api/keys', apiKeysRouter);
+
+// Profile Management Routes
+import profilesRouter from './routes/profiles.js';
+app.use('/api/profiles', profilesRouter);
+
+// Conversation Threading Routes
+import conversationsRouter from './routes/conversations.js';
+app.use('/api/conversations', conversationsRouter);
 
 // Folder Management Routes
 
 // Create folder
-app.post('/api/folders', async (req, res) => {
-  try {
-    const { name, description, userId, isAdmin = false, primaryFolderId } = req.body;
-    
-    if (!name || !userId) {
-      return res.status(400).json({ error: 'Name and userId are required' });
-    }
-
-    const folderId = uuidv4();
-    const folder = {
-      id: folderId,
-      name: name.trim(),
-      description: description?.trim(),
-      createdAt: new Date().toISOString(),
-      documentCount: 0,
-      userId,
-      isAdmin,
-      primaryFolderId: primaryFolderId || null
-    };
-
-    folders.set(folderId, folder);
-    saveFolders(folders);
-    
-    // Update primary folder counts if this folder belongs to a primary folder
-    if (primaryFolderId) {
-      updatePrimaryFolderCounts();
-    }
-    
-    console.log(`📁 Created folder: ${name} (ID: ${folderId})`);
-    res.json(folder);
-  } catch (error) {
-    console.error('📁 Folder creation error:', error);
-    res.status(500).json({ error: 'Failed to create folder' });
+app.post('/api/folders', authenticate, asyncHandler(async (req, res) => {
+  const { name, description, parent_folder_id = null } = req.body;
+  
+  if (!name?.trim()) {
+    return res.status(400).json({ error: 'Folder name is required' });
   }
-});
+
+  const folderData = {
+    organization_id: req.organizationId,
+    user_id: req.userId,
+    name: name.trim(),
+    description: description?.trim() || null,
+    parent_folder_id: parent_folder_id || null,
+    folder_type: 'user'
+  };
+
+  const result = await folderService.createFolder(folderData);
+  
+  if (!result.success) {
+    return res.status(500).json({ error: result.error || 'Failed to create folder' });
+  }
+  
+  console.log(`📁 Created folder: ${name} (ID: ${result.data.id})`);
+  res.json(result.data);
+}));
 
 // Get folders
-app.get('/api/folders', async (req, res) => {
-  try {
-    const { userId, isAdmin = 'false' } = req.query;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-
-    const userFolders = Array.from(folders.values()).filter(folder => {
-      if (isAdmin === 'true') {
-        return folder.isAdmin || folder.userId === userId;
-      }
-      return folder.userId === userId;
-    });
-
-    res.json(userFolders);
-  } catch (error) {
-    console.error('📁 Folder fetch error:', error);
-    res.status(500).json({ error: 'Failed to fetch folders' });
+app.get('/api/folders', authenticate, asyncHandler(async (req, res) => {
+  const { parent_folder_id = null, include_admin = false } = req.query;
+  
+  const filters = {
+    organization_id: req.organizationId,
+    user_id: req.userId
+  };
+  
+  if (parent_folder_id !== null) {
+    filters.parent_folder_id = parent_folder_id || null;
   }
-});
+  
+  // If include_admin is true and user has admin role, also get admin folders
+  if (include_admin === 'true' && req.user.role === 'admin') {
+    delete filters.user_id; // Remove user filter to get admin folders too
+    filters.folder_type = ['user', 'admin'];
+  }
+  
+  const result = await folderService.getFolders(filters, {
+    organizationId: req.organizationId,
+    orderBy: 'name'
+  });
+  
+  const userFolders = result.success ? result.data : [];
+  res.json(userFolders);
+}));
 
 // Update folder
 app.put('/api/folders/:folderId', async (req, res) => {
@@ -1324,29 +1671,37 @@ function buildConversationState(messages) {
 }
 
 // Tala AI Chat endpoint
-app.post('/api/chat', async (req, res) => {
-  try {
-    const { message, userId, isAdmin = false, conversationId, maxResults = 5 } = req.body;
+app.post('/api/chat', authenticate, asyncHandler(async (req, res) => {
+  const { message, conversationId, maxResults = 5 } = req.body;
     
-    if (!message || !userId) {
-      return res.status(400).json({ error: 'Message and userId are required' });
+    if (!message?.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
     }
 
-    console.log(`💬 Chat request from user ${userId}: "${message.substring(0, 100)}..."`); 
+    console.log(`💬 Chat request from user ${req.userId}: "${message.substring(0, 100)}..."`); 
     
-    const collectionName = getCollectionName(userId, isAdmin);
+    const collectionName = getCollectionName(req.userId, req.user.role === 'admin');
     
     // Step 1: Search relevant documents using Tala AI
     console.log('🔍 Searching knowledge base for relevant context...');
     const queryEmbedding = await generateEmbedding(message);
     
-    const searchResults = await qdrant.search(collectionName, {
-      vector: queryEmbedding,
-      limit: maxResults,
-      score_threshold: 0.3
-    });
+    let searchResults = [];
     
-    console.log(`📊 Found ${searchResults.length} relevant documents`);
+    if (queryEmbedding) {
+      try {
+        searchResults = await qdrant.search(collectionName, {
+          vector: queryEmbedding,
+          limit: maxResults,
+          score_threshold: 0.3
+        });
+        console.log(`📊 Found ${searchResults.length} relevant documents`);
+      } catch (error) {
+        console.warn('⚠️  Vector search failed, continuing without context:', error.message);
+      }
+    } else {
+      console.warn('⚠️  No embeddings available, continuing without document context');
+    }
     
     // Step 2: Prepare context from search results
     const contextChunks = searchResults.map(result => ({
@@ -1367,30 +1722,39 @@ app.post('/api/chat', async (req, res) => {
     let conversationState = {};
     
     if (conversationId) {
-      // Check if context persistence is enabled for this conversation
-      const conversation = conversations.get(conversationId);
-      const persistContext = conversation?.persistContext !== false; // Default to true
+      let conversation = null;
       
-      if (persistContext && !conversation?.contextReset) {
-        // Get previous messages for context
+      try {
+        // Try to get conversation from database first
+        const conversationResult = await conversationService.getConversationById(conversationId, {
+          organizationId: req.organizationId
+        });
+        conversation = conversationResult.success ? conversationResult.data : null;
+      } catch (error) {
+        // Fallback to file-based conversation
+        conversation = conversations.get(conversationId);
+      }
+      
+      const persistContext = conversation?.persist_context !== false && conversation?.persistContext !== false; // Default to true
+      
+      if (persistContext && conversation && !conversation.context_reset && !conversation.contextReset) {
+        // Get previous messages for context from file-based storage
         const existingMessages = conversationMessages.get(conversationId) || [];
         if (existingMessages.length > 0) {
-          // Include last 10 messages for better context (increase from 5)
-          const recentMessages = existingMessages.slice(-10);
-          conversationHistory = recentMessages
+          conversationHistory = existingMessages
             .map(msg => `${msg.sender === 'user' ? 'User' : 'Tala'}: ${msg.content}`)
             .join('\n');
           
           // Extract entities from previous messages to build conversation state
           const previousEntities = [];
-          recentMessages.forEach(msg => {
+          existingMessages.forEach(msg => {
             if (msg.entities) {
               previousEntities.push(...msg.entities);
             }
           });
           
           // Build conversation state from previous messages
-          conversationState = buildConversationState(recentMessages);
+          conversationState = buildConversationState(existingMessages);
         }
       } else if (conversation?.contextReset) {
         // If context was reset, clear the reset flag for future messages
@@ -1470,17 +1834,38 @@ ${conversationHistory ? `Recent Conversation History:\n${conversationHistory}\n`
 Context from knowledge base:
 ${context || 'No relevant documents found in the knowledge base.'}`;
     
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      max_tokens: 1000,
-      temperature: 0.7
+    // Step 4: Generate AI response using ChatService (supports both OpenAI-only and multi-LLM)
+    const chatResponse = await chatService.generateResponse({
+      message,
+      systemPrompt,
+      conversationContext: {
+        documentContext: context,
+        entities: extractedEntities,
+        messageCount: conversationHistory ? conversationHistory.split('\n').length : 0,
+        lastActivity: Date.now(),
+        conversationState
+      },
+      userPreferences: {
+        costOptimization: req.body.costOptimization || false,
+        fastResponse: req.body.fastResponse || false,
+        preferredModel: req.body.preferredModel || null
+      },
+      maxTokens: req.body.maxTokens || 1000,
+      temperature: req.body.temperature || 0.7,
+      userId: req.userId,
+      conversationId
     });
     
-    const aiResponse = completion.choices[0].message.content;
+    const aiResponse = chatResponse.content;
+    
+    // Handle generation errors
+    if (!aiResponse) {
+      return res.status(500).json({
+        error: 'Failed to generate response',
+        details: chatResponse.error,
+        routing: chatResponse.routing
+      });
+    }
     
     // Step 4: Prepare sources for the response
     const sources = contextChunks.map(chunk => ({
@@ -1493,51 +1878,119 @@ ${context || 'No relevant documents found in the knowledge base.'}`;
     console.log(`✅ Generated AI response (${aiResponse?.length} chars) with ${sources.length} sources`);
     
     // Step 5: Handle conversation storage
-    const finalConversationId = conversationId || `conv_${Date.now()}_${userId}`;
+    let finalConversationId = conversationId;
+    let conversation = null;
     
-    // Store/update conversation metadata
-    const conversation = conversations.get(finalConversationId) || {
-      id: finalConversationId,
-      userId: userId,
-      title: message.length > 50 ? message.substring(0, 50) + '...' : message,
-      createdAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString(),
-      messageCount: 0
-    };
+    if (finalConversationId) {
+      // Get existing conversation
+      try {
+        const conversationResult = await conversationService.getConversationById(finalConversationId, {
+          organizationId: req.organizationId
+        });
+        conversation = conversationResult.success ? conversationResult.data : null;
+      } catch (error) {
+        // Fallback to file-based conversation
+        conversation = conversations.get(finalConversationId);
+      }
+    }
     
-    // Update conversation metadata
-    conversation.lastActivity = new Date().toISOString();
-    conversation.lastMessage = aiResponse.length > 100 ? aiResponse.substring(0, 100) + '...' : aiResponse;
-    conversation.messageCount += 2; // User message + AI response
-    conversations.set(finalConversationId, conversation);
+    if (!conversation) {
+      // Create new conversation
+      const conversationData = {
+        organization_id: req.organizationId,
+        user_id: req.userId,
+        title: message.length > 50 ? message.substring(0, 50) + '...' : message,
+        persist_context: true,
+        context_reset: false
+      };
+      
+      try {
+        const createResult = await conversationService.createConversation(conversationData);
+        if (createResult.success) {
+          conversation = createResult.data;
+          finalConversationId = conversation.id;
+          console.log(`💬 Created new conversation: ${finalConversationId}`);
+        } else {
+          // Database unavailable, use file-based storage fallback
+          finalConversationId = uuidv4();
+          conversation = {
+            id: finalConversationId,
+            userId: req.userId,
+            title: conversationData.title,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            persistContext: true,
+            contextReset: false
+          };
+          conversations.set(finalConversationId, conversation);
+          saveConversations();
+          console.log(`💬 Created new file-based conversation: ${finalConversationId}`);
+        }
+      } catch (error) {
+        // Database unavailable, use file-based storage fallback
+        finalConversationId = uuidv4();
+        conversation = {
+          id: finalConversationId,
+          userId: req.userId,
+          title: conversationData.title,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          persistContext: true,
+          contextReset: false
+        };
+        conversations.set(finalConversationId, conversation);
+        saveConversations();
+        console.log(`💬 Created new file-based conversation: ${finalConversationId}`);
+      }
+    } else {
+      // Update existing conversation activity (optional if database available)
+      try {
+        await conversationService.updateConversation(finalConversationId, {
+          last_message_preview: aiResponse.length > 100 ? aiResponse.substring(0, 100) + '...' : aiResponse
+        }, { organizationId: req.organizationId });
+        console.log(`💬 Updated conversation: ${finalConversationId}`);
+      } catch (error) {
+        console.warn('⚠️  Could not update conversation in database, using file-based storage:', error.message);
+        // Update file-based conversation
+        const fileConversation = conversations.get(finalConversationId);
+        if (fileConversation) {
+          fileConversation.updatedAt = new Date().toISOString();
+          fileConversation.lastMessagePreview = aiResponse.length > 100 ? aiResponse.substring(0, 100) + '...' : aiResponse;
+          conversations.set(finalConversationId, fileConversation);
+          saveConversations();
+          console.log(`💬 Updated file-based conversation: ${finalConversationId}`);
+        }
+      }
+    }
     
-    // Store messages
+    // Store messages in file-based system as fallback
     const messages = conversationMessages.get(finalConversationId) || [];
     
-    // Add user message with extracted entities
+    // Add user message
     messages.push({
-      id: `user_${Date.now()}`,
-      content: message,
-      sender: 'user',
-      timestamp: new Date().toISOString(),
+      id: uuidv4(),
       conversationId: finalConversationId,
-      entities: extractedEntities // Store extracted entities for future reference
+      sender: 'user',
+      content: message,
+      timestamp: new Date().toISOString(),
+      entities: extractedEntities
     });
     
     // Add AI response
     messages.push({
-      id: `ai_${Date.now()}`,
+      id: uuidv4(),
+      conversationId: finalConversationId,
+      sender: 'assistant',
       content: aiResponse,
-      sender: 'tala',
       timestamp: new Date().toISOString(),
       sources: sources,
-      conversationId: finalConversationId,
-      tokensUsed: completion.usage?.total_tokens || 0
+      tokensUsed: chatResponse.tokensUsed || 0,
+      cost: chatResponse.cost || 0,
+      model: chatResponse.model || 'unknown',
+      provider: chatResponse.provider || 'unknown'
     });
     
     conversationMessages.set(finalConversationId, messages);
-    
-    // Save to file
     saveConversations();
     
     console.log(`💾 Saved conversation ${finalConversationId} with ${messages.length} messages`);
@@ -1549,17 +2002,15 @@ ${context || 'No relevant documents found in the knowledge base.'}`;
       contextUsed: contextChunks.length > 0,
       conversationId: finalConversationId,
       timestamp: new Date().toISOString(),
-      tokensUsed: completion.usage?.total_tokens || 0
+      tokensUsed: chatResponse.usage?.totalTokens || 0,
+      cost: chatResponse.usage?.cost || 0,
+      model: chatResponse.model,
+      provider: chatResponse.provider,
+      routing: chatResponse.routing,
+      performance: chatResponse.performance,
+      metadata: chatResponse.metadata
     });
-    
-  } catch (error) {
-    console.error('💬 Chat error:', error);
-    res.status(500).json({
-      error: 'Failed to process chat message',
-      details: error.message
-    });
-  }
-});
+}));
 
 // Entity extraction endpoint for conversation context
 app.post('/api/chat/extract-context', async (req, res) => {
@@ -1731,107 +2182,135 @@ Be precise and extract all relevant entities, including implicit ones from the c
 });
 
 // Get chat history
-app.get('/api/chat/history/:conversationId', async (req, res) => {
+app.get('/api/chat/history/:conversationId', authenticate, asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+  
+  let conversation = null;
+  let messages = [];
+  
   try {
-    const { conversationId } = req.params;
-    const { userId } = req.query;
+    // Try to get conversation from database first
+    const conversationResult = await conversationService.getConversationById(conversationId, {
+      organizationId: req.organizationId
+    });
     
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (conversationResult.success) {
+      conversation = conversationResult.data;
+      
+      // Verify user has access to this conversation
+      if (conversation.user_id !== req.userId) {
+        return res.status(403).json({ error: 'Access denied to this conversation' });
+      }
+      
+      // TODO: Get messages from database when MessageService is implemented
+      messages = [];
+      console.log(`📜 Retrieved ${messages.length} messages from database for conversation ${conversationId}`);
+    } else {
+      throw new Error('Conversation not found in database');
     }
+  } catch (error) {
+    // Fallback to file-based conversation
+    conversation = conversations.get(conversationId);
     
-    // Get conversation metadata
-    const conversation = conversations.get(conversationId);
-    if (!conversation || conversation.userId !== userId) {
+    if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
     
-    // Get messages for this conversation
-    const messages = conversationMessages.get(conversationId) || [];
+    // Verify user has access to this conversation
+    if (conversation.userId !== req.userId) {
+      return res.status(403).json({ error: 'Access denied to this conversation' });
+    }
     
-    console.log(`📜 Retrieved ${messages.length} messages for conversation ${conversationId}`);
-    
-    res.json({
-      conversationId,
-      conversation,
-      messages,
-      lastActivity: conversation.lastActivity
-    });
-    
-  } catch (error) {
-    console.error('📝 Chat history error:', error);
-    res.status(500).json({
-      error: 'Failed to retrieve chat history',
-      details: error.message
-    });
+    // Get messages from file-based storage
+    messages = conversationMessages.get(conversationId) || [];
+    console.log(`📜 Retrieved ${messages.length} file-based messages for conversation ${conversationId}`);
   }
-});
+  
+  res.json({
+    conversationId,
+    conversation,
+    messages,
+    lastActivity: conversation.updated_at
+  });
+}));
 
 // List user conversations
-app.get('/api/chat/conversations', async (req, res) => {
+app.get('/api/chat/conversations', authenticate, asyncHandler(async (req, res) => {
+  let userConversations = [];
+  
   try {
-    const { userId } = req.query;
+    // Try to get conversations from database first
+    const conversationsResult = await conversationService.getConversationsByUser(req.userId, {
+      organizationId: req.organizationId,
+      orderBy: 'updated_at',
+      orderDirection: 'desc',
+      pagination: { page: 1, pageSize: 15 }
+    });
     
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    if (conversationsResult.success) {
+      userConversations = conversationsResult.data;
+      console.log(`📋 Retrieved ${userConversations.length} conversations from database for user ${req.userId}`);
+    } else {
+      throw new Error('Database query failed');
     }
-    
-    // Get user's conversations, sorted by last activity (most recent first)
-    const userConversations = Array.from(conversations.values())
-      .filter(conv => conv.userId === userId)
-      .sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
-      .slice(0, 15); // Limit to last 15 conversations
-    
-    console.log(`📋 Retrieved ${userConversations.length} conversations for user ${userId}`);
-    
-    res.json({
-      conversations: userConversations
-    });
-    
   } catch (error) {
-    console.error('📋 Conversations list error:', error);
-    res.status(500).json({
-      error: 'Failed to retrieve conversations',
-      details: error.message
-    });
+    // Fallback to file-based conversations
+    console.warn('⚠️  Database unavailable, using file-based conversations');
+    userConversations = Array.from(conversations.values())
+      .filter(conv => conv.userId === req.userId)
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      .slice(0, 15)
+      .map(conv => ({
+        id: conv.id,
+        title: conv.title,
+        created_at: conv.createdAt,
+        updated_at: conv.updatedAt,
+        last_message_preview: conv.lastMessagePreview || '',
+        message_count: (conversationMessages.get(conv.id) || []).length,
+        lastActivity: conv.updatedAt
+      }));
+    
+    console.log(`📋 Retrieved ${userConversations.length} file-based conversations for user ${req.userId}`);
   }
-});
+  
+  res.json({
+    conversations: userConversations
+  });
+}));
 
 // Delete a conversation
-app.delete('/api/chat/conversations/:conversationId', async (req, res) => {
-  try {
-    const { conversationId } = req.params;
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-    
-    // Check if conversation exists and belongs to user
-    const conversation = conversations.get(conversationId);
-    if (!conversation || conversation.userId !== userId) {
-      return res.status(404).json({ error: 'Conversation not found' });
-    }
-    
-    // Delete conversation and its messages
-    conversations.delete(conversationId);
-    conversationMessages.delete(conversationId);
-    
-    // Save changes
-    saveConversations();
-    
-    console.log(`🗑️ Deleted conversation ${conversationId}`);
-    
-    res.json({ success: true });
-    
-  } catch (error) {
-    console.error('🗑️ Delete conversation error:', error);
-    res.status(500).json({
-      error: 'Failed to delete conversation',
-      details: error.message
-    });
+app.delete('/api/chat/conversations/:conversationId', authenticate, asyncHandler(async (req, res) => {
+  const { conversationId } = req.params;
+  
+  // Get conversation to verify ownership
+  const conversationResult = await conversationService.getConversationById(conversationId, {
+    organizationId: req.organizationId
+  });
+  
+  if (!conversationResult.success) {
+    return res.status(404).json({ error: 'Conversation not found' });
   }
-});
+  
+  const conversation = conversationResult.data;
+  
+  // Verify user owns this conversation
+  if (conversation.user_id !== req.userId) {
+    return res.status(403).json({ error: 'Access denied to this conversation' });
+  }
+  
+  // Delete conversation (this will cascade delete messages due to foreign key constraints)
+  const deleteResult = await conversationService.deleteConversation(conversationId, {
+    organizationId: req.organizationId
+  });
+  
+  if (!deleteResult.success) {
+    return res.status(500).json({ error: 'Failed to delete conversation' });
+  }
+  
+  console.log(`🗑️ Deleted conversation ${conversationId}`);
+  
+  res.json({ success: true });
+}));
 
 // Reset conversation context
 app.post('/api/chat/context/reset', async (req, res) => {
@@ -2822,21 +3301,58 @@ app.get('/api/collections', async (req, res) => {
   }
 });
 
-// Error handling middleware
-app.use((error, req, res, next) => {
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size is 500MB.' });
-    }
-  }
+// 404 handler for unknown routes
+app.use(notFoundHandler);
+
+// Centralized error handling middleware
+app.use(errorHandler);
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal) => {
+  console.log(`\n🛑 Received ${signal}. Starting graceful shutdown...`);
   
-  console.error('Server error:', error);
-  res.status(500).json({ error: 'Internal server error' });
-});
+  try {
+    if (chatService) {
+      await chatService.shutdown();
+      console.log('✅ Chat Service shutdown completed');
+    }
+    
+    if (llmRouter) {
+      await llmRouter.shutdown();
+      console.log('✅ LLM Router shutdown completed');
+    }
+    
+    // Cleanup Redis connection
+    const { cleanupRedis } = await import('./config/redis.js');
+    await cleanupRedis();
+    console.log('✅ Redis cleanup completed');
+    
+    console.log('🏁 Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+};
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Tala AI Backend Server running on port ${PORT}`);
   console.log(`📡 CORS enabled for: ${process.env.CORS_ORIGIN}`);
   console.log(`🔗 Qdrant URL: ${process.env.QDRANT_URL}`);
+  console.log(`🤖 Multi-LLM Mode: ${enableMultiLLM ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`🔐 Authentication: ${process.env.NODE_ENV === 'development' || process.env.MOCK_AUTH === 'true' || !process.env.NODE_ENV ? 'Mock mode (development)' : 'Production mode'}`);
+  console.log(`🚦 Rate Limiting: ENABLED`);
+  console.log(`⚡ Redis Caching: ${process.env.REDIS_URL ? 'ENABLED' : 'FALLBACK MODE'}`);
+  console.log(`🗄️  Database: ${process.env.SUPABASE_URL ? 'PostgreSQL (Supabase)' : 'JSON Files'}`);
+  
+  if (enableMultiLLM) {
+    console.log(`💰 Daily Budget: $${parseFloat(process.env.DAILY_LLM_BUDGET) || 50.00}`);
+    console.log(`📊 Monitoring: ENABLED`);
+    console.log(`🔗 Metrics: http://localhost:${PORT}/api/llm/metrics`);
+  }
 });

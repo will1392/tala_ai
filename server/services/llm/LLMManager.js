@@ -9,6 +9,7 @@ import OpenAIService from './OpenAIService.js';
 import AnthropicService from './AnthropicService.js';
 import GoogleService from './GoogleService.js';
 import GrokService from './GrokService.js';
+import MockLLMService from './providers/MockLLMService.js';
 
 import { 
   LLM_PROVIDERS, 
@@ -35,6 +36,13 @@ class LLMManager {
    */
   async initialize() {
     console.log('🚀 Initializing LLM Manager...');
+    
+    // Check if we're in mock mode
+    if (process.env.USE_MOCK_LLM === 'true' || process.env.MOCK_ENABLED === 'true') {
+      console.log('🎭 Using Mock LLM Service for testing');
+      this.useMockMode = true;
+      return true;
+    }
     
     // Check availability of all configured models
     const availabilityChecks = [];
@@ -64,6 +72,17 @@ class LLMManager {
    * @returns {BaseLLMService} Service instance
    */
   getService(modelId) {
+    // Return mock service if in mock mode
+    if (this.useMockMode) {
+      if (!this.mockService) {
+        this.mockService = new MockLLMService(modelId, {
+          simulateDelay: process.env.MOCK_LLM_DELAY ? parseInt(process.env.MOCK_LLM_DELAY) : 100
+        });
+        this.mockService.initialize();
+      }
+      return this.mockService;
+    }
+    
     if (this.services.has(modelId)) {
       return this.services.get(modelId);
     }

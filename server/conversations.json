@@ -55,9 +55,33 @@
         "userId": "admin-1",
         "title": "what can you tell me about Greece",
         "createdAt": "2025-07-10T00:12:15.329Z",
-        "lastActivity": "2025-07-10T00:20:16.756Z",
-        "messageCount": 6,
-        "lastMessage": "It looks like you might be testing the response. If you have any specific questions about your upcom..."
+        "lastActivity": "2025-07-13T15:50:11.800Z",
+        "messageCount": 10,
+        "lastMessage": "The **Electra Metropolis Athens** is a fantastic mid-range hotel option located in Metropolis Square..."
+      }
+    ],
+    [
+      "8b7cd0fc-5b07-4e5f-a3a0-d2ffc9eb4087",
+      {
+        "id": "8b7cd0fc-5b07-4e5f-a3a0-d2ffc9eb4087",
+        "userId": "mock-user-id",
+        "title": "Hello, I need help planning a trip to Japan",
+        "createdAt": "2025-07-13T20:46:49.033Z",
+        "updatedAt": "2025-07-13T20:46:49.033Z",
+        "persistContext": true,
+        "contextReset": false
+      }
+    ],
+    [
+      "efa6e124-c287-4da6-a2ce-019dc4b37d5a",
+      {
+        "id": "efa6e124-c287-4da6-a2ce-019dc4b37d5a",
+        "userId": "mock-user-id",
+        "title": "can you help with a trip to Greece?",
+        "createdAt": "2025-07-13T20:50:01.203Z",
+        "updatedAt": "2025-07-13T20:50:01.203Z",
+        "persistContext": true,
+        "contextReset": false
       }
     ]
   ],
@@ -474,6 +498,253 @@
           ],
           "conversationId": "conv_1752106335329_admin-1",
           "tokensUsed": 1323
+        },
+        {
+          "id": "user_1752200121950",
+          "content": "can you suggest some hotels for Greece?",
+          "sender": "user",
+          "timestamp": "2025-07-11T02:15:21.950Z",
+          "conversationId": "conv_1752106335329_admin-1",
+          "entities": [
+            {
+              "id": "country_greece_1752200115422",
+              "type": "country",
+              "value": "Greece",
+              "normalizedValue": "greece",
+              "confidence": 1,
+              "firstMentioned": "2025-07-11T02:15:15.422Z",
+              "lastReferenced": "2025-07-11T02:15:15.422Z",
+              "referenceCount": 1,
+              "context": "can you suggest some hotels for Greece?"
+            },
+            {
+              "id": "hotel_hotels_1752200115423",
+              "type": "hotel",
+              "value": "hotels",
+              "normalizedValue": "hotels",
+              "confidence": 0.9,
+              "firstMentioned": "2025-07-11T02:15:15.423Z",
+              "lastReferenced": "2025-07-11T02:15:15.423Z",
+              "referenceCount": 1,
+              "context": "can you suggest some hotels for Greece?"
+            }
+          ]
+        },
+        {
+          "id": "ai_1752200121950",
+          "content": "Absolutely! Here’s a list of recommended hotels in Greece, particularly focusing on Athens, where you mentioned you might be traveling:\n\n### Luxury Hotels\n1. **Hotel Grande Bretagne**\n   - **Location**: Syntagma Square\n   - **Highlights**: Luxurious accommodations, rooftop restaurant with views of the Acropolis, spa services.\n\n2. **King George, a Luxury Collection Hotel**\n   - **Location**: Syntagma Square\n   - **Highlights**: Elegant rooms, fine dining, and a central location ideal for sightseeing.\n\n### Mid-Range Hotels\n3. **Electra Metropolis Athens**\n   - **Location**: Metropolis Square\n   - **Highlights**: Modern design, rooftop pool, and excellent dining options.\n\n4. **Herodion Hotel**\n   - **Location**: Near the Acropolis\n   - **Highlights**: Comfortable rooms, close to major attractions, and a great view of the Acropolis.\n\n### Budget Hotels\n5. **Athens Center Square Hotel**\n   - **Location**: Near Monastiraki\n   - **Highlights**: Affordable rates, rooftop terrace, and convenient access to public transport.\n\n6. **Zappion Hotel**\n   - **Location**: Near the National Garden\n   - **Highlights**: Cozy atmosphere, reasonable prices, and a short walk to historical sites.\n\n### Boutique Hotels\n7. **Acropolis Museum Boutique Hotel**\n   - **Location**: Close to the Acropolis Museum\n   - **Highlights**: Unique design, personalized service, and a fantastic breakfast.\n\n8. **Kimon Athens Hotel**\n   - **Location**: Plaka\n   - **Highlights**: Charming atmosphere, friendly staff, and near local attractions.\n\nThese hotels cater to a range of preferences and budgets. Make sure to check availability and book in advance, especially if you're visiting during the peak tourist season. If you need more specific recommendations or have particular preferences, let me know!",
+          "sender": "tala",
+          "timestamp": "2025-07-11T02:15:21.950Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.539299,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            },
+            {
+              "title": "Travel agent training_ June 19, 2025.docx",
+              "type": "document",
+              "score": 0.34788007,
+              "documentId": "8ad87a08-025a-48e1-a7be-01869a189d8f"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.30895054,
+              "documentId": "5bcbd9c8-cc80-4b08-b066-469b75af6a9b"
+            },
+            {
+              "title": "Kensington Spain Guide.pdf",
+              "type": "document",
+              "score": 0.3089174,
+              "documentId": "3f0aad31-a2c4-4451-b861-e40e4ee9d057"
+            }
+          ],
+          "conversationId": "conv_1752106335329_admin-1",
+          "tokensUsed": 44199
+        },
+        {
+          "id": "user_1752421811800",
+          "content": "what can you tell me about the Electra Metropolis Athens?",
+          "sender": "user",
+          "timestamp": "2025-07-13T15:50:11.800Z",
+          "conversationId": "conv_1752106335329_admin-1",
+          "entities": [
+            {
+              "id": "hotel_electra metropolis athens_1752421804633",
+              "type": "hotel",
+              "value": "Electra Metropolis Athens",
+              "normalizedValue": "electra metropolis athens",
+              "confidence": 1,
+              "firstMentioned": "2025-07-13T15:50:04.633Z",
+              "lastReferenced": "2025-07-13T15:50:04.633Z",
+              "referenceCount": 1,
+              "context": "what can you tell me about the Electra Metropolis Athens?"
+            },
+            {
+              "id": "city_athens_1752421804633",
+              "type": "city",
+              "value": "Athens",
+              "normalizedValue": "athens",
+              "confidence": 1,
+              "firstMentioned": "2025-07-13T15:50:04.633Z",
+              "lastReferenced": "2025-07-13T15:50:04.633Z",
+              "referenceCount": 1,
+              "context": "what can you tell me about the Electra Metropolis Athens?"
+            }
+          ]
+        },
+        {
+          "id": "ai_1752421811800",
+          "content": "The **Electra Metropolis Athens** is a fantastic mid-range hotel option located in Metropolis Square, making it a great base for exploring the city. Here are some highlights about the hotel:\n\n### Hotel Features\n- **Modern Design**: The hotel boasts a contemporary architectural style with stylish interiors.\n- **Rooftop Pool**: Enjoy stunning views of the Acropolis from the rooftop pool, providing a perfect spot to relax after a day of sightseeing.\n- **Dining Options**: The hotel features excellent dining options, including a restaurant that serves a variety of Mediterranean dishes.\n- **Wellness Facilities**: There are wellness facilities available, including a fitness center and spa services, ensuring guests can unwind and rejuvenate.\n\n### Location\n- **Proximity to Attractions**: The hotel is situated close to major attractions like the Acropolis, the Ancient Agora, and the vibrant Plaka neighborhood, making it easy to explore Athens on foot.\n\n### Amenities\n- **Comfortable Rooms**: Rooms are designed for comfort and include modern amenities, ensuring a pleasant stay.\n- **Free Wi-Fi**: Complimentary Wi-Fi is available throughout the hotel, allowing you to stay connected during your trip.\n\nThe Electra Metropolis Athens is an excellent choice for travelers looking for modern accommodations in a central location. If you have any specific questions or need further details, feel free to ask!",
+          "sender": "tala",
+          "timestamp": "2025-07-13T15:50:11.800Z",
+          "sources": [
+            {
+              "title": "Kensington Greece Guide.pdf",
+              "type": "document",
+              "score": 0.40825796,
+              "documentId": "f0e780b1-6b77-4900-9963-434d1f144539"
+            }
+          ],
+          "conversationId": "conv_1752106335329_admin-1",
+          "tokensUsed": 13759,
+          "model": "gpt-4o-mini",
+          "routing": {
+            "queryType": "unknown",
+            "modelSelected": "gpt-4o-mini",
+            "fallbacksUsed": 0,
+            "costOptimized": false,
+            "reasoning": [
+              "OpenAI-only mode"
+            ]
+          }
+        }
+      ]
+    ],
+    [
+      "8b7cd0fc-5b07-4e5f-a3a0-d2ffc9eb4087",
+      [
+        {
+          "id": "ccfdf568-63f5-4343-85b2-de9b2835a6a9",
+          "conversationId": "8b7cd0fc-5b07-4e5f-a3a0-d2ffc9eb4087",
+          "sender": "user",
+          "content": "Hello, I need help planning a trip to Japan",
+          "timestamp": "2025-07-13T20:46:49.037Z",
+          "entities": []
+        },
+        {
+          "id": "5052df10-4ab3-4d77-9999-52f769484f9f",
+          "conversationId": "8b7cd0fc-5b07-4e5f-a3a0-d2ffc9eb4087",
+          "sender": "assistant",
+          "content": "Hello! I’d be happy to help you plan your trip to Japan. Do you have specific cities or regions in mind that you’d like to visit, or are you looking for general recommendations? Also, do you have any particular interests, like culture, food, nature, or history?",
+          "timestamp": "2025-07-13T20:46:49.037Z",
+          "sources": [],
+          "tokensUsed": 0,
+          "cost": 0,
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        {
+          "id": "2ce84708-3c8f-4137-a416-42bf95bb2de1",
+          "conversationId": "8b7cd0fc-5b07-4e5f-a3a0-d2ffc9eb4087",
+          "sender": "user",
+          "content": "I want to visit Tokyo and Kyoto",
+          "timestamp": "2025-07-13T20:48:39.334Z",
+          "entities": [
+            {
+              "id": "city_tokyo_1752439717127",
+              "type": "city",
+              "value": "Tokyo",
+              "normalizedValue": "tokyo",
+              "confidence": 1,
+              "firstMentioned": "2025-07-13T20:48:37.127Z",
+              "lastReferenced": "2025-07-13T20:48:37.127Z",
+              "referenceCount": 1,
+              "context": "I want to visit Tokyo and Kyoto"
+            },
+            {
+              "id": "city_kyoto_1752439717127",
+              "type": "city",
+              "value": "Kyoto",
+              "normalizedValue": "kyoto",
+              "confidence": 1,
+              "firstMentioned": "2025-07-13T20:48:37.127Z",
+              "lastReferenced": "2025-07-13T20:48:37.127Z",
+              "referenceCount": 1,
+              "context": "I want to visit Tokyo and Kyoto"
+            }
+          ]
+        },
+        {
+          "id": "43f1c34a-4060-4c33-ae8a-9cb7393b5579",
+          "conversationId": "8b7cd0fc-5b07-4e5f-a3a0-d2ffc9eb4087",
+          "sender": "assistant",
+          "content": "Great choices! Tokyo and Kyoto offer a wonderful contrast of modern and traditional Japan. \n\n### Tokyo\n- **Attractions**: Visit iconic spots like the Tokyo Tower, Shibuya Crossing, and the historic Asakusa district with the Senso-ji Temple.\n- **Culture**: Explore the vibrant neighborhoods of Shinjuku and Harajuku, and consider checking out a sumo match if you're interested in traditional sports.\n\n### Kyoto\n- **Attractions**: Don't miss the stunning Kinkaku-ji (Golden Pavilion), Fushimi Inari Shrine with its thousands of torii gates, and the beautiful Arashiyama Bamboo Grove.\n- **Culture**: Kyoto is known for its traditional tea houses and geisha culture, so consider experiencing a tea ceremony or visiting Gion district in the evening.\n\nAre you looking for specific activities, accommodations, or travel tips for either city? Also, make sure to check your passport's expiry date if you're planning to apply for a visa!",
+          "timestamp": "2025-07-13T20:48:39.334Z",
+          "sources": [],
+          "tokensUsed": 0,
+          "cost": 0,
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        }
+      ]
+    ],
+    [
+      "efa6e124-c287-4da6-a2ce-019dc4b37d5a",
+      [
+        {
+          "id": "d5ee5192-4de0-4a0d-9c0c-109d529e8afe",
+          "conversationId": "efa6e124-c287-4da6-a2ce-019dc4b37d5a",
+          "sender": "user",
+          "content": "can you help with a trip to Greece?",
+          "timestamp": "2025-07-13T20:50:01.207Z",
+          "entities": []
+        },
+        {
+          "id": "4a1aa43d-7497-4167-bab9-7d7337439817",
+          "conversationId": "efa6e124-c287-4da6-a2ce-019dc4b37d5a",
+          "sender": "assistant",
+          "content": "Absolutely! I'd be happy to help you plan your trip to Greece. \n\nTo get started, could you provide me with a bit more information? For example:\n- What cities or islands are you interested in visiting?\n- When do you plan to travel?\n- Are you aware of your visa requirements and passport validity for Greece? \n\nLet me know, and we can go from there!",
+          "timestamp": "2025-07-13T20:50:01.207Z",
+          "sources": [],
+          "tokensUsed": 0,
+          "cost": 0,
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        {
+          "id": "57831814-2522-4e05-90ab-b313c2c0495f",
+          "conversationId": "efa6e124-c287-4da6-a2ce-019dc4b37d5a",
+          "sender": "user",
+          "content": "January 2026",
+          "timestamp": "2025-07-14T01:33:16.777Z",
+          "entities": [
+            {
+              "id": "date_january 2026_1752456795648",
+              "type": "date",
+              "value": "January 2026",
+              "normalizedValue": "january 2026",
+              "confidence": 1,
+              "firstMentioned": "2025-07-14T01:33:15.648Z",
+              "lastReferenced": "2025-07-14T01:33:15.648Z",
+              "referenceCount": 1,
+              "context": "January 2026"
+            }
+          ]
+        },
+        {
+          "id": "e29d9b39-6f50-4b07-bf88-16f24e800aff",
+          "conversationId": "efa6e124-c287-4da6-a2ce-019dc4b37d5a",
+          "sender": "assistant",
+          "content": "Thanks for confirming your travel timeframe for Greece as January 2026! \n\nTo assist you further, could you please share:\n- Which cities or islands in Greece you are interested in visiting?\n- Are you aware of the visa requirements and your passport validity for that time?\n\nLet me know, and we can continue planning your trip!",
+          "timestamp": "2025-07-14T01:33:16.777Z",
+          "sources": [],
+          "tokensUsed": 0,
+          "cost": 0,
+          "model": "gpt-4o-mini",
+          "provider": "openai"
         }
       ]
     ]

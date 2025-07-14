@@ -57,33 +57,45 @@ class GrokService extends BaseLLMService {
           temperature: mergedOptions.temperature,
           max_tokens: mergedOptions.maxTokens,
           top_p: mergedOptions.topP,
-          frequency_penalty: mergedOptions.frequencyPenalty || 0,
-          presence_penalty: mergedOptions.presencePenalty || 0,
           stream: mergedOptions.stream || false
+          // Note: Grok 4 doesn't support frequency_penalty or presence_penalty
         })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Grok API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        let errorMessage = 'Unknown error';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || errorData.message || JSON.stringify(errorData);
+        } catch (e) {
+          errorMessage = await response.text();
+        }
+        throw new Error(`Grok API error: ${response.status} - ${errorMessage}`);
       }
 
       const data = await response.json();
 
       // Handle potential differences in usage reporting
       const inputTokens = data.usage?.prompt_tokens || this.estimateTokens(messages.map(m => m.content).join(''));
-      const outputTokens = data.usage?.completion_tokens || this.estimateTokens(data.choices[0].message.content);
+      const outputTokens = data.usage?.completion_tokens || 0;
+      
+      // Handle case where content might be empty (Grok 4 reasoning models)
+      const content = data.choices[0]?.message?.content || '';
+      
+      // For empty content, estimate based on reasoning tokens if available
+      const actualOutputTokens = outputTokens || (data.usage?.completion_tokens_details?.reasoning_tokens ? 0 : this.estimateTokens(content));
 
-      const usage = this.trackUsage(inputTokens, outputTokens);
+      const usage = this.trackUsage(inputTokens, actualOutputTokens);
 
       return this.createResponse(
-        data.choices[0].message.content,
+        content,
         usage,
         {
-          finishReason: data.choices[0].finish_reason,
+          finishReason: data.choices[0]?.finish_reason,
           responseId: data.id,
           model: data.model,
-          grokSpecific: true
+          grokSpecific: true,
+          reasoningTokens: data.usage?.completion_tokens_details?.reasoning_tokens || 0
         }
       );
 

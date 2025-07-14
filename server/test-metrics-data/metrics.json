@@ -1,0 +1,243 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": "2025-07-13T15:23:18.457Z",
+    "lastUpdated": "2025-07-13T15:23:18.458Z"
+  },
+  "metrics": [
+    {
+      "modelId": "gpt-4o-mini",
+      "queryType": "factual",
+      "responseTime": 1200,
+      "tokensUsed": 50,
+      "cost": 0.001,
+      "success": true,
+      "timestamp": 1752420198457,
+      "id": "1752420198457-92kvqpv1m"
+    },
+    {
+      "modelId": "claude-sonnet-4-20250514",
+      "queryType": "complexPlanning",
+      "responseTime": 2500,
+      "tokensUsed": 200,
+      "cost": 0.015,
+      "success": true,
+      "timestamp": 1752420198458,
+      "id": "1752420198458-kcorto8qd"
+    }
+  ],
+  "aggregations": {
+    "hourly": {
+      "486783": {
+        "period": "hour",
+        "key": 486783,
+        "timestamp": 1752420198457,
+        "requests": 2,
+        "successfulRequests": 2,
+        "totalResponseTime": 3700,
+        "totalCost": 0.016,
+        "totalTokens": 250,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    },
+    "daily": {
+      "20282": {
+        "period": "day",
+        "key": 20282,
+        "timestamp": 1752420198457,
+        "requests": 2,
+        "successfulRequests": 2,
+        "totalResponseTime": 3700,
+        "totalCost": 0.016,
+        "totalTokens": 250,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    },
+    "weekly": {
+      "2896": {
+        "period": "week",
+        "key": 2896,
+        "timestamp": 1752420198457,
+        "requests": 2,
+        "successfulRequests": 2,
+        "totalResponseTime": 3700,
+        "totalCost": 0.016,
+        "totalTokens": 250,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    },
+    "monthly": {
+      "2025-07": {
+        "period": "month",
+        "key": "2025-07",
+        "timestamp": 1752420198457,
+        "requests": 2,
+        "successfulRequests": 2,
+        "totalResponseTime": 3700,
+        "totalCost": 0.016,
+        "totalTokens": 250,
+        "models": {},
+        "queryTypes": {},
+        "users": {},
+        "errors": {}
+      }
+    }
+  },
+  "patterns": {
+    "queryTypes": {
+      "factual": {
+        "queryType": "factual",
+        "totalQueries": 1,
+        "avgResponseTime": 1200,
+        "avgCost": 0.001,
+        "avgTokens": 50,
+        "preferredModels": {
+          "gpt-4o-mini": 1
+        },
+        "timeOfDayDistribution": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "dayOfWeekDistribution": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "successRate": 200
+      },
+      "complexPlanning": {
+        "queryType": "complexPlanning",
+        "totalQueries": 1,
+        "avgResponseTime": 2500,
+        "avgCost": 0.015,
+        "avgTokens": 200,
+        "preferredModels": {
+          "claude-sonnet-4-20250514": 1
+        },
+        "timeOfDayDistribution": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "dayOfWeekDistribution": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "successRate": 200
+      }
+    },
+    "userBehavior": {},
+    "modelPerformance": {
+      "gpt-4o-mini": {
+        "modelId": "gpt-4o-mini",
+        "totalQueries": 1,
+        "avgResponseTime": 1200,
+        "avgCost": 0.001,
+        "successRate": 200,
+        "performanceTrend": [
+          {
+            "timestamp": 1752420198457,
+            "responseTime": 1200,
+            "success": true
+          }
+        ],
+        "costEfficiency": 0.0005,
+        "reliabilityScore": 100
+      },
+      "claude-sonnet-4-20250514": {
+        "modelId": "claude-sonnet-4-20250514",
+        "totalQueries": 1,
+        "avgResponseTime": 2500,
+        "avgCost": 0.015,
+        "successRate": 200,
+        "performanceTrend": [
+          {
+            "timestamp": 1752420198458,
+            "responseTime": 2500,
+            "success": true
+          }
+        ],
+        "costEfficiency": 0.0075,
+        "reliabilityScore": 100
+      }
+    },
+    "costTrends": {
+      "2025-07": {
+        "month": "2025-07",
+        "totalCost": 0.016,
+        "queriesCount": 2,
+        "avgCostPerQuery": 0.008,
+        "costByModel": {
+          "gpt-4o-mini": 0.001,
+          "claude-sonnet-4-20250514": 0.015
+        },
+        "costByQueryType": {
+          "factual": 0.001,
+          "complexPlanning": 0.015
+        },
+        "projectedMonthlyCost": 0.038153846153846156
+      }
+    }
+  }
+}
