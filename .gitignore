@@ -122,6 +122,11 @@ documents/
 .env.production
 .env.development
 .env.*.local
+.env.backup
+.env.s3
+.env.*
+!.env.example
+!.env.test
 
 # API configuration files
 api-keys.json
