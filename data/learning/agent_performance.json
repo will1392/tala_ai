@@ -1,0 +1,20 @@
+{
+  "email-monitor": {
+    "totalTasks": 11,
+    "successfulTasks": 11,
+    "averageExecutionTime": 511.1818181818182,
+    "taskTypes": {
+      "analyze-document": {
+        "count": 10,
+        "successes": 10,
+        "avgTime": 0
+      },
+      "booking-search": {
+        "count": 1,
+        "successes": 1,
+        "avgTime": 0
+      }
+    },
+    "userSatisfaction": []
+  }
+}

@@ -5,6 +5,7 @@ import { LoginPage } from './components/auth/LoginPage';
 import { Dashboard } from './pages/Dashboard';
 import { Knowledge } from './pages/Knowledge';
 import { Chat } from './pages/Chat';
+import { Email } from './pages/Email';
 import { Settings } from './pages/Settings';
 import { useAuthStore } from './store/authStore';
 import './styles/globals.css';
@@ -36,6 +37,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="knowledge" element={<Knowledge />} />
               <Route path="chat" element={<Chat />} />
+              <Route path="email" element={<Email />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           )}

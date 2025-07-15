@@ -1,6 +1,6 @@
 [
   {
-    "id": "e3647818-52ac-4d93-ba7d-333ece6a5021",
+    "id": "ca6c625c-6818-4dd7-8257-1901b8d48f98",
     "slug": "destinations",
     "name": "Destinations",
     "description": "Travel destination guides, requirements, and information",
@@ -14,15 +14,15 @@
       "canEdit": false
     },
     "isSystem": true,
-    "createdAt": "2025-07-02T23:19:23.547Z",
-    "updatedAt": "2025-07-14T02:22:35.462Z",
+    "createdAt": "2025-07-15T02:42:06.516Z",
+    "updatedAt": "2025-07-15T02:42:06.517Z",
     "userId": "admin-1",
-    "subFolderCount": 1,
+    "subFolderCount": 0,
     "documentCount": 0,
     "totalSize": 0
   },
   {
-    "id": "6ff7d315-20d2-495e-be90-99abaf50aa93",
+    "id": "6a592eb0-0d89-43d8-996f-47b13dbbcc96",
     "slug": "suppliers",
     "name": "Suppliers",
     "description": "Hotel, airline, and service provider information",
@@ -36,15 +36,15 @@
       "canEdit": false
     },
     "isSystem": true,
-    "createdAt": "2025-07-02T23:19:23.547Z",
-    "updatedAt": "2025-07-14T02:22:35.462Z",
+    "createdAt": "2025-07-15T02:42:06.516Z",
+    "updatedAt": "2025-07-15T02:42:06.517Z",
     "userId": "admin-1",
     "subFolderCount": 0,
     "documentCount": 0,
     "totalSize": 0
   },
   {
-    "id": "af7c966a-e40c-4e3a-bc16-c9117f850a16",
+    "id": "9d32f916-c2f9-4961-aee6-d3ce8c388dcb",
     "slug": "policies-regulations",
     "name": "Policies & Regulations",
     "description": "Travel policies, visa requirements, and regulatory information",
@@ -58,15 +58,15 @@
       "canEdit": false
     },
     "isSystem": true,
-    "createdAt": "2025-07-02T23:19:23.547Z",
-    "updatedAt": "2025-07-14T02:22:35.462Z",
+    "createdAt": "2025-07-15T02:42:06.516Z",
+    "updatedAt": "2025-07-15T02:42:06.517Z",
     "userId": "admin-1",
     "subFolderCount": 0,
     "documentCount": 0,
     "totalSize": 0
   },
   {
-    "id": "30461f99-921f-4341-b023-b3606c78b34c",
+    "id": "2940fc0c-7d25-4475-b377-d174a7b97a20",
     "slug": "marketing-materials",
     "name": "Marketing Materials",
     "description": "Brochures, promotional content, and marketing assets",
@@ -80,15 +80,15 @@
       "canEdit": false
     },
     "isSystem": true,
-    "createdAt": "2025-07-02T23:19:23.547Z",
-    "updatedAt": "2025-07-14T02:22:35.462Z",
+    "createdAt": "2025-07-15T02:42:06.516Z",
+    "updatedAt": "2025-07-15T02:42:06.517Z",
     "userId": "admin-1",
     "subFolderCount": 0,
     "documentCount": 0,
     "totalSize": 0
   },
   {
-    "id": "cae768d2-92b0-4e1e-a05e-0cb23425b352",
+    "id": "2ce7fa34-0550-4863-b460-6bf7b37858a5",
     "slug": "miscellaneous",
     "name": "Miscellaneous",
     "description": "Other documents and files that don't fit into specific categories",
@@ -102,11 +102,11 @@
       "canEdit": false
     },
     "isSystem": true,
-    "createdAt": "2025-07-02T23:19:23.547Z",
-    "updatedAt": "2025-07-14T02:22:35.462Z",
+    "createdAt": "2025-07-15T02:42:06.516Z",
+    "updatedAt": "2025-07-15T02:42:06.517Z",
     "userId": "admin-1",
     "subFolderCount": 0,
-    "documentCount": 1,
+    "documentCount": 0,
     "totalSize": 0
   }
 ]

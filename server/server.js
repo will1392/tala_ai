@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import session from 'express-session';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import { QdrantClient } from '@qdrant/qdrant-js';
@@ -152,6 +153,18 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true
 }));
+
+// Session middleware for OAuth token storage
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // Set to true in production with HTTPS
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
@@ -698,6 +711,18 @@ app.use('/api/profiles', profilesRouter);
 // Conversation Threading Routes
 import conversationsRouter from './routes/conversations.js';
 app.use('/api/conversations', conversationsRouter);
+
+// Email to Task Conversion Routes
+import emailTaskRoutes from './routes/email-tasks.js';
+app.use('/api/email-tasks', emailTaskRoutes);
+
+// Task Management Routes (if using native task management)
+import taskRoutes from './routes/tasks.js';
+app.use('/api/tasks', taskRoutes);
+
+// Email Connection Routes
+import emailConnectRoutes from './routes/email-connect.js';
+app.use('/api/email', emailConnectRoutes);
 
 // Folder Management Routes
 
@@ -3354,5 +3379,10 @@ app.listen(PORT, () => {
     console.log(`💰 Daily Budget: $${parseFloat(process.env.DAILY_LLM_BUDGET) || 50.00}`);
     console.log(`📊 Monitoring: ENABLED`);
     console.log(`🔗 Metrics: http://localhost:${PORT}/api/llm/metrics`);
+  }
+  
+  // Start WebSocket server for email-to-task updates
+  if (process.env.EMAIL_WS_PORT) {
+    console.log(`📡 WebSocket server for email updates on port ${process.env.EMAIL_WS_PORT}`);
   }
 });
