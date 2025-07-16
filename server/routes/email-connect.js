@@ -329,4 +329,48 @@ router.post('/disconnect', authenticate, async (req, res) => {
     }
 });
 
+/**
+ * Debug endpoint to check token storage (development only)
+ */
+router.get('/debug/check-tokens', authenticate, async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+        return res.status(404).json({ error: 'Not found' });
+    }
+    
+    try {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const { fileURLToPath } = await import('url');
+        const { dirname } = await import('path');
+        
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const tokenPath = path.join(__dirname, '../data/oauth-tokens', `gmail-${req.userId}.json`);
+        
+        try {
+            const stats = await fs.stat(tokenPath);
+            const content = await fs.readFile(tokenPath, 'utf8');
+            const data = JSON.parse(content);
+            
+            res.json({
+                exists: true,
+                path: tokenPath,
+                size: stats.size,
+                modified: stats.mtime,
+                userId: data.user_id,
+                status: data.status,
+                hasTokens: !!data.config
+            });
+        } catch (error) {
+            res.json({
+                exists: false,
+                path: tokenPath,
+                error: error.message
+            });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Debug check failed' });
+    }
+});
+
 export default router;

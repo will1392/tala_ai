@@ -713,7 +713,7 @@ import conversationsRouter from './routes/conversations.js';
 app.use('/api/conversations', conversationsRouter);
 
 // Email to Task Conversion Routes
-import emailTaskRoutes from './routes/email-tasks.js';
+import emailTaskRoutes from './routes/email-tasks-simple.js';
 app.use('/api/email-tasks', emailTaskRoutes);
 
 // Task Management Routes (if using native task management)

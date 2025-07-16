@@ -15,6 +15,106 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/shared/Button';
 import { GmailConnect } from '../components/email/GmailConnect';
+import taskService from '../services/taskService';
+
+// Decode HTML entities
+const decodeHTMLEntities = (text: string): string => {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+};
+
+// Format email body for better readability
+const formatEmailBody = (body: string): string => {
+  if (!body) return '';
+  
+  // Decode HTML entities
+  let formatted = decodeHTMLEntities(body);
+  
+  // Replace non-breaking spaces with regular spaces
+  formatted = formatted.replace(/&nbsp;/g, ' ');
+  
+  // Add proper line breaks before common email thread patterns
+  // Match "On [date] at [time], [name] <email> wrote:"
+  formatted = formatted.replace(/On ([A-Z][a-z]{2} \d{1,2}, \d{4}(?:,)? at \d{1,2}:\d{2} [AP]M), ([^<]+)<([^>]+)> wrote:/g, '\n\n---\n\nOn $1, $2<$3> wrote:\n\n');
+  
+  // Match "On [date], [name] <email> wrote:"
+  formatted = formatted.replace(/On ([A-Z][a-z]{2,} \d{1,2}, \d{4}), ([^<]+)<([^>]+)> wrote:/g, '\n\n---\n\nOn $1, $2<$3> wrote:\n\n');
+  
+  // Add line breaks before "Sent from my iPhone/iPad"
+  formatted = formatted.replace(/(Sent from my \w+)/g, '\n\n$1\n');
+  
+  // Clean up excessive whitespace
+  formatted = formatted.replace(/\s{3,}/g, '\n\n');
+  
+  // Ensure proper spacing after punctuation
+  formatted = formatted.replace(/\.([A-Z])/g, '. $1');
+  
+  // Remove any remaining HTML tags
+  formatted = formatted.replace(/<[^>]*>/g, '');
+  
+  // Trim whitespace
+  return formatted.trim();
+};
+
+// Parse email thread to identify quoted sections
+const parseEmailThread = (body: string) => {
+  const formatted = formatEmailBody(body);
+  const sections = [];
+  
+  // Split by thread separators
+  const parts = formatted.split(/\n---\n/);
+  
+  parts.forEach((part, index) => {
+    const trimmed = part.trim();
+    if (trimmed) {
+      sections.push({
+        content: trimmed,
+        isQuoted: index > 0
+      });
+    }
+  });
+  
+  return sections;
+};
+
+// Format email date to be more readable
+const formatEmailDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  // Today - show time
+  if (diffDays === 0) {
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  }
+  
+  // Yesterday
+  if (diffDays === 1) {
+    return 'Yesterday';
+  }
+  
+  // Within this year - show MM/DD
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString('en-US', { 
+      month: 'numeric', 
+      day: 'numeric' 
+    });
+  }
+  
+  // Older - show MM/DD/YY
+  return date.toLocaleDateString('en-US', { 
+    month: 'numeric', 
+    day: 'numeric',
+    year: '2-digit'
+  });
+};
 
 interface EmailMessage {
   id: string;
@@ -22,6 +122,7 @@ interface EmailMessage {
   subject: string;
   snippet: string;
   date: string;
+  body?: string;
   isUnread: boolean;
   hasAttachments: boolean;
   labels?: string[];
@@ -39,6 +140,7 @@ interface ExtractedTask {
 
 export const Email = () => {
   const [isConnected, setIsConnected] = useState(false);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(true); // New state for initial check
   const [emails, setEmails] = useState<EmailMessage[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
@@ -47,34 +149,40 @@ export const Email = () => {
   const [filter, setFilter] = useState<'all' | 'unread' | 'processed'>('all');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   console.log('Email component render - isConnected:', isConnected, 'error:', error);
+  console.log('Current extractedTasks:', extractedTasks);
 
   // Fetch emails when connected
   useEffect(() => {
     console.log('isConnected changed to:', isConnected);
     if (isConnected) {
-      // Double check we should actually be fetching
-      const urlParams = new URLSearchParams(window.location.search);
-      const realGmail = urlParams.get('realGmail');
-      
-      if (realGmail === 'true') {
-        console.log('Fetching emails for real Gmail connection');
-        fetchEmails();
-      } else {
-        console.log('Not fetching emails - no real Gmail connection detected, realGmail:', realGmail);
-        setIsConnected(false); // Reset if no real connection
-      }
+      console.log('Fetching emails');
+      fetchEmails();
     }
   }, [isConnected]);
 
-  const fetchEmails = async () => {
-    console.log('fetchEmails called, isConnected:', isConnected);
-    setIsLoading(true);
-    setError(null);
+  const fetchEmails = async (pageToken?: string) => {
+    console.log('fetchEmails called, isConnected:', isConnected, 'pageToken:', pageToken);
+    
+    // Set appropriate loading state
+    if (pageToken) {
+      setIsLoadingMore(true);
+    } else {
+      setIsLoading(true);
+      setError(null);
+    }
     
     try {
-      const response = await fetch('http://localhost:3001/api/email/messages', {
+      const url = new URL('http://localhost:3001/api/email/messages');
+      url.searchParams.append('maxResults', '20');
+      if (pageToken) {
+        url.searchParams.append('pageToken', pageToken);
+      }
+      
+      const response = await fetch(url.toString(), {
         headers: {
           'x-user-id': 'test_user_123'
         },
@@ -84,23 +192,41 @@ export const Email = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('Fetched emails:', data);
-        setEmails(data.messages || []);
+        
+        if (pageToken) {
+          // Append to existing emails
+          setEmails(prev => [...prev, ...(data.messages || [])]);
+        } else {
+          // Replace emails (initial load or refresh)
+          setEmails(data.messages || []);
+        }
+        
+        setNextPageToken(data.nextPageToken || null);
       } else if (response.status === 401) {
         // Gmail not connected - this is expected if user hasn't connected Gmail yet
         const errorData = await response.json();
         console.log('Gmail not connected (expected):', errorData.message);
-        setEmails([]);
+        // Don't clear emails if we already have some
+        if (!pageToken) {
+          setEmails([]);
+        }
         setIsConnected(false); // Reset connection status
+        setError('Gmail session expired. Please reconnect.');
       } else {
         setError(`Failed to fetch emails: ${response.status}`);
-        setEmails([]);
+        if (!pageToken) {
+          setEmails([]);
+        }
       }
     } catch (error) {
       console.error('Error fetching emails:', error);
       setError('Unable to connect to email service');
-      setEmails([]);
+      if (!pageToken) {
+        setEmails([]);
+      }
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -110,6 +236,7 @@ export const Email = () => {
   }, []);
   
   const checkGmailStatus = async () => {
+    setIsCheckingConnection(true);
     try {
       const response = await fetch('http://localhost:3001/api/email/status', {
         headers: { 'x-user-id': 'test_user_123' },
@@ -118,58 +245,118 @@ export const Email = () => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Gmail status:', data);
         if (data.connected) {
           console.log('Gmail already connected:', data.email);
           setIsConnected(true);
           setError(null);
-          // Fetch emails if connected
-          fetchEmails();
+          // Don't fetch emails here, let the useEffect handle it
         } else {
+          console.log('Gmail not connected');
           setIsConnected(false);
         }
       }
     } catch (error) {
       console.error('Error checking Gmail status:', error);
       setIsConnected(false);
+    } finally {
+      setIsCheckingConnection(false);
+    }
+  };
+
+  const fetchFullEmail = async (emailId: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/email/message/${emailId}`, {
+        headers: {
+          'x-user-id': 'test_user_123'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const fullEmail = await response.json();
+        // Update the email in our list with the full body
+        setEmails(prev => prev.map(email => 
+          email.id === emailId ? { ...email, body: fullEmail.body } : email
+        ));
+        return fullEmail;
+      }
+    } catch (error) {
+      console.error('Error fetching full email:', error);
     }
   };
 
   const handleSendToTala = async (email: EmailMessage) => {
+    console.log('handleSendToTala called with email:', email);
     setIsProcessing(true);
-    setSelectedEmail(email);
+    // Don't reset selectedEmail here since it's already selected
     
-    // Simulate AI processing
-    setTimeout(() => {
-      setExtractedTasks([
-        {
-          id: '1',
-          title: 'Finalize investor presentation',
-          priority: 'urgent',
-          dueDate: 'Tomorrow',
-          assignee: 'Product Team',
-          tags: ['presentation', 'investor-meeting'],
-          description: 'Update slides with Q1 metrics and projections'
+    try {
+      // Send email to AI for task extraction
+      console.log('Sending request to extract tasks...');
+      const response = await fetch('http://localhost:3001/api/email-tasks/extract', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': 'test_user_123'
         },
-        {
-          id: '2',
-          title: 'Book flights to San Francisco',
-          priority: 'urgent',
-          dueDate: 'Today',
-          assignee: 'Travel Coordinator',
-          tags: ['travel', 'investor-meeting'],
-          description: 'Business class flights for 3 team members'
-        },
-        {
-          id: '3',
-          title: 'Reserve conference room for prep meeting',
-          priority: 'high',
-          dueDate: 'Friday',
-          tags: ['meeting', 'preparation'],
-          description: 'Book large conference room for final rehearsal'
+        credentials: 'include',
+        body: JSON.stringify({
+          emailId: email.id,
+          subject: email.subject,
+          from: email.from,
+          body: email.body || email.snippet,
+          useAI: true
+        })
+      });
+      
+      console.log('Response status:', response.status);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Extracted data:', data);
+        
+        // If we got extracted tasks, display them
+        if (data.tasks && data.tasks.length > 0) {
+          console.log('Setting extracted tasks:', data.tasks);
+          setExtractedTasks(data.tasks);
+          console.log('State should be updated now');
+          // Scroll to show the tasks
+          setTimeout(() => {
+            const tasksElement = document.querySelector('.extracted-tasks');
+            if (tasksElement) {
+              tasksElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 100);
+        } else {
+          // Fallback: create a single task from the email
+          const fallbackTask = {
+            id: 'temp-1',
+            title: `Follow up: ${email.subject}`,
+            priority: 'medium' as const,
+            dueDate: 'Tomorrow',
+            tags: ['email', 'follow-up'],
+            description: `Follow up on email from ${email.from}\n\nSnippet: ${email.snippet}`
+          };
+          setExtractedTasks([fallbackTask]);
         }
-      ]);
+      } else {
+        console.error('Failed to extract tasks from email');
+        // Create a simple task as fallback
+        const fallbackTask = {
+          id: 'temp-1',
+          title: `Review email: ${email.subject}`,
+          priority: 'medium' as const,
+          dueDate: 'Today',
+          tags: ['email'],
+          description: email.snippet
+        };
+        setExtractedTasks([fallbackTask]);
+      }
+    } catch (error) {
+      console.error('Error processing email:', error);
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
   const filteredEmails = emails.filter(email => {
@@ -183,7 +370,15 @@ export const Email = () => {
 
   return (
     <div className="h-full">
-      {!isConnected ? (
+      {isCheckingConnection ? (
+        // Show loading state while checking connection
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <Loader2 className="animate-spin text-primary mx-auto mb-4" size={48} />
+            <p className="text-white/60">Checking Gmail connection...</p>
+          </div>
+        </div>
+      ) : !isConnected ? (
         <div>
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4 mx-6 mt-6">
@@ -223,7 +418,7 @@ export const Email = () => {
       ) : (
         <>
           {/* Header */}
-          <div className="glass-light border-b border-white/10 p-6">
+          <div className="glass-light border-b border-white/10 p-6 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -238,7 +433,7 @@ export const Email = () => {
             <Button 
               variant="primary" 
               className="gap-2" 
-              onClick={fetchEmails}
+              onClick={() => fetchEmails()}
               disabled={isLoading}
             >
               <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
@@ -273,9 +468,9 @@ export const Email = () => {
         </div>
       </div>
 
-      <div className="flex h-[calc(100%-88px)]">
+      <div className="flex flex-1 overflow-hidden">
         {/* Email List */}
-        <div className="w-1/3 border-r border-white/10 overflow-y-auto">
+        <div className="w-1/3 border-r border-white/10 flex flex-col">
           {/* Search and Filter */}
           <div className="p-4 border-b border-white/10">
             <div className="relative mb-3">
@@ -316,8 +511,16 @@ export const Email = () => {
             </div>
           </div>
 
+          {/* Email Count */}
+          {emails.length > 0 && (
+            <div className="px-4 py-2 text-xs text-white/50 bg-white/5 border-b border-white/10">
+              Showing {filteredEmails.length} of {emails.length} emails
+              {nextPageToken && ' • More available'}
+            </div>
+          )}
+
           {/* Email Items */}
-          <div className="divide-y divide-white/10">
+          <div className="divide-y divide-white/10 overflow-y-auto flex-1">
             {error && (
               <div className="p-4 text-center">
                 <AlertCircle className="mx-auto text-red-400 mb-2" size={24} />
@@ -353,7 +556,17 @@ export const Email = () => {
                 className={`p-4 hover:bg-white/5 cursor-pointer transition-colors ${
                   selectedEmail?.id === email.id ? 'bg-white/10' : ''
                 }`}
-                onClick={() => setSelectedEmail(email)}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  setSelectedEmail(email);
+                  // Fetch full email content if we don't have it
+                  if (!email.body) {
+                    const fullEmail = await fetchFullEmail(email.id);
+                    if (fullEmail) {
+                      setSelectedEmail({ ...email, body: fullEmail.body });
+                    }
+                  }
+                }}
               >
                 <div className="flex items-start justify-between mb-1">
                   <div className="flex items-center gap-2">
@@ -362,10 +575,10 @@ export const Email = () => {
                     )}
                     <span className="font-medium text-white">{email.from}</span>
                   </div>
-                  <span className="text-xs text-white/40">{email.date}</span>
+                  <span className="text-xs text-white/40">{formatEmailDate(email.date)}</span>
                 </div>
                 <h3 className="font-medium text-white/90 mb-1">{email.subject}</h3>
-                <p className="text-sm text-white/60 line-clamp-1">{email.snippet}</p>
+                <p className="text-sm text-white/60 line-clamp-1">{decodeHTMLEntities(email.snippet)}</p>
                 {email.labels && (
                   <div className="flex gap-1 mt-2">
                     {email.labels.map((label) => (
@@ -380,13 +593,34 @@ export const Email = () => {
                 )}
               </motion.div>
             ))}
+            
+            {/* Load More Button */}
+            {nextPageToken && !isLoading && !isLoadingMore && (
+              <div className="p-4 border-t border-white/10">
+                <Button
+                  variant="secondary"
+                  className="w-full gap-2"
+                  onClick={() => fetchEmails(nextPageToken)}
+                >
+                  <RefreshCw size={16} />
+                  Load More Emails
+                </Button>
+              </div>
+            )}
+            
+            {isLoadingMore && (
+              <div className="p-4 text-center text-white/60">
+                <Loader2 className="animate-spin mx-auto mb-2" size={20} />
+                Loading more emails...
+              </div>
+            )}
           </div>
         </div>
 
         {/* Email Content and Task Extraction */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {selectedEmail ? (
-            <div className="p-6">
+            <div className="flex-1 overflow-y-auto p-6">
               {/* Email Header */}
               <div className="glass rounded-xl p-6 mb-6">
                 <div className="flex items-start justify-between mb-4">
@@ -395,11 +629,14 @@ export const Email = () => {
                       {selectedEmail.subject}
                     </h2>
                     <p className="text-white/60">From: {selectedEmail.from}</p>
-                    <p className="text-white/60">Date: {selectedEmail.date}</p>
+                    <p className="text-white/60">Date: {formatEmailDate(selectedEmail.date)}</p>
                   </div>
                   <Button
                     variant="primary"
-                    onClick={() => handleSendToTala(selectedEmail)}
+                    onClick={() => {
+                      console.log('Button clicked!');
+                      handleSendToTala(selectedEmail);
+                    }}
                     disabled={isProcessing}
                     className="gap-2"
                   >
@@ -417,36 +654,51 @@ export const Email = () => {
                   </Button>
                 </div>
                 <div className="text-white/80">
-                  <p className="mb-4">{selectedEmail.snippet}</p>
-                  <p>Dear Team,</p>
-                  <p className="mt-2">
-                    We have an important investor meeting scheduled for next week in San Francisco. 
-                    This is a critical opportunity for our Series B funding round.
-                  </p>
-                  <p className="mt-2">
-                    Please ensure the following items are completed by Friday:
-                  </p>
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Finalize the investor presentation with Q1 metrics</li>
-                    <li>Book business class flights for the team</li>
-                    <li>Reserve a conference room for final preparation</li>
-                    <li>Update financial projections</li>
-                  </ul>
-                  <p className="mt-4">Best regards,<br />CEO</p>
+                  {/* Show actual email body if available, otherwise show snippet */}
+                  {selectedEmail.body ? (
+                    <div className="font-sans text-base leading-relaxed">
+                      {parseEmailThread(selectedEmail.body).map((section, index) => (
+                        <div
+                          key={index}
+                          className={`${
+                            section.isQuoted
+                              ? 'mt-6 pl-4 border-l-2 border-white/20 text-white/60 text-sm'
+                              : 'text-white/90'
+                          } ${
+                            index > 0 ? 'mt-6' : ''
+                          }`}
+                        >
+                          <pre className="whitespace-pre-wrap break-words font-sans">
+                            {section.content}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-white/60 italic">Email preview:</p>
+                      <p className="mt-2">{decodeHTMLEntities(selectedEmail.snippet)}</p>
+                      <p className="mt-4 text-sm text-white/40">Full email content will be loaded when you select this email.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Extracted Tasks */}
+              {console.log('Rendering extracted tasks section, count:', extractedTasks.length)}
               {extractedTasks.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-4"
+                  className="space-y-4 extracted-tasks"
                 >
                   <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                     <CheckCircle2 className="text-green-400" />
-                    Extracted Tasks ({extractedTasks.length})
+                    Suggested Task
                   </h3>
+                  <p className="text-sm text-white/60 mb-4">
+                    Tala found this action item. You can also copy this email to chat for more specific task creation.
+                  </p>
                   
                   {extractedTasks.map((task) => (
                     <motion.div
@@ -497,10 +749,50 @@ export const Email = () => {
                   ))}
 
                   <div className="flex gap-3 mt-6">
-                    <Button variant="primary" className="flex-1">
-                      Create All Tasks
+                    <Button 
+                      variant="primary" 
+                      className="flex-1"
+                      onClick={async () => {
+                        try {
+                          // Create all tasks
+                          const tasksToCreate = extractedTasks.map(task => ({
+                            title: task.title,
+                            description: task.description,
+                            priority: task.priority,
+                            dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
+                            assignee: task.assignee,
+                            tags: task.tags,
+                            source: 'email' as const,
+                            sourceId: selectedEmail?.id
+                          }));
+                          
+                          const createdTasks = await taskService.createTasksFromEmail(
+                            selectedEmail?.id || '',
+                            tasksToCreate
+                          );
+                          
+                          if (createdTasks.length > 0) {
+                            alert(`Successfully created ${createdTasks.length} tasks!`);
+                            setExtractedTasks([]); // Clear the extracted tasks
+                          } else {
+                            alert('Failed to create tasks. Please try again.');
+                          }
+                        } catch (error) {
+                          console.error('Error creating tasks:', error);
+                          alert('Error creating tasks. Please try again.');
+                        }
+                      }}
+                    >
+                      Create Task
                     </Button>
-                    <Button variant="secondary" className="flex-1">
+                    <Button 
+                      variant="secondary" 
+                      className="flex-1"
+                      onClick={() => {
+                        // TODO: Implement task editing modal
+                        alert('Task editing coming soon!');
+                      }}
+                    >
                       Edit Tasks
                     </Button>
                   </div>

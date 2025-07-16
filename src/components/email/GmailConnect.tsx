@@ -8,7 +8,7 @@ interface GmailConnectProps {
 }
 
 export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
-  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error' | 'checking'>('checking');
   const [testMode, setTestMode] = useState(true);
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   
@@ -33,6 +33,7 @@ export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
   }, []);
   
   const checkExistingConnection = async () => {
+    setConnectionState('checking');
     try {
       const response = await fetch('http://localhost:3001/api/email/status', {
         headers: { 'x-user-id': 'test_user_123' },
@@ -41,16 +42,22 @@ export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Existing connection check:', data);
         if (data.connected) {
           setConnectionState('connected');
           setExistingEmail(data.email);
-          setTimeout(() => {
-            onConnectionSuccess();
-          }, 500);
+          setTestMode(false); // It's a real connection
+          // Notify parent component immediately
+          onConnectionSuccess();
+        } else {
+          setConnectionState('idle');
         }
+      } else {
+        setConnectionState('idle');
       }
     } catch (error) {
       console.error('Error checking existing connection:', error);
+      setConnectionState('idle');
     }
   };
   
@@ -65,21 +72,23 @@ export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
     console.log('GmailConnect URL params:', { connected, email, realGmail, errorParam });
     
     if (connected === 'true' && realGmail === 'true' && email) {
-      // Only proceed if we have explicit real Gmail connection
+      // OAuth callback - new connection
       setConnectionState('connected');
       setTestMode(false);
+      setExistingEmail(email);
       console.log('Real Gmail connection detected:', email);
+      
+      // Clear URL params after processing
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
       setTimeout(() => {
-        onConnectionSuccess(); // Only call this for verified real Gmail connections
+        onConnectionSuccess();
       }, 1000);
     } else if (errorParam) {
       setConnectionState('error');
       console.error('OAuth error:', errorParam);
-    } else if (connected || email) {
-      // Clear stale parameters that don't represent a real connection
-      console.log('Clearing stale OAuth parameters');
+      // Clear URL params
       window.history.replaceState({}, document.title, window.location.pathname);
-      setConnectionState('idle');
     }
   }, [onConnectionSuccess]);
   
@@ -95,6 +104,18 @@ export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
         animate={{ opacity: 1, y: 0 }}
         className="glass rounded-xl p-8 max-w-md w-full"
       >
+        {connectionState === 'checking' && (
+          <div className="text-center py-8">
+            <Loader2 className="animate-spin text-primary mx-auto mb-4" size={48} />
+            <h3 className="text-xl font-semibold text-white mb-2">
+              Checking connection...
+            </h3>
+            <p className="text-white/60">
+              Please wait while we check your Gmail status
+            </p>
+          </div>
+        )}
+        
         {connectionState === 'idle' && (
           <>
             <div className="text-center mb-6">

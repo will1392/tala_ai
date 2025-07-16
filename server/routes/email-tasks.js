@@ -8,6 +8,7 @@ import express from 'express';
 import { authenticate } from '../middleware/auth.js';
 import EmailActionHandler from '../services/email/EmailActionHandler.js';
 import EmailManager from '../services/email/EmailManager.js';
+import TaskStore from '../services/tasks/TaskStore.js';
 
 const router = express.Router();
 
@@ -51,7 +52,103 @@ const initializeServices = async (req, res, next) => {
 
 // Apply middleware
 router.use(authenticate);
-router.use(initializeServices);
+
+/**
+ * Extract tasks from email content
+ * POST /api/email-tasks/extract
+ */
+router.post('/extract', async (req, res) => {
+  try {
+    const { emailId, subject, from, body, useAI = true } = req.body;
+    
+    if (!body && !subject) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email content is required'
+      });
+    }
+    
+    // For now, use a simple extraction logic
+    // In production, this would use AI/NLP to extract tasks
+    const tasks = [];
+    
+    // Simple keyword-based extraction
+    const content = (body || '') + ' ' + (subject || '');
+    const lines = content.split(/[.!?\n]+/).filter(line => line.trim());
+    
+    // Look for action items
+    lines.forEach((line, index) => {
+      const lowerLine = line.toLowerCase();
+      
+      // Check for task indicators
+      const taskIndicators = [
+        'please', 'need to', 'must', 'should', 'have to', 'required',
+        'follow up', 'call', 'email', 'send', 'book', 'schedule',
+        'prepare', 'review', 'complete', 'finish', 'submit'
+      ];
+      
+      const hasIndicator = taskIndicators.some(indicator => lowerLine.includes(indicator));
+      
+      if (hasIndicator) {
+        // Determine priority based on keywords
+        let priority = 'medium';
+        if (lowerLine.includes('urgent') || lowerLine.includes('asap') || lowerLine.includes('immediately')) {
+          priority = 'urgent';
+        } else if (lowerLine.includes('important') || lowerLine.includes('critical')) {
+          priority = 'high';
+        }
+        
+        // Extract due date hints
+        let dueDate = 'Tomorrow';
+        if (lowerLine.includes('today')) dueDate = 'Today';
+        else if (lowerLine.includes('tomorrow')) dueDate = 'Tomorrow';
+        else if (lowerLine.includes('next week')) dueDate = 'Next Week';
+        else if (lowerLine.includes('friday')) dueDate = 'Friday';
+        else if (lowerLine.includes('monday')) dueDate = 'Monday';
+        
+        // Clean up the task title
+        let title = line.trim();
+        if (title.length > 100) title = title.substring(0, 100) + '...';
+        
+        tasks.push({
+          id: `task-${index}`,
+          title: title,
+          priority: priority,
+          dueDate: dueDate,
+          tags: ['email', 'extracted'],
+          description: `From: ${from}\nSubject: ${subject}\n\nContext: ${line}`,
+          assignee: null
+        });
+      }
+    });
+    
+    // If no tasks found, create a follow-up task
+    if (tasks.length === 0) {
+      tasks.push({
+        id: 'task-0',
+        title: `Follow up on: ${subject}`,
+        priority: 'medium',
+        dueDate: 'Tomorrow',
+        tags: ['email', 'follow-up'],
+        description: `Email from ${from}\n\n${body?.substring(0, 200)}...`,
+        assignee: null
+      });
+    }
+    
+    res.json({
+      success: true,
+      tasks: tasks,
+      emailId: emailId
+    });
+    
+  } catch (error) {
+    console.error('Extract tasks error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 /**
  * Send email to Tala for task extraction
@@ -186,6 +283,57 @@ router.post('/confirm/:sessionId', async (req, res) => {
  * Get conversion session status
  * GET /api/email-tasks/status/:sessionId
  */
+/**
+ * Process and create tasks from email
+ * POST /api/email-tasks/process
+ */
+router.post('/process', async (req, res) => {
+  try {
+    const { emailId, tasks, autoAssign = true } = req.body;
+    const userId = req.user?.id || req.userId || 'test_user_123';
+    
+    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tasks array is required'
+      });
+    }
+    
+    // Create tasks using TaskStore
+    const createdTasks = [];
+    
+    for (const task of tasks) {
+      try {
+        const taskData = {
+          ...task,
+          userId: userId,
+          source: 'email',
+          sourceId: emailId
+        };
+        
+        const newTask = TaskStore.createTask(taskData);
+        createdTasks.push(newTask);
+      } catch (error) {
+        console.error('Error creating task:', error);
+      }
+    }
+    
+    res.json({
+      success: true,
+      tasks: createdTasks,
+      created: createdTasks.length,
+      failed: tasks.length - createdTasks.length
+    });
+    
+  } catch (error) {
+    console.error('Process tasks error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 router.get('/status/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -306,61 +454,7 @@ router.get('/actions', async (req, res) => {
   }
 });
 
-/**
- * Extract tasks from email without creating them (preview only)
- * POST /api/email-tasks/extract
- */
-router.post('/extract', async (req, res) => {
-  try {
-    const { emailId } = req.body;
-    const userId = req.user?.id || req.userId;
-    
-    if (!emailId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email ID is required'
-      });
-    }
-    
-    // Get email data
-    const emailData = await req.emailServices.emailManager.getEmail(emailId);
-    if (!emailData) {
-      return res.status(404).json({
-        success: false,
-        error: 'Email not found'
-      });
-    }
-    
-    // Extract tasks without creating
-    const converter = req.emailServices.actionHandler.converter;
-    const extractedContent = await converter.extractEmailContent(emailData);
-    const extractedTasks = await converter.taskExtractor.extractTasks(extractedContent);
-    const suggestions = await converter.suggestionEngine.generateSuggestions(
-      extractedTasks,
-      emailData
-    );
-    
-    res.json({
-      success: true,
-      email: {
-        id: emailData.id,
-        subject: emailData.subject,
-        from: emailData.from,
-        date: emailData.date
-      },
-      extractedTasks,
-      suggestions,
-      emailType: converter.detectEmailType(emailData)
-    });
-    
-  } catch (error) {
-    console.error('Extract tasks error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
+// Removed duplicate /extract endpoint - using the simpler one above
 
 /**
  * Get email thread context for task creation

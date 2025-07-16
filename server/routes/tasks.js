@@ -7,6 +7,7 @@
 
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
+import TaskStore from '../services/tasks/TaskStore.js';
 import TaskManager from '../services/tasks/TaskManager.js';
 import TaskWorkflow from '../services/tasks/TaskWorkflow.js';
 import TaskAutomation from '../services/tasks/TaskAutomation.js';
@@ -67,16 +68,14 @@ router.use(initializeServices);
 // Create task
 router.post('/', async (req, res) => {
   try {
-    const { taskManager, reminderService } = req.taskServices;
-    const taskData = req.body;
+    const userId = req.userId || 'test_user_123';
+    const taskData = {
+      ...req.body,
+      userId
+    };
     
-    // Create task
-    const task = await taskManager.createTask(taskData);
-    
-    // Create default reminders if due date is set
-    if (task.dueDate) {
-      await reminderService.createTaskReminders(task.id, task);
-    }
+    // Create task using TaskStore
+    const task = TaskStore.createTask(taskData);
     
     res.status(201).json({
       success: true,
@@ -94,10 +93,16 @@ router.post('/', async (req, res) => {
 // Get task by ID
 router.get('/:taskId', async (req, res) => {
   try {
-    const { taskManager } = req.taskServices;
     const { taskId } = req.params;
     
-    const task = await taskManager.getTask(taskId);
+    const task = TaskStore.getTask(taskId);
+    
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
     
     res.json({
       success: true,
@@ -115,11 +120,17 @@ router.get('/:taskId', async (req, res) => {
 // Update task
 router.put('/:taskId', async (req, res) => {
   try {
-    const { taskManager } = req.taskServices;
     const { taskId } = req.params;
     const updates = req.body;
     
-    const task = await taskManager.updateTask(taskId, updates);
+    const task = TaskStore.updateTask(taskId, updates);
+    
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
     
     res.json({
       success: true,
@@ -137,10 +148,16 @@ router.put('/:taskId', async (req, res) => {
 // Delete task
 router.delete('/:taskId', async (req, res) => {
   try {
-    const { taskManager } = req.taskServices;
     const { taskId } = req.params;
     
-    await taskManager.deleteTask(taskId);
+    const deleted = TaskStore.deleteTask(taskId);
+    
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
     
     res.json({
       success: true,
@@ -158,28 +175,19 @@ router.delete('/:taskId', async (req, res) => {
 // List tasks with filters
 router.get('/', async (req, res) => {
   try {
-    const { taskManager } = req.taskServices;
+    const userId = req.userId || 'test_user_123';
     const filters = {
       status: req.query.status,
       priority: req.query.priority,
-      assignedTo: req.query.assignedTo,
-      createdBy: req.query.createdBy || req.user?.id,
-      dueAfter: req.query.dueAfter,
-      dueBefore: req.query.dueBefore,
-      tags: req.query.tags ? req.query.tags.split(',') : undefined,
-      travelType: req.query.travelType,
-      search: req.query.search,
-      limit: parseInt(req.query.limit) || 50,
-      offset: parseInt(req.query.offset) || 0,
-      sortBy: req.query.sortBy,
-      sortOrder: req.query.sortOrder
+      limit: parseInt(req.query.limit) || 50
     };
     
-    const result = await taskManager.listTasks(filters);
+    // Get tasks from TaskStore
+    const tasks = TaskStore.getTasksByUser(userId, filters);
     
     res.json({
       success: true,
-      ...result
+      tasks
     });
   } catch (error) {
     console.error('Error listing tasks:', error);

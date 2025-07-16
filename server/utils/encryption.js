@@ -208,18 +208,16 @@ const encryption = new Encryption();
 
 export default encryption;
 
-// Named exports for convenience
-export const {
-    encrypt,
-    decrypt,
-    encryptObject,
-    decryptObject,
-    generateToken,
-    hashPassword,
-    verifyPassword,
-    createHash,
-    createHmac,
-    verifyHmac,
-    encryptFields,
-    decryptFields
-} = encryption;
+// Named exports for convenience - bind to preserve context
+export const encrypt = encryption.encrypt.bind(encryption);
+export const decrypt = encryption.decrypt.bind(encryption);
+export const encryptObject = encryption.encryptObject.bind(encryption);
+export const decryptObject = encryption.decryptObject.bind(encryption);
+export const generateToken = encryption.generateToken.bind(encryption);
+export const hashPassword = encryption.hashPassword.bind(encryption);
+export const verifyPassword = encryption.verifyPassword.bind(encryption);
+export const createHash = encryption.createHash.bind(encryption);
+export const createHmac = encryption.createHmac.bind(encryption);
+export const verifyHmac = encryption.verifyHmac.bind(encryption);
+export const encryptFields = encryption.encryptFields.bind(encryption);
+export const decryptFields = encryption.decryptFields.bind(encryption);

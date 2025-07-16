@@ -6,6 +6,7 @@
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import { getSupabaseService } from '../../db/supabaseClient.js';
 import { v4 as uuidv4 } from 'uuid';
+import TokenStorageServiceTemp from './TokenStorageServiceTemp.js';
 
 const supabaseAdmin = getSupabaseService();
 
@@ -24,6 +25,16 @@ class TokenStorageService {
      */
     async saveGmailIntegration(userId, email, tokens) {
         try {
+            // Check if database table exists
+            const { error: tableCheckError } = await supabaseAdmin
+                .from('integration_configs')
+                .select('id')
+                .limit(1);
+            
+            if (tableCheckError && tableCheckError.message.includes('does not exist')) {
+                console.log('⚠️  integration_configs table not found, using temporary file storage');
+                return TokenStorageServiceTemp.saveGmailIntegration(userId, email, tokens);
+            }
             // Encrypt sensitive token data
             const encryptedTokens = encrypt(JSON.stringify({
                 access_token: tokens.access_token,
@@ -95,6 +106,15 @@ class TokenStorageService {
      */
     async getGmailIntegration(userId) {
         try {
+            // Check if database table exists
+            const { error: tableCheckError } = await supabaseAdmin
+                .from('integration_configs')
+                .select('id')
+                .limit(1);
+            
+            if (tableCheckError && tableCheckError.message.includes('does not exist')) {
+                return TokenStorageServiceTemp.getGmailIntegration(userId);
+            }
             // Check cache first
             const cached = this.cache.get(userId);
             if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
@@ -162,6 +182,15 @@ class TokenStorageService {
      */
     async updateGmailTokens(userId, newTokens) {
         try {
+            // Check if database table exists
+            const { error: tableCheckError } = await supabaseAdmin
+                .from('integration_configs')
+                .select('id')
+                .limit(1);
+            
+            if (tableCheckError && tableCheckError.message.includes('does not exist')) {
+                return TokenStorageServiceTemp.updateGmailTokens(userId, newTokens);
+            }
             const encryptedTokens = encrypt(JSON.stringify({
                 access_token: newTokens.access_token,
                 refresh_token: newTokens.refresh_token,
@@ -198,6 +227,15 @@ class TokenStorageService {
      */
     async removeGmailIntegration(userId) {
         try {
+            // Check if database table exists
+            const { error: tableCheckError } = await supabaseAdmin
+                .from('integration_configs')
+                .select('id')
+                .limit(1);
+            
+            if (tableCheckError && tableCheckError.message.includes('does not exist')) {
+                return TokenStorageServiceTemp.removeGmailIntegration(userId);
+            }
             // Soft delete
             const { error } = await supabaseAdmin
                 .from('integration_configs')
@@ -227,6 +265,15 @@ class TokenStorageService {
      */
     async getGmailStatus(userId) {
         try {
+            // Check if database table exists
+            const { error: tableCheckError } = await supabaseAdmin
+                .from('integration_configs')
+                .select('id')
+                .limit(1);
+            
+            if (tableCheckError && tableCheckError.message.includes('does not exist')) {
+                return TokenStorageServiceTemp.getGmailStatus(userId);
+            }
             const integration = await this.getGmailIntegration(userId);
             
             if (!integration) {
@@ -264,4 +311,75 @@ class TokenStorageService {
     }
 }
 
-export default new TokenStorageService();
+// Extended class that adds getGmailTokens and updateIntegrationStatus methods
+class ExtendedTokenStorageService extends TokenStorageService {
+    async getGmailTokens(userId) {
+        try {
+            // Check if database table exists
+            const { error: tableCheckError } = await supabaseAdmin
+                .from('integration_configs')
+                .select('id')
+                .limit(1);
+            
+            if (tableCheckError && tableCheckError.message.includes('does not exist')) {
+                return TokenStorageServiceTemp.getGmailTokens(userId);
+            }
+
+            const integration = await this.getGmailIntegration(userId);
+            
+            if (!integration) {
+                return {
+                    success: false,
+                    error: 'No Gmail integration found'
+                };
+            }
+
+            // Check if token needs refresh
+            const expiryDate = new Date(integration.tokens.expiry_date);
+            const needsRefresh = expiryDate < new Date();
+
+            return {
+                success: true,
+                tokens: integration.tokens,
+                needsRefresh,
+                integrationId: integration.id
+            };
+        } catch (error) {
+            console.error('Error getting Gmail tokens:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    async updateIntegrationStatus(integrationId, status, message) {
+        try {
+            // Check if database table exists
+            const { error: tableCheckError } = await supabaseAdmin
+                .from('integration_configs')
+                .select('id')
+                .limit(1);
+            
+            if (tableCheckError && tableCheckError.message.includes('does not exist')) {
+                return TokenStorageServiceTemp.updateIntegrationStatus(integrationId, status, message);
+            }
+
+            const { error } = await supabaseAdmin
+                .from('integration_configs')
+                .update({
+                    status: status,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', integrationId);
+
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error('Error updating integration status:', error);
+            return false;
+        }
+    }
+}
+
+export default new ExtendedTokenStorageService();
