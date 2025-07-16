@@ -6,6 +6,7 @@
 import express from 'express';
 import googleOAuthService from '../services/auth/GoogleOAuthService.js';
 import realGmailService from '../services/auth/RealGmailService.js';
+import tokenStorageService from '../services/auth/TokenStorageService.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -60,10 +61,14 @@ router.get('/callback/gmail', async (req, res) => {
             const { tokens, userInfo } = await realGmailService.exchangeCodeForTokens(code);
             console.log('✅ Gmail connected successfully for:', userInfo.email);
             
-            // Store tokens temporarily in session (in production, use secure storage)
-            req.session = req.session || {};
-            req.session.gmailTokens = tokens;
-            req.session.gmailUser = userInfo;
+            // Save tokens persistently
+            await tokenStorageService.saveGmailIntegration(
+                stateData.userId,
+                userInfo.email,
+                tokens
+            );
+            
+            console.log('✅ Gmail tokens saved persistently for user:', stateData.userId);
             
             // Test the connection
             const testResult = await realGmailService.testConnection(tokens.access_token);
@@ -92,14 +97,14 @@ router.get('/callback/gmail', async (req, res) => {
  */
 router.get('/test', authenticate, async (req, res) => {
     try {
-        // In production, get tokens from secure storage
-        const tokens = req.session?.gmailTokens;
+        // Get tokens from persistent storage
+        const tokenResult = await tokenStorageService.getGmailTokens(req.userId);
         
-        if (!tokens) {
-            return res.status(401).json({ error: 'Not connected to Gmail' });
+        if (!tokenResult.success || !tokenResult.tokens) {
+            return res.status(401).json({ error: tokenResult.error || 'Not connected to Gmail' });
         }
         
-        const result = await realGmailService.testConnection(tokens.access_token);
+        const result = await realGmailService.testConnection(tokenResult.tokens.access_token);
         res.json(result);
     } catch (error) {
         console.error('Test connection error:', error);
@@ -112,33 +117,10 @@ router.get('/test', authenticate, async (req, res) => {
  */
 router.get('/messages', authenticate, async (req, res) => {
     try {
-        // Check for real Gmail tokens first
-        const tokens = req.session?.gmailTokens;
+        // Get tokens from persistent storage
+        const tokenResult = await tokenStorageService.getGmailTokens(req.userId);
         
-        if (tokens && tokens.access_token) {
-            // Use real Gmail API
-            console.log('📧 Fetching real Gmail messages...');
-            try {
-                const result = await realGmailService.listMessages(tokens.access_token, {
-                    maxResults: parseInt(req.query.maxResults) || 20,
-                    query: req.query.q || 'in:inbox',
-                    pageToken: req.query.pageToken
-                });
-                
-                console.log(`✅ Fetched ${result.messages.length} real Gmail messages`);
-                return res.json(result);
-            } catch (gmailError) {
-                console.error('Gmail API error:', gmailError);
-                return res.status(503).json({
-                    error: 'Gmail API error',
-                    message: 'Unable to fetch Gmail messages at this time',
-                    code: 'GMAIL_API_ERROR'
-                });
-            }
-        }
-        
-        // No tokens available - return error
-        if (!tokens) {
+        if (!tokenResult.success || !tokenResult.tokens) {
             console.log('❌ No Gmail tokens available');
             return res.status(401).json({
                 error: 'Gmail not connected',
@@ -147,13 +129,61 @@ router.get('/messages', authenticate, async (req, res) => {
             });
         }
         
-        const result = await googleOAuthService.listMessages(tokens, {
-            maxResults: parseInt(req.query.maxResults) || 20,
-            query: req.query.q || 'in:inbox',
-            pageToken: req.query.pageToken
-        });
+        let accessToken = tokenResult.tokens.access_token;
         
-        res.json(result);
+        // Check if token needs refresh
+        if (tokenResult.needsRefresh && tokenResult.tokens.refresh_token) {
+            console.log('🔄 Refreshing Gmail access token...');
+            try {
+                const refreshResult = await realGmailService.refreshToken(tokenResult.tokens.refresh_token);
+                
+                // Update stored tokens
+                await tokenStorageService.updateGmailTokens(req.userId, refreshResult);
+                
+                accessToken = refreshResult.access_token;
+                console.log('✅ Access token refreshed successfully');
+            } catch (refreshError) {
+                console.error('Token refresh failed:', refreshError);
+                // Continue with existing token, it might still work
+            }
+        }
+        
+        // Use real Gmail API
+        console.log('📧 Fetching real Gmail messages...');
+        try {
+            const result = await realGmailService.listMessages(accessToken, {
+                maxResults: parseInt(req.query.maxResults) || 20,
+                query: req.query.q || 'in:inbox',
+                pageToken: req.query.pageToken
+            });
+            
+            console.log(`✅ Fetched ${result.messages.length} real Gmail messages`);
+            return res.json(result);
+        } catch (gmailError) {
+            console.error('Gmail API error:', gmailError);
+            
+            // Check if it's an authentication error
+            if (gmailError.message && gmailError.message.includes('401')) {
+                // Update integration status
+                await tokenStorageService.updateIntegrationStatus(
+                    tokenResult.integrationId,
+                    'error',
+                    'Authentication failed - please reconnect'
+                );
+                
+                return res.status(401).json({
+                    error: 'Gmail authentication failed',
+                    message: 'Please reconnect your Gmail account',
+                    code: 'GMAIL_AUTH_FAILED'
+                });
+            }
+            
+            return res.status(503).json({
+                error: 'Gmail API error',
+                message: 'Unable to fetch Gmail messages at this time',
+                code: 'GMAIL_API_ERROR'
+            });
+        }
     } catch (error) {
         console.error('List messages error:', error);
         res.status(500).json({ error: 'Failed to list messages' });
@@ -165,25 +195,10 @@ router.get('/messages', authenticate, async (req, res) => {
  */
 router.get('/message/:id', authenticate, async (req, res) => {
     try {
-        const tokens = req.session?.gmailTokens;
+        // Get tokens from persistent storage
+        const tokenResult = await tokenStorageService.getGmailTokens(req.userId);
         
-        if (tokens && tokens.access_token) {
-            // Use real Gmail API
-            try {
-                const message = await realGmailService.getMessage(tokens.access_token, req.params.id);
-                return res.json(message);
-            } catch (gmailError) {
-                console.error('Gmail API error:', gmailError);
-                return res.status(503).json({
-                    error: 'Gmail API error', 
-                    message: 'Unable to fetch this message at this time',
-                    code: 'GMAIL_API_ERROR'
-                });
-            }
-        }
-        
-        // No tokens available - return error
-        if (!tokens) {
+        if (!tokenResult.success || !tokenResult.tokens) {
             return res.status(401).json({
                 error: 'Gmail not connected',
                 message: 'Please connect your Gmail account to view this message',
@@ -191,10 +206,86 @@ router.get('/message/:id', authenticate, async (req, res) => {
             });
         }
         
-        res.status(500).json({ error: 'No valid tokens available' });
+        let accessToken = tokenResult.tokens.access_token;
+        
+        // Check if token needs refresh
+        if (tokenResult.needsRefresh && tokenResult.tokens.refresh_token) {
+            console.log('🔄 Refreshing Gmail access token for message fetch...');
+            try {
+                const refreshResult = await realGmailService.refreshToken(tokenResult.tokens.refresh_token);
+                await tokenStorageService.updateGmailTokens(req.userId, refreshResult);
+                accessToken = refreshResult.access_token;
+            } catch (refreshError) {
+                console.error('Token refresh failed:', refreshError);
+            }
+        }
+        
+        // Use real Gmail API
+        try {
+            const message = await realGmailService.getMessage(accessToken, req.params.id);
+            return res.json(message);
+        } catch (gmailError) {
+            console.error('Gmail API error:', gmailError);
+            
+            // Check if it's an authentication error
+            if (gmailError.message && gmailError.message.includes('401')) {
+                await tokenStorageService.updateIntegrationStatus(
+                    tokenResult.integrationId,
+                    'error',
+                    'Authentication failed - please reconnect'
+                );
+                
+                return res.status(401).json({
+                    error: 'Gmail authentication failed',
+                    message: 'Please reconnect your Gmail account',
+                    code: 'GMAIL_AUTH_FAILED'
+                });
+            }
+            
+            return res.status(503).json({
+                error: 'Gmail API error', 
+                message: 'Unable to fetch this message at this time',
+                code: 'GMAIL_API_ERROR'
+            });
+        }
     } catch (error) {
         console.error('Get message error:', error);
         res.status(500).json({ error: 'Failed to get message' });
+    }
+});
+
+/**
+ * Check Gmail connection status
+ */
+router.get('/status', authenticate, async (req, res) => {
+    try {
+        const status = await tokenStorageService.getGmailStatus(req.userId);
+        res.json(status);
+    } catch (error) {
+        console.error('Status check error:', error);
+        res.status(500).json({ error: 'Failed to check connection status' });
+    }
+});
+
+/**
+ * Disconnect Gmail
+ */
+router.delete('/disconnect', authenticate, async (req, res) => {
+    try {
+        const result = await tokenStorageService.removeGmailIntegration(req.userId);
+        
+        if (result.success) {
+            console.log(`✅ Gmail disconnected for user: ${req.userId}`);
+            return res.json({ success: true, message: 'Gmail disconnected successfully' });
+        }
+        
+        return res.status(400).json({ 
+            success: false, 
+            error: result.error || 'Failed to disconnect Gmail' 
+        });
+    } catch (error) {
+        console.error('Disconnect error:', error);
+        res.status(500).json({ error: 'Failed to disconnect Gmail' });
     }
 });
 
@@ -214,6 +305,27 @@ router.get('/test-oauth', (req, res) => {
         }
     } else {
         res.redirect('http://localhost:5173/email?connected=true&email=test@example.com');
+    }
+});
+
+/**
+ * Disconnect Gmail
+ */
+router.post('/disconnect', authenticate, async (req, res) => {
+    try {
+        await tokenStorageService.removeGmailIntegration(req.userId);
+        
+        // Clear session
+        if (req.session) {
+            delete req.session.gmailTokens;
+            delete req.session.gmailUser;
+        }
+        
+        console.log(`✅ Gmail disconnected for user: ${req.userId}`);
+        res.json({ success: true, message: 'Gmail disconnected successfully' });
+    } catch (error) {
+        console.error('Disconnect error:', error);
+        res.status(500).json({ error: 'Failed to disconnect Gmail' });
     }
 });
 

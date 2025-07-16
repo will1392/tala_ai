@@ -104,11 +104,35 @@ export const Email = () => {
     }
   };
 
-  // Initial state - make sure we start disconnected
+  // Check Gmail connection status on mount
   useEffect(() => {
-    setIsConnected(false);
-    setError(null);
+    checkGmailStatus();
   }, []);
+  
+  const checkGmailStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/email/status', {
+        headers: { 'x-user-id': 'test_user_123' },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.connected) {
+          console.log('Gmail already connected:', data.email);
+          setIsConnected(true);
+          setError(null);
+          // Fetch emails if connected
+          fetchEmails();
+        } else {
+          setIsConnected(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking Gmail status:', error);
+      setIsConnected(false);
+    }
+  };
 
   const handleSendToTala = async (email: EmailMessage) => {
     setIsProcessing(true);
@@ -210,15 +234,42 @@ export const Email = () => {
               Transform emails into actionable tasks with AI
             </p>
           </div>
-          <Button 
-            variant="primary" 
-            className="gap-2" 
-            onClick={fetchEmails}
-            disabled={isLoading}
-          >
-            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-            {isLoading ? 'Syncing...' : 'Sync Emails'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="primary" 
+              className="gap-2" 
+              onClick={fetchEmails}
+              disabled={isLoading}
+            >
+              <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+              {isLoading ? 'Syncing...' : 'Sync Emails'}
+            </Button>
+            <Button
+              variant="secondary"
+              className="gap-2"
+              onClick={async () => {
+                try {
+                  const response = await fetch('http://localhost:3001/api/email/disconnect', {
+                    method: 'POST',
+                    headers: { 'x-user-id': 'test_user_123' },
+                    credentials: 'include'
+                  });
+                  
+                  if (response.ok) {
+                    setIsConnected(false);
+                    setEmails([]);
+                    setSelectedEmail(null);
+                    setError(null);
+                  }
+                } catch (error) {
+                  console.error('Error disconnecting Gmail:', error);
+                }
+              }}
+            >
+              <AlertCircle size={18} />
+              Disconnect
+            </Button>
+          </div>
         </div>
       </div>
 

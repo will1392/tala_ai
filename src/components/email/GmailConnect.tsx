@@ -10,6 +10,7 @@ interface GmailConnectProps {
 export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [testMode, setTestMode] = useState(true);
+  const [existingEmail, setExistingEmail] = useState<string | null>(null);
   
   const handleGmailConnect = () => {
     if (testMode) {
@@ -23,6 +24,33 @@ export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
       // Real OAuth flow - include auth header via query param for redirect
       const userId = localStorage.getItem('userId') || 'test_user_123';
       window.location.href = `http://localhost:3001/api/email/connect/gmail?userId=${userId}`;
+    }
+  };
+  
+  // Check for existing connection first
+  React.useEffect(() => {
+    checkExistingConnection();
+  }, []);
+  
+  const checkExistingConnection = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/email/status', {
+        headers: { 'x-user-id': 'test_user_123' },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.connected) {
+          setConnectionState('connected');
+          setExistingEmail(data.email);
+          setTimeout(() => {
+            onConnectionSuccess();
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing connection:', error);
     }
   };
   
@@ -164,7 +192,8 @@ export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
               Successfully Connected!
             </h3>
             <p className="text-white/60">
-              {testMode ? 'Demo mode active - connect real Gmail to see your emails' : 'Your Gmail account is now connected'}
+              {testMode ? 'Demo mode active - connect real Gmail to see your emails' : 
+               existingEmail ? `Connected: ${existingEmail}` : 'Your Gmail account is now connected'}
             </p>
             {testMode && (
               <Button 
