@@ -110,9 +110,12 @@ export class ConversationContextService {
       const contextSummary = this.buildContextSummary(context);
 
       // Use OpenAI function calling for structured extraction
-      const response = await fetch('/api/chat/extract-context', {
+      const response = await fetch('http://localhost:3001/api/chat/extract-context', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': 'test_user_123' // TODO: Get from auth context
+        },
         body: JSON.stringify({
           message,
           contextSummary,
@@ -121,6 +124,8 @@ export class ConversationContextService {
       });
 
       if (!response.ok) {
+        const errorData = await response.text();
+        console.warn('Context extraction API failed:', response.status, errorData);
         throw new Error('Failed to extract context');
       }
 
@@ -128,7 +133,7 @@ export class ConversationContextService {
       return this.parseExtractionResult(result, message);
       
     } catch (error) {
-      console.error('Entity extraction failed:', error);
+      console.warn('Entity extraction failed, using fallback:', error.message);
       return this.fallbackExtraction(message, context);
     }
   }
@@ -167,7 +172,8 @@ export class ConversationContextService {
       visa_inquiry: ['visa', 'entry', 'requirements', 'permit'],
       passport_check: ['passport', 'valid', 'expire', 'expiry'],
       restaurant_search: ['restaurant', 'food', 'eat', 'dining'],
-      hotel_search: ['hotel', 'accommodation', 'stay', 'booking']
+      hotel_search: ['hotel', 'accommodation', 'stay', 'booking'],
+      task_creation: ['create a task', 'remind me', 'add a task', 'make a task', 'schedule', 'todo', 'task to']
     };
 
     Object.entries(intentKeywords).forEach(([intent, keywords]) => {
@@ -178,6 +184,44 @@ export class ConversationContextService {
         intents.push(this.createIntent(intent as IntentType, 0.6));
       }
     });
+
+    // Task extraction for task creation intent
+    if (intents.some(i => i.type === 'task_creation')) {
+      // Extract task title - text after task keywords
+      const taskPatterns = ['create a task to', 'remind me to', 'add a task to', 'make a task to', 'task to'];
+      for (const pattern of taskPatterns) {
+        const index = message.toLowerCase().indexOf(pattern);
+        if (index !== -1) {
+          const afterPattern = message.substring(index + pattern.length).trim();
+          const taskTitle = afterPattern.split(/\s+(by|on|at|before|tomorrow|today|next)\s+/i)[0].trim();
+          if (taskTitle) {
+            entities.push(this.createEntity('task_title', taskTitle, 0.7, message));
+          }
+          break;
+        }
+      }
+      
+      // Extract due date patterns
+      const dueDatePatterns = [
+        { pattern: /\b(tomorrow)\b/i, value: 'tomorrow' },
+        { pattern: /\b(today)\b/i, value: 'today' },
+        { pattern: /\b(next week)\b/i, value: 'next week' },
+        { pattern: /\b(next monday|next tuesday|next wednesday|next thursday|next friday)\b/i, value: null }
+      ];
+      
+      for (const { pattern, value } of dueDatePatterns) {
+        const match = message.match(pattern);
+        if (match) {
+          entities.push(this.createEntity('task_due_date', value || match[0], 0.7, message));
+          break;
+        }
+      }
+      
+      // Extract priority
+      if (message.toLowerCase().includes('urgent') || message.toLowerCase().includes('asap')) {
+        entities.push(this.createEntity('task_priority', 'high', 0.8, message));
+      }
+    }
 
     // Basic reference detection
     const referencePatterns = ['there', 'it', 'that place', 'the country', 'the city'];

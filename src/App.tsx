@@ -8,6 +8,7 @@ import { Chat } from './pages/Chat';
 import { Email } from './pages/Email';
 import { Settings } from './pages/Settings';
 import EmailInbox from './components/email/EmailInbox';
+import { DueTaskBanner } from './components/notifications/DueTaskBanner';
 import { useAuthStore } from './store/authStore';
 import './styles/globals.css';
 
@@ -29,6 +30,7 @@ function App() {
             },
           }}
         />
+        {isAuthenticated && <DueTaskBanner />}
         <Routes>
           {!isAuthenticated ? (
             <Route path="*" element={<LoginPage />} />

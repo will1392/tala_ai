@@ -95,6 +95,30 @@
         "persistContext": true,
         "contextReset": false
       }
+    ],
+    [
+      "29c07ab7-3a95-42f7-93d0-1a923d51ce96",
+      {
+        "id": "29c07ab7-3a95-42f7-93d0-1a923d51ce96",
+        "userId": "mock-user-id",
+        "title": "can you create a task that needs to be done today ...",
+        "createdAt": "2025-07-21T21:16:55.912Z",
+        "updatedAt": "2025-07-21T21:16:55.912Z",
+        "persistContext": true,
+        "contextReset": false
+      }
+    ],
+    [
+      "8cb40d18-fc8f-44da-a120-6fb0db55f22a",
+      {
+        "id": "8cb40d18-fc8f-44da-a120-6fb0db55f22a",
+        "userId": "mock-user-id",
+        "title": "can you create a task that needs to be done today ...",
+        "createdAt": "2025-07-21T21:24:24.137Z",
+        "updatedAt": "2025-07-21T21:24:24.137Z",
+        "persistContext": true,
+        "contextReset": false
+      }
     ]
   ],
   "messages": [
@@ -780,6 +804,121 @@
           "sender": "assistant",
           "content": "Thanks for confirming your travel timeframe for Greece as January 2026! \n\nTo assist you further, could you please share:\n- Which cities or islands in Greece you are interested in visiting?\n- Are you aware of the visa requirements and your passport validity for that time?\n\nLet me know, and we can continue planning your trip!",
           "timestamp": "2025-07-14T01:33:16.777Z",
+          "sources": [],
+          "tokensUsed": 0,
+          "cost": 0,
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        }
+      ]
+    ],
+    [
+      "29c07ab7-3a95-42f7-93d0-1a923d51ce96",
+      [
+        {
+          "id": "eddea8c7-0edb-4bcf-af7d-77ac680e99d9",
+          "conversationId": "29c07ab7-3a95-42f7-93d0-1a923d51ce96",
+          "sender": "user",
+          "content": "can you create a task that needs to be done today by 8pm? I need to reach out to John about his trip to Japan",
+          "timestamp": "2025-07-21T21:16:55.917Z",
+          "entities": []
+        },
+        {
+          "id": "043adf66-e795-4136-8600-65b62d0de796",
+          "conversationId": "29c07ab7-3a95-42f7-93d0-1a923d51ce96",
+          "sender": "assistant",
+          "content": "Sure! Here's a task for you:\n\n### Task: Reach Out to John\n- **Deadline:** Today by 8 PM\n- **Action:** Contact John to discuss his trip to Japan. \n\nMake sure to gather any specific questions or topics you want to cover regarding his trip so you can have a productive conversation. If you need any tips or information about Japan to share with him, feel free to ask!",
+          "timestamp": "2025-07-21T21:16:55.917Z",
+          "sources": [],
+          "tokensUsed": 0,
+          "cost": 0,
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        }
+      ]
+    ],
+    [
+      "8cb40d18-fc8f-44da-a120-6fb0db55f22a",
+      [
+        {
+          "id": "5cb79f95-9c2a-4d7d-bfe4-7b00db6bb964",
+          "conversationId": "8cb40d18-fc8f-44da-a120-6fb0db55f22a",
+          "sender": "user",
+          "content": "can you create a task that needs to be done today by 8pm? I need to reach out to John about his trip to Japan",
+          "timestamp": "2025-07-21T21:24:24.140Z",
+          "entities": []
+        },
+        {
+          "id": "018116e2-d1c1-43fd-b671-8394693f102d",
+          "conversationId": "8cb40d18-fc8f-44da-a120-6fb0db55f22a",
+          "sender": "assistant",
+          "content": "I've created a task for you! \n\n**Task:** Reach out to John about his trip to Japan  \n**Deadline:** Today by 8 PM  \n\nIf you need any more help with this task or have other questions, feel free to ask!",
+          "timestamp": "2025-07-21T21:24:24.140Z",
+          "sources": [],
+          "tokensUsed": 0,
+          "cost": 0,
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        {
+          "id": "10da0208-cde2-4838-8c44-38d2c3cfd94b",
+          "conversationId": "8cb40d18-fc8f-44da-a120-6fb0db55f22a",
+          "sender": "user",
+          "content": "can you create a task that needs to be done today by 8pm? I need to reach out to John about his trip to Japan",
+          "timestamp": "2025-07-21T21:32:42.607Z",
+          "entities": [
+            {
+              "id": "task_title_reach out to john about his trip to japan_1753133561598",
+              "type": "task_title",
+              "value": "Reach out to John about his trip to Japan",
+              "normalizedValue": "reach out to john about his trip to japan",
+              "confidence": 1,
+              "firstMentioned": "2025-07-21T21:32:41.598Z",
+              "lastReferenced": "2025-07-21T21:32:41.598Z",
+              "referenceCount": 1,
+              "context": "can you create a task that needs to be done today by 8pm? I need to reach out to John about his trip to Japan"
+            },
+            {
+              "id": "task_due_date_today by 8 pm_1753133561598",
+              "type": "task_due_date",
+              "value": "today by 8 PM",
+              "normalizedValue": "today by 8 pm",
+              "confidence": 1,
+              "firstMentioned": "2025-07-21T21:32:41.598Z",
+              "lastReferenced": "2025-07-21T21:32:41.598Z",
+              "referenceCount": 1,
+              "context": "can you create a task that needs to be done today by 8pm? I need to reach out to John about his trip to Japan"
+            },
+            {
+              "id": "country_japan_1753133561598",
+              "type": "country",
+              "value": "Japan",
+              "normalizedValue": "japan",
+              "confidence": 1,
+              "firstMentioned": "2025-07-21T21:32:41.598Z",
+              "lastReferenced": "2025-07-21T21:32:41.598Z",
+              "referenceCount": 1,
+              "context": "can you create a task that needs to be done today by 8pm? I need to reach out to John about his trip to Japan"
+            },
+            {
+              "id": "person_name_john_1753133561598",
+              "type": "person_name",
+              "value": "John",
+              "normalizedValue": "john",
+              "confidence": 1,
+              "firstMentioned": "2025-07-21T21:32:41.598Z",
+              "lastReferenced": "2025-07-21T21:32:41.598Z",
+              "referenceCount": 1,
+              "context": "can you create a task that needs to be done today by 8pm? I need to reach out to John about his trip to Japan"
+            }
+          ]
+        },
+        {
+          "id": "c144469e-e8d0-44b2-b3fe-d044daa48b02",
+          "conversationId": "8cb40d18-fc8f-44da-a120-6fb0db55f22a",
+          "sender": "assistant",
+          "content": "I already created that task for you! Just to recap:\n\n**Task:** Reach out to John about his trip to Japan  \n**Deadline:** Today by 8 PM  \n\nIf you need any further assistance with this task or anything else, feel free to ask!",
+          "timestamp": "2025-07-21T21:32:42.608Z",
           "sources": [],
           "tokensUsed": 0,
           "cost": 0,

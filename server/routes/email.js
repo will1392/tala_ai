@@ -28,7 +28,8 @@ router.get('/providers', requireAuth, (req, res) => {
  */
 router.get('/accounts', requireAuth, async (req, res) => {
   try {
-    const accounts = await emailManager.getUserAccounts(req.user.id);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const accounts = await emailManager.getUserAccounts(userId);
     res.json(accounts);
   } catch (error) {
     console.error('Failed to get email accounts:', error);
@@ -48,10 +49,11 @@ router.post('/connect', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Provider required' });
     }
     
-    const result = await emailManager.initiateConnection(req.user.id, provider, {
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const result = await emailManager.initiateConnection(userId, provider, {
       email,
       credentials,
-      returnUrl: req.body.returnUrl || '/dashboard'
+      returnUrl: req.body.returnUrl || 'http://localhost:5173/dashboard'
     });
     
     if (result.authUrl) {
@@ -67,86 +69,9 @@ router.post('/connect', requireAuth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/email/callback/:provider
- * Handle OAuth callbacks from providers
- */
-router.get('/callback/:provider', async (req, res) => {
-  try {
-    const { provider } = req.params;
-    const { code, state, error } = req.query;
-    
-    if (error) {
-      console.log(`User denied ${provider} access:`, error);
-      return res.redirect(`/dashboard?email=${provider}_denied`);
-    }
-    
-    const result = await emailManager.handleOAuthCallback(provider, code, state);
-    
-    if (result.success) {
-      // Start initial sync
-      syncService.startInitialSync(result.userId, result.email, provider).catch(err => {
-        console.error('Initial sync failed:', err);
-      });
-      
-      res.redirect(`${result.returnUrl}?email=connected&provider=${provider}&address=${encodeURIComponent(result.email)}`);
-    } else {
-      res.redirect('/dashboard?error=email_auth_failed');
-    }
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    res.redirect('/dashboard?error=email_auth_failed');
-  }
-});
+// OAuth callback routes are handled in email-connect.js
 
-/**
- * GET /api/email/connect/gmail
- * Initiates Gmail OAuth flow
- */
-router.get('/connect/gmail', requireAuth, (req, res) => {
-  try {
-    const authUrl = googleOAuthService.generateAuthUrl(req.user.id, {
-      returnUrl: req.query.returnUrl || '/dashboard'
-    });
-    
-    res.redirect(authUrl);
-  } catch (error) {
-    console.error('Failed to generate auth URL:', error);
-    res.redirect('/dashboard?error=gmail_connect_failed');
-  }
-});
-
-/**
- * GET /api/email/callback/gmail
- * Handles OAuth callback from Google
- */
-router.get('/callback/gmail', async (req, res) => {
-  try {
-    const { code, state, error } = req.query;
-    
-    // Handle user denial
-    if (error) {
-      console.log('User denied Gmail access:', error);
-      return res.redirect('/dashboard?gmail=denied');
-    }
-    
-    // Validate state
-    const stateData = googleOAuthService.parseState(state);
-    
-    // Exchange code for tokens
-    const tokenData = await googleOAuthService.getTokens(code);
-    
-    // Store tokens for user
-    const email = await googleOAuthService.storeUserTokens(stateData.userId, tokenData);
-    
-    // Redirect back to app with success
-    res.redirect(`${stateData.returnUrl}?gmail=connected&email=${encodeURIComponent(email)}`);
-    
-  } catch (error) {
-    console.error('Gmail OAuth callback error:', error);
-    res.redirect('/dashboard?error=gmail_auth_failed');
-  }
-});
+// Gmail connect and callback routes are handled in email-connect.js
 
 /**
  * GET /api/email/status
@@ -154,7 +79,22 @@ router.get('/callback/gmail', async (req, res) => {
  */
 router.get('/status', requireAuth, async (req, res) => {
   try {
-    const connections = await googleOAuthService.getUserConnections(req.user.id);
+    // First check session
+    if (req.session && req.session.gmailConnection) {
+      const conn = req.session.gmailConnection;
+      return res.json({
+        connected: true,
+        accounts: [{
+          email: conn.email,
+          connectedAt: conn.connectedAt,
+          picture: conn.userInfo?.picture
+        }]
+      });
+    }
+    
+    // Then check in-memory service
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const connections = await googleOAuthService.getUserConnections(userId);
     
     res.json({
       connected: connections.length > 0,
@@ -183,7 +123,8 @@ router.post('/disconnect', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Email address required' });
     }
     
-    await googleOAuthService.disconnect(req.user.id, email);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    await googleOAuthService.disconnect(userId, email);
     
     res.json({ 
       success: true, 
@@ -202,7 +143,8 @@ router.post('/disconnect', requireAuth, async (req, res) => {
 router.get('/test/:email?', requireAuth, async (req, res) => {
   try {
     const email = req.params.email || null;
-    const result = await googleOAuthService.testConnection(req.user.id, email);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const result = await googleOAuthService.testConnection(userId, email);
     
     res.json(result);
   } catch (error) {
@@ -226,7 +168,8 @@ router.get('/inbox', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Email address required' });
     }
     
-    const result = await emailManager.fetchInbox(req.user.id, provider, email, {
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const result = await emailManager.fetchInbox(userId, provider, email, {
       maxResults: parseInt(maxResults),
       pageToken,
       query
@@ -253,7 +196,8 @@ router.get('/message/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Email address required' });
     }
     
-    const message = await emailManager.getMessage(req.user.id, provider, email, id);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const message = await emailManager.getMessage(userId, provider, email, id);
     
     res.json(message);
     
@@ -272,7 +216,8 @@ router.post('/message/:id/modify', requireAuth, async (req, res) => {
     const { email, addLabelIds = [], removeLabelIds = [] } = req.body;
     const { id } = req.params;
     
-    const { gmail } = await googleOAuthService.getGmailClient(req.user.id, email);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const { gmail } = await googleOAuthService.getGmailClient(userId, email);
     
     await gmail.users.messages.modify({
       userId: 'me',
@@ -356,7 +301,8 @@ router.post('/message/:id/send-to-tala', requireAuth, async (req, res) => {
     const { email, provider = 'gmail' } = req.body;
     const { id } = req.params;
     
-    const result = await emailManager.analyzeEmail(req.user.id, provider, email, id);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const result = await emailManager.analyzeEmail(userId, provider, email, id);
     
     res.json(result);
   } catch (error) {
@@ -377,7 +323,8 @@ router.delete('/disconnect', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Email and provider required' });
     }
     
-    await emailManager.disconnectEmail(req.user.id, provider, email);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    await emailManager.disconnectEmail(userId, provider, email);
     
     res.json({ 
       success: true, 
@@ -395,7 +342,8 @@ router.delete('/disconnect', requireAuth, async (req, res) => {
  */
 router.get('/sync/status', requireAuth, async (req, res) => {
   try {
-    const status = await syncService.getSyncStatus(req.user.id);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const status = await syncService.getSyncStatus(userId);
     res.json(status);
   } catch (error) {
     console.error('Failed to get sync status:', error);
@@ -411,7 +359,8 @@ router.post('/sync', requireAuth, async (req, res) => {
   try {
     const { email, provider } = req.body;
     
-    const result = await syncService.triggerSync(req.user.id, email, provider);
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const result = await syncService.triggerSync(userId, email, provider);
     
     res.json(result);
   } catch (error) {
@@ -432,7 +381,8 @@ router.get('/search', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Search query required' });
     }
     
-    const results = await emailManager.searchEmails(req.user.id, provider, email, {
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    const results = await emailManager.searchEmails(userId, provider, email, {
       query,
       limit: parseInt(limit)
     });

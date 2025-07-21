@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import { GlassCard } from '../components/layout/GlassCard';
 import { cn } from '../utils/cn';
 import { 
@@ -33,12 +34,37 @@ const item = {
 
 export const Dashboard = () => {
   console.log('Dashboard component rendering...');
+  const location = useLocation();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
+  const [isLoadingCompletedTasks, setIsLoadingCompletedTasks] = useState(true);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [stats, setStats] = useState({
+    activeTasks: 0,
+    completedThisMonth: 0,
+    totalDocuments: 0,
+    activeSessions: 0,
+    activeClients: 0,
+    previousMonth: {
+      activeTasks: 0,
+      completedTasks: 0
+    }
+  });
   
   useEffect(() => {
     loadTasks();
-  }, []);
+    loadCompletedTasks();
+    loadPreviousMonthStats();
+    
+    // Check if we should highlight a task from navigation
+    if (location.state?.highlightTaskId) {
+      setHighlightedTaskId(location.state.highlightTaskId);
+      // Clear highlight after 3 seconds
+      setTimeout(() => setHighlightedTaskId(null), 3000);
+    }
+  }, [location]);
   
   const loadTasks = async () => {
     setIsLoadingTasks(true);
@@ -52,6 +78,101 @@ export const Dashboard = () => {
     }
   };
   
+  const loadCompletedTasks = async () => {
+    setIsLoadingCompletedTasks(true);
+    try {
+      // Get first and last day of current month
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      // Get completed tasks for the current month
+      const completed = await taskService.getTasks({
+        status: 'completed',
+        limit: 50
+      });
+      
+      // Filter to only show tasks completed this month
+      const thisMonthCompleted = completed.filter(task => {
+        if (!task.updatedAt) return false;
+        const completedDate = new Date(task.updatedAt);
+        return completedDate >= firstDay && completedDate <= lastDay;
+      });
+      
+      setCompletedTasks(thisMonthCompleted);
+      
+      // Update stats
+      setStats(prev => ({
+        ...prev,
+        completedThisMonth: thisMonthCompleted.length
+      }));
+    } catch (error) {
+      console.error('Error loading completed tasks:', error);
+    } finally {
+      setIsLoadingCompletedTasks(false);
+    }
+  };
+  
+  const loadPreviousMonthStats = async () => {
+    try {
+      // Get first and last day of previous month
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+      
+      // Get all tasks to calculate previous month stats
+      const allTasks = await taskService.getTasks({ limit: 100 });
+      
+      // Count tasks that were active last month
+      const activeLastMonth = allTasks.filter(task => {
+        const createdDate = new Date(task.createdAt);
+        return createdDate <= lastDay && task.status !== 'completed';
+      }).length;
+      
+      // Count tasks completed last month
+      const completedLastMonth = allTasks.filter(task => {
+        if (!task.updatedAt || task.status !== 'completed') return false;
+        const completedDate = new Date(task.updatedAt);
+        return completedDate >= firstDay && completedDate <= lastDay;
+      }).length;
+      
+      setStats(prev => ({
+        ...prev,
+        previousMonth: {
+          activeTasks: activeLastMonth,
+          completedTasks: completedLastMonth
+        }
+      }));
+    } catch (error) {
+      console.error('Error loading previous month stats:', error);
+    }
+  };
+  
+  const completeTask = async (taskId: string) => {
+    setCompletingTaskId(taskId);
+    try {
+      const updatedTask = await taskService.updateTask(taskId, { status: 'completed' });
+      if (updatedTask) {
+        // Remove the completed task from the list with a small delay for animation
+        setTimeout(() => {
+          setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+          // Add to completed tasks if it's from this month
+          const now = new Date();
+          const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+          if (new Date(updatedTask.updatedAt) >= firstDay) {
+            setCompletedTasks(prev => [updatedTask, ...prev]);
+          }
+          setCompletingTaskId(null);
+        }, 300);
+      } else {
+        setCompletingTaskId(null);
+      }
+    } catch (error) {
+      console.error('Error completing task:', error);
+      setCompletingTaskId(null);
+    }
+  };
+  
   const formatDueDate = (dateString?: string) => {
     if (!dateString) return 'No due date';
     
@@ -59,14 +180,31 @@ export const Dashboard = () => {
     const now = new Date();
     const diffMs = date.getTime() - now.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
-    if (diffHours < 0) return 'Overdue';
-    if (diffHours < 24) return `Due in ${diffHours} hours`;
-    if (diffDays === 1) return 'Due tomorrow';
-    if (diffDays < 7) return `Due in ${diffDays} days`;
+    // Format date and time
+    const dateOptions: Intl.DateTimeFormatOptions = {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    };
     
-    return date.toLocaleDateString();
+    // Add year if it's not the current year
+    if (date.getFullYear() !== now.getFullYear()) {
+      dateOptions.year = 'numeric';
+    }
+    
+    const formattedDate = date.toLocaleString('en-US', dateOptions);
+    
+    // Add relative time indicator for near-future tasks
+    if (diffHours < 0) {
+      return `Overdue - ${formattedDate}`;
+    } else if (diffHours < 24) {
+      return `${formattedDate} (${diffHours}h)`;
+    } else {
+      return formattedDate;
+    }
   };
   
   const getPriorityColor = (priority: string) => {
@@ -79,8 +217,59 @@ export const Dashboard = () => {
     }
   };
   
+  // Determine effective priority based on due date
+  const getEffectivePriority = (task: Task): string => {
+    if (!task.dueDate) return task.priority;
+    
+    const date = new Date(task.dueDate);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    // If due within 24 hours and not already urgent, show as urgent
+    if (diffHours <= 24 && diffHours >= 0 && task.priority !== 'urgent') {
+      return 'urgent';
+    }
+    
+    return task.priority;
+  };
+  
   // Update stats to show real task count
   const activeTaskCount = tasks.filter(t => t.status !== 'completed').length;
+  const completedThisMonth = completedTasks.length;
+  
+  // Calculate percentage changes
+  const calculatePercentageChange = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? '+100%' : '0%';
+    const change = ((current - previous) / previous) * 100;
+    const sign = change >= 0 ? '+' : '';
+    return `${sign}${Math.round(change)}%`;
+  };
+  
+  // Update stats when tasks change
+  useEffect(() => {
+    setStats(prev => ({
+      ...prev,
+      activeTasks: activeTaskCount
+    }));
+  }, [activeTaskCount]);
+  
+  // Format completed date
+  const formatCompletedDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    });
+  };
   
   return (
     <div className="space-y-6">
@@ -98,10 +287,30 @@ export const Dashboard = () => {
         animate="show"
       >
         {[
-          { label: 'Active Tasks', value: activeTaskCount.toString(), icon: Activity, trend: '+12%' },
-          { label: 'Documents', value: '156', icon: FileText, trend: '+5%' },
-          { label: 'Chat Sessions', value: '89', icon: MessageSquare, trend: '+23%' },
-          { label: 'Active Clients', value: '45', icon: Users, trend: '+8%' },
+          { 
+            label: 'Active Tasks', 
+            value: activeTaskCount.toString(), 
+            icon: Activity, 
+            trend: calculatePercentageChange(activeTaskCount, stats.previousMonth.activeTasks)
+          },
+          { 
+            label: 'Completed This Month', 
+            value: completedThisMonth.toString(), 
+            icon: CheckCircle, 
+            trend: calculatePercentageChange(completedThisMonth, stats.previousMonth.completedTasks)
+          },
+          { 
+            label: 'Documents', 
+            value: '0', 
+            icon: FileText, 
+            trend: '0%' 
+          },
+          { 
+            label: 'Chats Created', 
+            value: '0', 
+            icon: MessageSquare, 
+            trend: '0%' 
+          },
         ].map((stat) => (
           <motion.div key={stat.label} variants={item}>
             <GlassCard glow className="hover:scale-105 transition-transform cursor-pointer">
@@ -177,8 +386,14 @@ export const Dashboard = () => {
                 </div>
               ) : (
                 tasks.slice(0, 4).map((task) => (
-                  <div key={task.id} className="glass rounded-lg p-3 hover:bg-white/10 transition-colors">
-                    <div className="flex items-center justify-between">
+                  <div 
+                    key={task.id} 
+                    className={cn(
+                      "glass rounded-lg p-3 hover:bg-white/10 transition-all group",
+                      highlightedTaskId === task.id && "ring-2 ring-red-500 bg-red-500/10 animate-pulse"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex-1">
                         <p className="font-medium">{task.title}</p>
                         <div className="flex items-center gap-3 mt-1">
@@ -191,12 +406,35 @@ export const Dashboard = () => {
                           )}
                         </div>
                       </div>
-                      <span className={cn(
-                        'px-2 py-1 rounded-full text-xs',
-                        getPriorityColor(task.priority)
-                      )}>
-                        {task.priority}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'px-2 py-1 rounded-full text-xs',
+                          getPriorityColor(getEffectivePriority(task))
+                        )}>
+                          {getEffectivePriority(task)}
+                        </span>
+                        <button
+                          onClick={() => completeTask(task.id)}
+                          className={cn(
+                            "p-1.5 hover:bg-white/10 rounded-lg transition-all",
+                            completingTaskId === task.id 
+                              ? "opacity-100" 
+                              : "opacity-0 group-hover:opacity-100"
+                          )}
+                          disabled={completingTaskId === task.id}
+                          title="Mark as completed"
+                        >
+                          <CheckCircle 
+                            size={18} 
+                            className={cn(
+                              "transition-colors",
+                              completingTaskId === task.id 
+                                ? "text-green-400 animate-pulse" 
+                                : "text-green-400"
+                            )}
+                          />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -205,6 +443,70 @@ export const Dashboard = () => {
           </GlassCard>
         </motion.div>
       </div>
+
+      {/* Completed Tasks This Month */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+      >
+        <GlassCard>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <CheckCircle className="text-primary" size={20} />
+              Completed This Month
+            </h2>
+            <span className="text-sm text-white/60">
+              {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </span>
+          </div>
+          
+          <div className="space-y-3">
+            {isLoadingCompletedTasks ? (
+              <div className="text-center py-8">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-white/10 rounded w-3/4 mx-auto mb-2"></div>
+                  <div className="h-4 bg-white/10 rounded w-1/2 mx-auto"></div>
+                </div>
+              </div>
+            ) : completedTasks.length === 0 ? (
+              <div className="text-center py-8 text-white/50">
+                <CheckCircle size={32} className="mx-auto mb-2 opacity-50" />
+                <p>No tasks completed this month yet</p>
+                <p className="text-sm mt-1">Complete tasks to see them here</p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {completedTasks.slice(0, 10).map((task) => (
+                  <div key={task.id} className="glass rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle size={16} className="text-green-400 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium line-through text-white/70">{task.title}</p>
+                        <p className="text-sm text-white/50">
+                          Completed {formatCompletedDate(task.updatedAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={cn(
+                      'px-2 py-1 rounded-full text-xs opacity-60',
+                      getPriorityColor(task.priority)
+                    )}>
+                      {task.priority}
+                    </span>
+                  </div>
+                ))}
+                
+                {completedTasks.length > 10 && (
+                  <p className="text-center text-sm text-white/50 pt-2">
+                    Showing {Math.min(10, completedTasks.length)} of {completedTasks.length} completed tasks
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </GlassCard>
+      </motion.div>
     </div>
   );
 };

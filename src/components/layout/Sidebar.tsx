@@ -6,8 +6,7 @@ import {
   MessageSquare, 
   Mail,
   Settings,
-  Sparkles,
-  Mail
+  Sparkles
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 

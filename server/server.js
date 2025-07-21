@@ -1268,6 +1268,136 @@ app.get('/api/primary-folders/:id/hierarchy', async (req, res) => {
   }
 });
 
+// Task API Routes
+
+// Get tasks with filters
+app.get('/api/tasks', authenticate, asyncHandler(async (req, res) => {
+  const { status, priority, limit, offset } = req.query;
+  
+  const { TaskService } = await import('./services/db/taskService.js');
+  const taskService = new TaskService();
+  
+  const result = await taskService.getUserTasks(
+    'test_user_123',
+    'test_org_123',
+    {
+      status,
+      priority,
+      limit: limit ? parseInt(limit) : undefined,
+      offset: offset ? parseInt(offset) : undefined
+    }
+  );
+  
+  if (!result.success) {
+    return res.status(500).json({ error: result.error });
+  }
+  
+  res.json({
+    tasks: result.data || [],
+    total: result.pagination?.total || 0
+  });
+}));
+
+// Create a task
+app.post('/api/tasks', authenticate, asyncHandler(async (req, res) => {
+  const { title, description, priority, dueDate, tags, source, sourceId } = req.body;
+  
+  if (!title?.trim()) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+  
+  const { TaskService } = await import('./services/db/taskService.js');
+  const taskService = new TaskService();
+  
+  const result = await taskService.createTask({
+    title: title.trim(),
+    description,
+    priority: priority || 'medium',
+    dueDate,
+    tags,
+    source,
+    sourceId,
+    userId: 'test_user_123',
+    organizationId: 'test_org_123'
+  });
+  
+  if (!result.success) {
+    return res.status(500).json({ error: result.error });
+  }
+  
+  res.json({
+    task: result.data
+  });
+}));
+
+// Update a task
+app.put('/api/tasks/:taskId', authenticate, asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  const updates = req.body;
+  
+  const { TaskService } = await import('./services/db/taskService.js');
+  const taskService = new TaskService();
+  
+  const result = await taskService.updateTask(
+    taskId,
+    updates,
+    'test_user_123',
+    'test_org_123'
+  );
+  
+  if (!result.success) {
+    return res.status(result.error === 'Unauthorized' ? 403 : 500).json({ error: result.error });
+  }
+  
+  res.json({
+    task: result.data
+  });
+}));
+
+// Delete a task
+app.delete('/api/tasks/:taskId', authenticate, asyncHandler(async (req, res) => {
+  const { taskId } = req.params;
+  
+  const { TaskService } = await import('./services/db/taskService.js');
+  const taskService = new TaskService();
+  
+  const result = await taskService.deleteTask(
+    taskId,
+    'test_user_123',
+    'test_org_123'
+  );
+  
+  if (!result.success) {
+    return res.status(result.error === 'Unauthorized' ? 403 : 500).json({ error: result.error });
+  }
+  
+  res.json({
+    success: true
+  });
+}));
+
+// Get upcoming tasks
+app.get('/api/tasks/upcoming', authenticate, asyncHandler(async (req, res) => {
+  const { limit = 5 } = req.query;
+  
+  const { TaskService } = await import('./services/db/taskService.js');
+  const taskService = new TaskService();
+  
+  const result = await taskService.getUpcomingTasks(
+    'test_user_123',
+    'test_org_123',
+    parseInt(limit)
+  );
+  
+  if (!result.success) {
+    return res.status(500).json({ error: result.error });
+  }
+  
+  res.json({
+    tasks: result.data || []
+  });
+}));
+
 // Extract data from documents without storing
 app.post('/api/documents/extract', upload.array('document', 10), async (req, res) => {
   try {
@@ -1824,6 +1954,7 @@ app.post('/api/chat', authenticate, asyncHandler(async (req, res) => {
     let conversationContext = '';
     let extractedEntities = [];
     let conversationState = {};
+    let taskCreated = null;
     
     if (conversationId) {
       let conversation = null;
@@ -1883,6 +2014,70 @@ app.post('/api/chat', authenticate, asyncHandler(async (req, res) => {
           const contextData = await contextResponse.json();
           extractedEntities = contextData.entities || [];
           
+          // Check if user wants to create a task
+          const hasTaskCreationIntent = contextData.intents?.some(intent => intent.type === 'task_creation');
+          
+          if (hasTaskCreationIntent) {
+            // Extract task details from entities
+            const taskTitle = contextData.entities.find(e => e.type === 'task_title')?.value;
+            const taskDueDate = contextData.entities.find(e => e.type === 'task_due_date')?.value;
+            const taskPriority = contextData.entities.find(e => e.type === 'task_priority')?.value || 'medium';
+            const taskDescription = contextData.entities.find(e => e.type === 'task_description')?.value || '';
+            
+            if (taskTitle) {
+              try {
+                // Parse due date if provided
+                let dueDate = null;
+                if (taskDueDate) {
+                  // Handle relative dates
+                  const today = new Date();
+                  const tomorrow = new Date(today);
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  
+                  const nextWeek = new Date(today);
+                  nextWeek.setDate(nextWeek.getDate() + 7);
+                  
+                  if (taskDueDate.toLowerCase().includes('tomorrow')) {
+                    dueDate = tomorrow.toISOString();
+                  } else if (taskDueDate.toLowerCase().includes('next week')) {
+                    dueDate = nextWeek.toISOString();
+                  } else if (taskDueDate.toLowerCase().includes('today')) {
+                    dueDate = today.toISOString();
+                  } else {
+                    // Try to parse as date
+                    const parsed = new Date(taskDueDate);
+                    if (!isNaN(parsed.getTime())) {
+                      dueDate = parsed.toISOString();
+                    }
+                  }
+                }
+                
+                // Create the task
+                const { TaskService } = await import('./services/db/taskService.js');
+                const taskService = new TaskService();
+                
+                const newTask = await taskService.createTask({
+                  title: taskTitle,
+                  description: taskDescription || `Task created from chat: ${message}`,
+                  priority: taskPriority,
+                  dueDate: dueDate,
+                  status: 'pending',
+                  source: 'chat',
+                  sourceId: finalConversationId,
+                  userId: 'test_user_123',
+                  organizationId: 'test_org_123'
+                });
+                
+                if (newTask.success) {
+                  taskCreated = newTask.data;
+                  console.log('✅ Task created from chat:', taskCreated.id);
+                }
+              } catch (error) {
+                console.error('Failed to create task from chat:', error);
+              }
+            }
+          }
+          
           if (contextData.entities?.length > 0 || contextData.contextUpdates) {
             const entities = contextData.entities.map(e => `${e.type}: ${e.value}`).join(', ');
             const updates = Object.entries(contextData.contextUpdates || {})
@@ -1913,6 +2108,18 @@ app.post('/api/chat', authenticate, asyncHandler(async (req, res) => {
     }
 
     // Step 4: Generate AI response using Tala AI with conversation awareness
+    let taskCreationContext = '';
+    if (taskCreated) {
+      taskCreationContext = `\n\nTASK CREATED SUCCESSFULLY:
+- Title: ${taskCreated.title}
+- Due Date: ${taskCreated.dueDate ? new Date(taskCreated.dueDate).toLocaleString() : 'No due date set'}
+- Priority: ${taskCreated.priority}
+- Status: ${taskCreated.status}
+${taskCreated.description ? `- Description: ${taskCreated.description}` : ''}
+
+Please acknowledge the task creation and let the user know it has been added to their task list.`;
+    }
+    
     const systemPrompt = `You are Tala, an AI travel assistant with access to a comprehensive knowledge base of travel documents, visa requirements, airline policies, and destination information.
 
 Your role:
@@ -1925,6 +2132,7 @@ Your role:
 - Always be friendly, professional, and travel-focused
 - Cite specific documents when possible
 - Use markdown formatting for better readability
+- When a task is created, acknowledge it and confirm the details
 
 IMPORTANT CONTEXT AWARENESS RULES:
 1. When the user says "there" or "that place", refer to the most recently discussed location
@@ -1933,7 +2141,7 @@ IMPORTANT CONTEXT AWARENESS RULES:
 4. For follow-up questions, always consider what was discussed in previous messages
 5. If passport expiry was mentioned earlier and the user asks about visa requirements, proactively consider if their passport validity meets the requirements
 
-${conversationHistory ? `Recent Conversation History:\n${conversationHistory}\n` : ''}${conversationContext}
+${conversationHistory ? `Recent Conversation History:\n${conversationHistory}\n` : ''}${conversationContext}${taskCreationContext}
 
 Context from knowledge base:
 ${context || 'No relevant documents found in the knowledge base.'}`;
@@ -2112,7 +2320,14 @@ ${context || 'No relevant documents found in the knowledge base.'}`;
       provider: chatResponse.provider,
       routing: chatResponse.routing,
       performance: chatResponse.performance,
-      metadata: chatResponse.metadata
+      metadata: chatResponse.metadata,
+      taskCreated: taskCreated ? {
+        id: taskCreated.id,
+        title: taskCreated.title,
+        dueDate: taskCreated.dueDate,
+        priority: taskCreated.priority,
+        status: taskCreated.status
+      } : null
     });
 }));
 
@@ -2142,7 +2357,7 @@ app.post('/api/chat/extract-context', async (req, res) => {
                 properties: {
                   type: {
                     type: 'string',
-                    enum: ['country', 'city', 'date', 'passport_expiry', 'travel_date', 'person_name', 'airline', 'hotel', 'visa_type', 'duration', 'currency', 'document_type', 'restaurant', 'activity', 'transportation', 'custom']
+                    enum: ['country', 'city', 'date', 'passport_expiry', 'travel_date', 'person_name', 'airline', 'hotel', 'visa_type', 'duration', 'currency', 'document_type', 'restaurant', 'activity', 'transportation', 'task_title', 'task_due_date', 'task_priority', 'task_description', 'custom']
                   },
                   value: { type: 'string' },
                   confidence: { type: 'number', minimum: 0, maximum: 1 }
@@ -2157,7 +2372,7 @@ app.post('/api/chat/extract-context', async (req, res) => {
                 properties: {
                   type: {
                     type: 'string',
-                    enum: ['visa_inquiry', 'passport_check', 'travel_planning', 'restaurant_search', 'hotel_search', 'flight_inquiry', 'document_request', 'general_info', 'itinerary_planning', 'booking_assistance', 'travel_requirements', 'emergency_info', 'cost_inquiry', 'weather_inquiry', 'cultural_info', 'language_help', 'currency_exchange', 'transportation_info', 'activity_search']
+                    enum: ['visa_inquiry', 'passport_check', 'travel_planning', 'restaurant_search', 'hotel_search', 'flight_inquiry', 'document_request', 'general_info', 'itinerary_planning', 'booking_assistance', 'travel_requirements', 'emergency_info', 'cost_inquiry', 'weather_inquiry', 'cultural_info', 'language_help', 'currency_exchange', 'transportation_info', 'activity_search', 'task_creation', 'task_reminder']
                   },
                   confidence: { type: 'number', minimum: 0, maximum: 1 }
                 },
@@ -2218,9 +2433,17 @@ CRITICAL REFERENCE RESOLUTION RULES:
 5. When someone asks "What about if my passport expires in [date]?" → extract passport_expiry entity
 6. For follow-up questions without explicit entity mentions, infer from conversation context
 
+TASK CREATION DETECTION:
+- If user says "create a task", "remind me", "add a task", "make a task", "schedule", "todo" → set intent as task_creation
+- Extract task_title from the main action/reminder requested
+- Extract task_due_date from time expressions (tomorrow, next week, July 15th, etc.)
+- Extract task_priority from urgency words (urgent, important, ASAP → high, soon → medium, whenever → low)
+- Extract task_description from additional details provided
+
 Examples:
+- "Create a task to renew my passport by next Friday" → task_creation intent, task_title: "Renew passport", task_due_date: "next Friday", task_priority: "high"
+- "Remind me to check visa requirements for Greece" → task_creation intent, task_title: "Check visa requirements for Greece"
 - If user previously asked about Greece visa and then asks "What documents do I need for it?" → "it" = Greece visa
-- If user mentioned passport expiry and asks about visa requirements → include passport validity in context updates
 
 Be precise and extract all relevant entities, including implicit ones from the conversation context.`;
 
@@ -2415,6 +2638,72 @@ app.delete('/api/chat/conversations/:conversationId', authenticate, asyncHandler
   
   res.json({ success: true });
 }));
+
+// Get conversation context status
+app.get('/api/chat/context/status/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Get conversation
+    const conversation = conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Get conversation messages to check for entities
+    const messages = conversationMessages.get(conversationId) || [];
+    const hasEntities = messages.some(msg => msg.entities && msg.entities.length > 0);
+    
+    res.json({
+      conversationId,
+      persistContext: conversation.persistContext !== false,
+      contextReset: conversation.contextReset || false,
+      lastContextReset: conversation.lastContextReset || null,
+      hasEntities,
+      messageCount: messages.length
+    });
+  } catch (error) {
+    console.error('Context status error:', error);
+    res.status(500).json({ error: 'Failed to get context status' });
+  }
+});
+
+// Toggle context persistence
+app.post('/api/chat/context/toggle', async (req, res) => {
+  try {
+    const { conversationId, userId, persistContext } = req.body;
+    
+    if (!conversationId || !userId) {
+      return res.status(400).json({ error: 'conversationId and userId are required' });
+    }
+    
+    // Verify conversation belongs to user
+    const conversation = conversations.get(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    
+    // Update persistence setting
+    conversation.persistContext = persistContext;
+    conversations.set(conversationId, conversation);
+    saveConversations();
+    
+    console.log(`🔄 Updated context persistence for conversation ${conversationId}: ${persistContext}`);
+    
+    res.json({ 
+      success: true,
+      persistContext
+    });
+  } catch (error) {
+    console.error('Context toggle error:', error);
+    res.status(500).json({ error: 'Failed to toggle context persistence' });
+  }
+});
 
 // Reset conversation context
 app.post('/api/chat/context/reset', async (req, res) => {

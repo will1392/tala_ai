@@ -16,7 +16,7 @@ export interface Task {
   tags?: string[];
   createdAt: string;
   updatedAt: string;
-  source?: 'email' | 'manual' | 'automation';
+  source?: 'email' | 'manual' | 'automation' | 'chat';
   sourceId?: string; // Email ID if created from email
 }
 
@@ -27,7 +27,7 @@ export interface CreateTaskInput {
   dueDate?: string;
   assignee?: string;
   tags?: string[];
-  source?: 'email' | 'manual' | 'automation';
+  source?: 'email' | 'manual' | 'automation' | 'chat';
   sourceId?: string;
 }
 
@@ -119,7 +119,7 @@ class TaskService {
   async updateTask(taskId: string, updates: Partial<Task>): Promise<Task | null> {
     try {
       const response = await fetch(`${API_BASE}/tasks/${taskId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: this.headers,
         credentials: 'include',
         body: JSON.stringify(updates)

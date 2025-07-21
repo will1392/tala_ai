@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/shared/Button';
 import { GmailConnect } from '../components/email/GmailConnect';
+import { TaskEditModal } from '../components/tasks/TaskEditModal';
 import taskService from '../services/taskService';
 
 // Decode HTML entities
@@ -151,6 +152,7 @@ export const Email = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isTaskEditModalOpen, setIsTaskEditModalOpen] = useState(false);
   
   console.log('Email component render - isConnected:', isConnected, 'error:', error);
   console.log('Current extractedTasks:', extractedTasks);
@@ -719,30 +721,10 @@ export const Email = () => {
                         </span>
                       </div>
                       <p className="text-sm text-white/60 mb-3">{task.description}</p>
-                      <div className="flex items-center gap-4 text-sm">
-                        {task.dueDate && (
-                          <div className="flex items-center gap-1 text-white/60">
-                            <Clock size={14} />
-                            {task.dueDate}
-                          </div>
-                        )}
-                        {task.assignee && (
-                          <div className="flex items-center gap-1 text-white/60">
-                            <AlertCircle size={14} />
-                            {task.assignee}
-                          </div>
-                        )}
-                      </div>
-                      {task.tags.length > 0 && (
-                        <div className="flex gap-1 mt-3">
-                          {task.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-2 py-0.5 bg-white/10 text-white/70 text-xs rounded-full"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                      {task.dueDate && (
+                        <div className="flex items-center gap-1 text-sm text-white/60">
+                          <Clock size={14} />
+                          {task.dueDate}
                         </div>
                       )}
                     </motion.div>
@@ -789,8 +771,7 @@ export const Email = () => {
                       variant="secondary" 
                       className="flex-1"
                       onClick={() => {
-                        // TODO: Implement task editing modal
-                        alert('Task editing coming soon!');
+                        setIsTaskEditModalOpen(true);
                       }}
                     >
                       Edit Tasks
@@ -811,6 +792,50 @@ export const Email = () => {
       </div>
       </>
       )}
+      
+      {/* Task Edit Modal */}
+      <TaskEditModal
+        isOpen={isTaskEditModalOpen}
+        onClose={() => setIsTaskEditModalOpen(false)}
+        tasks={extractedTasks}
+        onSave={async (updatedTasks) => {
+          try {
+            // Create the tasks if they haven't been created yet
+            const tasksToCreate = updatedTasks.map(task => ({
+              ...task,
+              // Convert datetime-local format to ISO string for API
+              dueDate: task.dueDate ? (() => {
+                // If it's in datetime-local format (YYYY-MM-DDTHH:mm), parse it as local time
+                if (task.dueDate.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                  // Append seconds and timezone to create a proper ISO string
+                  return new Date(task.dueDate + ':00').toISOString();
+                }
+                // Otherwise, assume it's already a valid date string
+                return new Date(task.dueDate).toISOString();
+              })() : undefined,
+              source: 'email' as const,
+              sourceId: selectedEmail?.id
+            }));
+            
+            const createdTasks = await taskService.createTasksFromEmail(
+              selectedEmail?.id || '',
+              tasksToCreate
+            );
+            
+            if (createdTasks.length > 0) {
+              alert(`Successfully created ${createdTasks.length} tasks!`);
+              setExtractedTasks([]); // Clear the extracted tasks
+              setIsTaskEditModalOpen(false);
+            } else {
+              alert('Failed to create tasks. Please try again.');
+            }
+          } catch (error) {
+            console.error('Error creating tasks:', error);
+            alert('Error creating tasks. Please try again.');
+          }
+        }}
+        mode="create"
+      />
     </div>
   );
 };

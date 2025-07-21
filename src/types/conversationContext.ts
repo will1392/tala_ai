@@ -44,6 +44,10 @@ export type EntityType =
   | 'restaurant'
   | 'activity'
   | 'transportation'
+  | 'task_title'
+  | 'task_due_date'
+  | 'task_priority'
+  | 'task_description'
   | 'custom';
 
 export interface ConversationIntent {
@@ -82,7 +86,9 @@ export type IntentType =
   | 'language_help'
   | 'currency_exchange'
   | 'transportation_info'
-  | 'activity_search';
+  | 'activity_search'
+  | 'task_creation'
+  | 'task_reminder';
 
 export interface ConversationContext {
   /** Unique session identifier */

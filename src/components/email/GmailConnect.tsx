@@ -168,7 +168,12 @@ export const GmailConnect = ({ onConnectionSuccess }: GmailConnectProps) => {
                   className="w-full gap-2 text-xs"
                   onClick={() => {
                     // Test OAuth flow without Google
-                    window.location.href = `http://localhost:3001/api/email/test-oauth`;
+                    const userId = localStorage.getItem('userId') || 'test_user_123';
+                    const state = btoa(JSON.stringify({
+                      userId: userId,
+                      returnUrl: 'http://localhost:5173/email?connected=true'
+                    }));
+                    window.location.href = `http://localhost:3001/api/email/test-oauth?state=${state}`;
                   }}
                 >
                   Test OAuth Flow (Skip Google)

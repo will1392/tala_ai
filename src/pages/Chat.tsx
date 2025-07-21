@@ -29,7 +29,9 @@ const chatService = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-user-id': 'test_user_123' // TODO: Get from auth context
       },
+      credentials: 'include',
       body: JSON.stringify({
         message: content,
         userId: 'admin-1',
@@ -111,7 +113,12 @@ export const Chat = () => {
   const loadConversations = async () => {
     try {
       setLoadingConversations(true);
-      const response = await fetch('http://localhost:3001/api/chat/conversations?userId=admin-1');
+      const response = await fetch('http://localhost:3001/api/chat/conversations?userId=admin-1', {
+        headers: {
+          'x-user-id': 'test_user_123' // TODO: Get from auth context
+        },
+        credentials: 'include'
+      });
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations || []);
@@ -128,7 +135,12 @@ export const Chat = () => {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch(`http://localhost:3001/api/chat/history/${conversationId}?userId=admin-1`);
+      const response = await fetch(`http://localhost:3001/api/chat/history/${conversationId}?userId=admin-1`, {
+        headers: {
+          'x-user-id': 'test_user_123' // TODO: Get from auth context
+        },
+        credentials: 'include'
+      });
       if (response.ok) {
         const data = await response.json();
         // Convert timestamp strings back to Date objects for ChatMessage component
@@ -173,7 +185,11 @@ export const Chat = () => {
     try {
       const response = await fetch(`http://localhost:3001/api/chat/conversations/${conversationId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': 'test_user_123' // TODO: Get from auth context
+        },
+        credentials: 'include',
         body: JSON.stringify({ userId: 'admin-1' })
       });
       
@@ -235,10 +251,20 @@ export const Chat = () => {
           type: source.type,
           score: source.score
         })),
-        tokensUsed: response.tokensUsed
+        tokensUsed: response.tokensUsed,
+        taskCreated: response.taskCreated
       };
       
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Show toast notification if task was created
+      if (response.taskCreated) {
+        const toast = (await import('react-hot-toast')).default;
+        toast.success(`Task created: ${response.taskCreated.title}`, {
+          duration: 5000,
+          icon: '✅'
+        });
+      }
       
       // Reload conversations to show the updated list
       setTimeout(() => loadConversations(), 500);
@@ -267,7 +293,13 @@ export const Chat = () => {
   const loadContextStatus = async (conversationId: string) => {
     try {
       const response = await fetch(
-        `http://localhost:3001/api/chat/context/status/${conversationId}?userId=admin-1`
+        `http://localhost:3001/api/chat/context/status/${conversationId}?userId=admin-1`,
+        {
+          headers: {
+            'x-user-id': 'test_user_123' // TODO: Get from auth context
+          },
+          credentials: 'include'
+        }
       );
       if (response.ok) {
         const status = await response.json();
@@ -285,7 +317,11 @@ export const Chat = () => {
     try {
       const response = await fetch('http://localhost:3001/api/chat/context/reset', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': 'test_user_123' // TODO: Get from auth context
+        },
+        credentials: 'include',
         body: JSON.stringify({
           conversationId: currentConversationId,
           userId: 'admin-1'
@@ -310,7 +346,11 @@ export const Chat = () => {
     try {
       const response = await fetch('http://localhost:3001/api/chat/context/toggle', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': 'test_user_123' // TODO: Get from auth context
+        },
+        credentials: 'include',
         body: JSON.stringify({
           conversationId: currentConversationId,
           userId: 'admin-1',
