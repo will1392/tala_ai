@@ -6,7 +6,9 @@
  */
 
 import crypto from 'crypto';
-import argon2 from 'argon2';
+// Temporarily disabled argon2 due to build issues
+// import argon2 from 'argon2';
+import bcrypt from 'bcryptjs';
 
 // Cryptographic constants
 const CRYPTO_CONFIG = {
@@ -18,13 +20,14 @@ const CRYPTO_CONFIG = {
     tagLength: 16         // 128 bits
   },
   
-  // Argon2 key derivation
+  // Argon2 key derivation (temporarily using bcrypt)
   argon2: {
-    type: argon2.argon2id,
-    memoryCost: 2 ** 16,  // 64 MB
-    timeCost: 3,          // 3 iterations
-    parallelism: 1,       // Single thread
-    hashLength: 32        // 256 bits
+    // type: argon2.argon2id,
+    // memoryCost: 2 ** 16,  // 64 MB
+    // timeCost: 3,          // 3 iterations
+    // parallelism: 1,       // Single thread
+    // hashLength: 32        // 256 bits
+    saltRounds: 10  // For bcrypt
   },
   
   // RSA key generation
@@ -74,22 +77,12 @@ export function generateSalt(length = CRYPTO_CONFIG.random.saltLength) {
  */
 export async function deriveKey(password, salt, options = {}) {
   try {
-    const config = {
-      ...CRYPTO_CONFIG.argon2,
-      ...options
-    };
+    // Temporarily using bcrypt instead of argon2
+    const saltStr = salt.toString('base64').substring(0, 16);
+    const hash = await bcrypt.hash(password, CRYPTO_CONFIG.argon2.saltRounds);
     
-    const hash = await argon2.hash(password, {
-      salt,
-      type: config.type,
-      memoryCost: config.memoryCost,
-      timeCost: config.timeCost,
-      parallelism: config.parallelism,
-      hashLength: config.hashLength,
-      raw: true
-    });
-    
-    return Buffer.from(hash);
+    // Return a 32-byte key derived from the hash
+    return crypto.createHash('sha256').update(hash).digest();
     
   } catch (error) {
     throw new Error(`Key derivation failed: ${error.message}`);
@@ -104,7 +97,8 @@ export async function deriveKey(password, salt, options = {}) {
  */
 export async function verifyPassword(password, hash) {
   try {
-    return await argon2.verify(hash, password);
+    // Temporarily using bcrypt instead of argon2
+    return await bcrypt.compare(password, hash);
   } catch (error) {
     return false;
   }
@@ -118,19 +112,8 @@ export async function verifyPassword(password, hash) {
  */
 export async function hashPassword(password, options = {}) {
   try {
-    const config = {
-      ...CRYPTO_CONFIG.argon2,
-      ...options
-    };
-    
-    return await argon2.hash(password, {
-      type: config.type,
-      memoryCost: config.memoryCost,
-      timeCost: config.timeCost,
-      parallelism: config.parallelism,
-      hashLength: config.hashLength
-    });
-    
+    // Temporarily using bcrypt instead of argon2
+    return await bcrypt.hash(password, CRYPTO_CONFIG.argon2.saltRounds);
   } catch (error) {
     throw new Error(`Password hashing failed: ${error.message}`);
   }

@@ -11,6 +11,7 @@
  */
 
 import { BaseService } from './baseService.js';
+// Removed circular dependency - smartPipeline will be injected when needed
 
 export class DocumentService extends BaseService {
   constructor(options = {}) {
@@ -18,6 +19,36 @@ export class DocumentService extends BaseService {
       enableSoftDelete: true,
       enableLogging: true,
       ...options
+    });
+    
+    // Smart pipeline will be injected later to avoid circular dependency
+    this.smartPipeline = null;
+  }
+  
+  /**
+   * Set the smart pipeline instance
+   */
+  setSmartPipeline(pipeline) {
+    this.smartPipeline = pipeline;
+    this.setupPipelineListeners();
+  }
+  
+  /**
+   * Setup listeners for smart pipeline events
+   */
+  setupPipelineListeners() {
+    if (!this.smartPipeline) return;
+    
+    this.smartPipeline.on('document:completed', async (event) => {
+      this.log(`Document processing completed: ${event.documentId} in ${event.duration}ms`);
+    });
+    
+    this.smartPipeline.on('document:failed', async (event) => {
+      this.log(`Document processing failed: ${event.documentId} - ${event.finalError}`, 'error');
+    });
+    
+    this.smartPipeline.on('stage:error', async (event) => {
+      this.log(`Pipeline stage error in ${event.stage}: ${event.error}`, 'warn');
     });
   }
 
@@ -47,6 +78,10 @@ export class DocumentService extends BaseService {
 
     try {
       const transaction = await this.beginTransaction();
+      
+      // Check if smart processing is enabled
+      const useSmartPipeline = options.useSmartPipeline !== false && 
+                              (data.file_path || data.file_url || this.requiresSmartProcessing(data));
 
       // Prepare document data with defaults
       const documentData = {
@@ -75,7 +110,7 @@ export class DocumentService extends BaseService {
         vector_embedding: data.vector_embedding || null,
         metadata: data.metadata || {},
         search_vector: null, // Will be generated from content
-        processing_status: data.processing_status || 'completed',
+        processing_status: useSmartPipeline ? 'pending' : 'completed',
         extraction_metadata: data.extraction_metadata || {}
       };
 
@@ -104,6 +139,17 @@ export class DocumentService extends BaseService {
       if (autoTag) {
         await this.generateAutoTags(document.id, document.content);
       }
+      
+      // Queue for smart pipeline processing if enabled
+      let processingResult = null;
+      if (useSmartPipeline) {
+        processingResult = this.smartPipeline ? await this.smartPipeline.processDocument(document, {
+          priority: options.processingPriority || 'medium',
+          targetLanguage: options.targetLanguage || 'en',
+          includeWeakRelationships: options.includeWeakRelationships || false,
+          ocrLanguages: options.ocrLanguages || ['eng']
+        }) : null;
+      }
 
       await this.commitTransaction(transaction);
 
@@ -115,6 +161,8 @@ export class DocumentService extends BaseService {
         metadata: {
           embeddingsQueued: generateEmbeddings,
           autoTagged: autoTag,
+          smartProcessingQueued: useSmartPipeline,
+          processingId: processingResult?.processingId,
           transaction: transaction.transactionId
         }
       };
@@ -728,6 +776,287 @@ export class DocumentService extends BaseService {
     const titleWeight = title ? `${title} ${title} ` : '';
     const contentText = content || '';
     return `${titleWeight}${contentText}`;
+  }
+
+  /**
+   * Check if document requires smart processing
+   * @param {Object} data - Document data
+   * @returns {boolean} Whether smart processing is needed
+   */
+  requiresSmartProcessing(data) {
+    // Check for travel-related keywords
+    const travelKeywords = ['flight', 'hotel', 'booking', 'passport', 'visa', 'itinerary', 'travel', 'trip'];
+    const contentToCheck = `${data.title || ''} ${data.description || ''} ${data.content || ''}`.toLowerCase();
+    
+    return travelKeywords.some(keyword => contentToCheck.includes(keyword));
+  }
+
+  /**
+   * Get document processing status
+   * @param {string} processingId - Processing ID
+   * @returns {Object} Processing status
+   */
+  async getProcessingStatus(processingId) {
+    return this.smartPipeline ? this.smartPipeline.getProcessingStatus(processingId) : null;
+  }
+
+  /**
+   * Get documents with relationships
+   * @param {string} documentId - Document ID
+   * @param {Object} options - Query options
+   * @returns {Object} Document with relationships
+   */
+  async getDocumentWithRelationships(documentId, options = {}) {
+    const { organizationId = null } = options;
+
+    try {
+      // Get base document
+      const docResult = await this.getDocument(documentId, {
+        organizationId,
+        includeContent: true
+      });
+
+      if (!docResult.success) {
+        return docResult;
+      }
+
+      const document = docResult.data;
+
+      // Get relationships from metadata
+      if (document.metadata?.relationships) {
+        document.relationships = document.metadata.relationships;
+      }
+
+      // Get trip information
+      if (document.metadata?.trips) {
+        document.trips = document.metadata.trips;
+      }
+
+      // Get visual analysis if available
+      if (document.metadata?.visualAnalysis) {
+        document.visualAnalysis = document.metadata.visualAnalysis;
+      }
+
+      // Get translation if available
+      if (document.metadata?.translation) {
+        document.translation = document.metadata.translation;
+      }
+
+      return {
+        success: true,
+        data: document
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'RELATIONSHIP_FETCH_ERROR',
+          message: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * Get documents by trip
+   * @param {string} tripId - Trip ID
+   * @param {Object} options - Query options
+   * @returns {Object} Documents in trip
+   */
+  async getDocumentsByTrip(tripId, options = {}) {
+    const { organizationId = null, userId = null } = options;
+
+    try {
+      // Query documents where metadata contains the trip ID
+      const query = {
+        organization_id: organizationId,
+        'metadata.trips.tripIds': { contains: tripId }
+      };
+
+      if (userId) {
+        query.user_id = userId;
+      }
+
+      return this.getMany(query, {
+        sort: { field: 'created_at', direction: 'desc' }
+      });
+
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'TRIP_DOCUMENTS_ERROR',
+          message: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * Bulk process documents through smart pipeline
+   * @param {Array} documentIds - Document IDs to process
+   * @param {Object} options - Processing options
+   * @returns {Object} Bulk processing result
+   */
+  async bulkProcessDocuments(documentIds, options = {}) {
+    const {
+      organizationId = null,
+      priority = 'medium',
+      processingOptions = {}
+    } = options;
+
+    try {
+      const results = {
+        queued: [],
+        failed: [],
+        skipped: []
+      };
+
+      for (const docId of documentIds) {
+        // Get document
+        const docResult = await this.getDocument(docId, {
+          organizationId,
+          includeContent: false
+        });
+
+        if (!docResult.success) {
+          results.failed.push({
+            documentId: docId,
+            error: 'Document not found'
+          });
+          continue;
+        }
+
+        const document = docResult.data;
+
+        // Skip if already processing
+        if (['queued', 'processing'].includes(document.processing_status)) {
+          results.skipped.push({
+            documentId: docId,
+            reason: 'Already processing'
+          });
+          continue;
+        }
+
+        // Queue for processing
+        const processingResult = this.smartPipeline ? await this.smartPipeline.processDocument(document, {
+          priority,
+          ...processingOptions
+        }) : null;
+
+        if (processingResult.success) {
+          results.queued.push({
+            documentId: docId,
+            processingId: processingResult.processingId
+          });
+        } else {
+          results.failed.push({
+            documentId: docId,
+            error: processingResult.error
+          });
+        }
+      }
+
+      return {
+        success: true,
+        data: results,
+        summary: {
+          total: documentIds.length,
+          queued: results.queued.length,
+          failed: results.failed.length,
+          skipped: results.skipped.length
+        }
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'BULK_PROCESSING_ERROR',
+          message: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * Get smart pipeline statistics
+   * @returns {Object} Pipeline statistics
+   */
+  async getPipelineStatistics() {
+    return this.smartPipeline ? this.smartPipeline.getStatistics() : {};
+  }
+
+  /**
+   * Cancel document processing
+   * @param {string} processingId - Processing ID to cancel
+   * @returns {Object} Cancellation result
+   */
+  async cancelProcessing(processingId) {
+    return this.smartPipeline ? this.smartPipeline.cancelProcessing(processingId) : false;
+  }
+
+  /**
+   * Translate document content
+   * @param {string} documentId - Document ID
+   * @param {string} targetLanguage - Target language code
+   * @param {Object} options - Translation options
+   * @returns {Object} Translation result
+   */
+  async translateDocument(documentId, targetLanguage, options = {}) {
+    const { organizationId = null } = options;
+
+    try {
+      // Get document
+      const docResult = await this.getDocument(documentId, {
+        organizationId,
+        includeContent: true
+      });
+
+      if (!docResult.success) {
+        return docResult;
+      }
+
+      const document = docResult.data;
+
+      // Check if translation already exists
+      if (document.metadata?.translation?.targetLanguage === targetLanguage) {
+        return {
+          success: true,
+          data: {
+            translatedContent: document.metadata.translation.translatedContent,
+            sourceLanguage: document.metadata.translation.sourceLanguage,
+            targetLanguage: document.metadata.translation.targetLanguage,
+            cached: true
+          }
+        };
+      }
+
+      // Queue for processing with translation priority
+      const processingResult = this.smartPipeline ? await this.smartPipeline.processDocument(document, {
+        priority: 'high',
+        targetLanguage,
+        forceTranslation: true
+      }) : null;
+
+      return {
+        success: true,
+        data: {
+          processingId: processingResult.processingId,
+          message: 'Document queued for translation'
+        }
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'TRANSLATION_ERROR',
+          message: error.message
+        }
+      };
+    }
   }
 }
 

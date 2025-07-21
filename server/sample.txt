@@ -1,0 +1,17 @@
+Welcome to our travel booking system!
+
+This is a sample document for testing language detection.
+
+We offer flights to many popular destinations around the world, including:
+- Paris, France
+- Tokyo, Japan
+- New York, USA
+- London, UK
+- Sydney, Australia
+
+For bookings, please contact us at travel@example.com or call +1-800-TRAVEL-1.
+
+Booking confirmation code: ABC123
+Flight number: AA1234
+
+Thank you for choosing our services!

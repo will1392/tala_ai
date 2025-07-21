@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Knowledge } from './pages/Knowledge';
 import { Chat } from './pages/Chat';
 import { Settings } from './pages/Settings';
+import EmailInbox from './components/email/EmailInbox';
 import { useAuthStore } from './store/authStore';
 import './styles/globals.css';
 
@@ -36,6 +37,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="knowledge" element={<Knowledge />} />
               <Route path="chat" element={<Chat />} />
+              <Route path="email" element={<EmailInbox />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           )}

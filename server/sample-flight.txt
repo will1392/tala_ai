@@ -1,0 +1,32 @@
+ELECTRONIC TICKET RECEIPT
+
+Booking Reference: ABC123
+Date of Issue: 10 JAN 2025
+
+PASSENGER INFORMATION
+Name: DOE/JOHN MR
+Frequent Flyer: AA1234567
+
+FLIGHT DETAILS
+Flight: AA1234
+Date: 15 MAR 2025
+From: New York (JFK)
+To: Los Angeles (LAX)
+Departure: 10:00 AM
+Arrival: 1:00 PM (local time)
+Class: Economy
+Seat: 24A
+Status: CONFIRMED
+
+Fare Information:
+Base Fare: USD 350.00
+Taxes: USD 65.00
+Total: USD 415.00
+
+IMPORTANT INFORMATION:
+- Please arrive at the airport at least 2 hours before departure
+- Online check-in available 24 hours before flight
+- Baggage allowance: 1 checked bag (23kg), 1 carry-on
+
+Ticket Number: 001-2345678901
+Issued by: American Airlines

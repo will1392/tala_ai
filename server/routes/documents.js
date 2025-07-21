@@ -618,6 +618,437 @@ router.post('/:id/share',
 );
 
 /**
+ * POST /api/documents/analyze-visual
+ * Analyze visual content of a document
+ */
+router.post('/analyze-visual',
+  authenticate,
+  requirePermission('documents:read'),
+  async (req, res) => {
+    try {
+      const schema = {
+        documentId: { required: true, type: 'string', maxLength: 36 },
+        features: { type: 'array', maxItems: 10 }
+      };
+
+      validateRequestStructure(req.body, schema);
+
+      const documentId = sanitizeString(req.body.documentId, { maxLength: 36 });
+      
+      // Get document
+      const docResult = await documentService.getDocument(documentId, {
+        organizationId: req.organizationId,
+        userId: req.userId,
+        includeContent: false
+      });
+
+      if (!docResult.success) {
+        return res.status(404).json({
+          success: false,
+          error: 'DOCUMENT_NOT_FOUND',
+          message: 'Document not found'
+        });
+      }
+
+      const document = docResult.data;
+
+      // Check if visual analysis already exists
+      if (document.metadata?.visualAnalysis) {
+        return res.json({
+          success: true,
+          data: document.metadata.visualAnalysis,
+          cached: true
+        });
+      }
+
+      // Queue for processing
+      const processingResult = await documentService.bulkProcessDocuments([documentId], {
+        organizationId: req.organizationId,
+        priority: 'high',
+        processingOptions: {
+          forceVisualAnalysis: true
+        }
+      });
+
+      await auditLog('document_visual_analysis', 'document', req.userId, req.ip, {
+        documentId,
+        queued: processingResult.data.queued.length > 0
+      });
+
+      res.json({
+        success: true,
+        data: processingResult.data.queued[0] || { documentId, status: 'skipped' }
+      });
+
+    } catch (error) {
+      await auditLog('visual_analysis_error', 'document', req.userId, req.ip, {
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'VISUAL_ANALYSIS_ERROR',
+        message: 'Failed to analyze document'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/documents/:id/relationships
+ * Get document relationships
+ */
+router.get('/:id/relationships',
+  authenticate,
+  requireResourceAccess('document'),
+  async (req, res) => {
+    try {
+      const documentId = sanitizeString(req.params.id, { maxLength: 36 });
+      
+      const result = await documentService.getDocumentWithRelationships(documentId, {
+        organizationId: req.organizationId
+      });
+
+      if (!result.success) {
+        if (result.error?.code === 'ACCESS_DENIED') {
+          return res.status(403).json(result);
+        }
+        return res.status(404).json(result);
+      }
+
+      await auditLog('document_relationships_accessed', 'document', req.userId, req.ip, {
+        documentId,
+        relationshipCount: result.data.relationships?.count || 0
+      });
+
+      res.json({
+        success: true,
+        data: {
+          document: result.data,
+          relationships: result.data.relationships,
+          trips: result.data.trips
+        }
+      });
+
+    } catch (error) {
+      await auditLog('relationships_access_error', 'document', req.userId, req.ip, {
+        documentId: req.params.id,
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'RELATIONSHIPS_ERROR',
+        message: 'Failed to get document relationships'
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/documents/:id/translate
+ * Translate document content
+ */
+router.post('/:id/translate',
+  authenticate,
+  requireResourceAccess('document'),
+  requirePermission('documents:write'),
+  async (req, res) => {
+    try {
+      const documentId = sanitizeString(req.params.id, { maxLength: 36 });
+      
+      const schema = {
+        targetLanguage: { required: true, type: 'string', maxLength: 10 }
+      };
+
+      validateRequestStructure(req.body, schema);
+
+      const targetLanguage = sanitizeString(req.body.targetLanguage, { maxLength: 10 });
+
+      const result = await documentService.translateDocument(documentId, targetLanguage, {
+        organizationId: req.organizationId
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      await auditLog('document_translation_requested', 'document', req.userId, req.ip, {
+        documentId,
+        targetLanguage,
+        cached: result.data.cached || false
+      });
+
+      res.json(result);
+
+    } catch (error) {
+      await auditLog('translation_error', 'document', req.userId, req.ip, {
+        documentId: req.params.id,
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'TRANSLATION_ERROR',
+        message: 'Failed to translate document'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/documents/trips
+ * Get all trips for user
+ */
+router.get('/trips',
+  authenticate,
+  requirePermission('documents:read'),
+  async (req, res) => {
+    try {
+      // Get all user documents
+      const docsResult = await documentService.getDocumentsByUser(req.userId, {
+        organizationId: req.organizationId,
+        pagination: { page: 1, pageSize: 1000 },
+        includeContent: false
+      });
+
+      if (!docsResult.success) {
+        throw new Error(docsResult.message);
+      }
+
+      // Extract unique trips from documents
+      const trips = new Map();
+      
+      docsResult.data.forEach(doc => {
+        if (doc.metadata?.trips?.tripIds) {
+          doc.metadata.trips.tripIds.forEach(tripId => {
+            if (!trips.has(tripId)) {
+              trips.set(tripId, {
+                id: tripId,
+                documents: []
+              });
+            }
+            trips.get(tripId).documents.push({
+              id: doc.id,
+              title: doc.title,
+              type: doc.type,
+              createdAt: doc.created_at
+            });
+          });
+        }
+      });
+
+      await auditLog('trips_listed', 'document', req.userId, req.ip, {
+        tripCount: trips.size
+      });
+
+      res.json({
+        success: true,
+        data: Array.from(trips.values()),
+        count: trips.size
+      });
+
+    } catch (error) {
+      await auditLog('trips_list_error', 'document', req.userId, req.ip, {
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'TRIPS_LIST_ERROR',
+        message: 'Failed to retrieve trips'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/documents/trips/:tripId
+ * Get documents for a specific trip
+ */
+router.get('/trips/:tripId',
+  authenticate,
+  requirePermission('documents:read'),
+  async (req, res) => {
+    try {
+      const tripId = sanitizeString(req.params.tripId, { maxLength: 36 });
+      
+      const result = await documentService.getDocumentsByTrip(tripId, {
+        organizationId: req.organizationId,
+        userId: req.userId
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      await auditLog('trip_documents_accessed', 'document', req.userId, req.ip, {
+        tripId,
+        documentCount: result.data.length
+      });
+
+      res.json(result);
+
+    } catch (error) {
+      await auditLog('trip_documents_error', 'document', req.userId, req.ip, {
+        tripId: req.params.tripId,
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'TRIP_DOCUMENTS_ERROR',
+        message: 'Failed to retrieve trip documents'
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/documents/bulk-process
+ * Bulk process multiple documents
+ */
+router.post('/bulk-process',
+  authenticate,
+  requirePermission('documents:write'),
+  requireRole('admin'),
+  async (req, res) => {
+    try {
+      const schema = {
+        documentIds: { required: true, type: 'array', minItems: 1, maxItems: 100 },
+        priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+        options: { type: 'object' }
+      };
+
+      validateRequestStructure(req.body, schema);
+
+      const documentIds = req.body.documentIds.map(id => 
+        sanitizeString(id, { maxLength: 36 })
+      );
+
+      const result = await documentService.bulkProcessDocuments(documentIds, {
+        organizationId: req.organizationId,
+        priority: req.body.priority || 'medium',
+        processingOptions: req.body.options || {}
+      });
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      await auditLog('bulk_processing_initiated', 'document', req.userId, req.ip, {
+        documentCount: documentIds.length,
+        summary: result.summary
+      }, 'medium');
+
+      res.json(result);
+
+    } catch (error) {
+      await auditLog('bulk_processing_error', 'document', req.userId, req.ip, {
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'BULK_PROCESSING_ERROR',
+        message: 'Failed to initiate bulk processing'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/documents/processing/:processingId
+ * Get processing status
+ */
+router.get('/processing/:processingId',
+  authenticate,
+  async (req, res) => {
+    try {
+      const processingId = sanitizeString(req.params.processingId, { maxLength: 36 });
+      
+      const status = await documentService.getProcessingStatus(processingId);
+
+      res.json({
+        success: true,
+        data: status
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'STATUS_CHECK_ERROR',
+        message: 'Failed to get processing status'
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/documents/processing/:processingId
+ * Cancel processing job
+ */
+router.delete('/processing/:processingId',
+  authenticate,
+  requirePermission('documents:write'),
+  async (req, res) => {
+    try {
+      const processingId = sanitizeString(req.params.processingId, { maxLength: 36 });
+      
+      const result = await documentService.cancelProcessing(processingId);
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      await auditLog('processing_cancelled', 'document', req.userId, req.ip, {
+        processingId
+      });
+
+      res.json(result);
+
+    } catch (error) {
+      await auditLog('processing_cancel_error', 'document', req.userId, req.ip, {
+        processingId: req.params.processingId,
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'CANCEL_ERROR',
+        message: 'Failed to cancel processing'
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/documents/pipeline/stats
+ * Get pipeline statistics
+ */
+router.get('/pipeline/stats',
+  authenticate,
+  requireRole('admin'),
+  async (req, res) => {
+    try {
+      const stats = await documentService.getPipelineStatistics();
+
+      res.json({
+        success: true,
+        data: stats
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'STATS_ERROR',
+        message: 'Failed to get pipeline statistics'
+      });
+    }
+  }
+);
+
+/**
  * POST /api/documents/upload
  * Upload document files with security validation
  */
@@ -682,6 +1113,10 @@ router.post('/upload',
         description: `Uploaded file: ${req.file.originalname}`,
         user_id: req.userId,
         organization_id: req.organizationId,
+        file_name: req.file.originalname,
+        file_type: req.file.mimetype,
+        mime_type: req.file.mimetype,
+        file_size: req.file.size,
         file_metadata: {
           originalName: req.file.originalname,
           mimeType: req.file.mimetype,
@@ -690,7 +1125,17 @@ router.post('/upload',
         }
       };
 
-      const result = await documentService.createDocument(documentData);
+      // Determine if smart processing should be used
+      const useSmartProcessing = req.body.smartProcessing !== 'false' && 
+                                (req.file.mimetype.startsWith('image/') || 
+                                 content.toLowerCase().includes('flight') ||
+                                 content.toLowerCase().includes('hotel') ||
+                                 content.toLowerCase().includes('booking'));
+
+      const result = await documentService.createDocument(documentData, {
+        useSmartPipeline: useSmartProcessing,
+        processingPriority: req.body.priority || 'medium'
+      });
 
       if (!result.success) {
         throw new Error(result.message);

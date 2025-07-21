@@ -13,6 +13,9 @@ import mammoth from 'mammoth';
 import XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import CloudStorageService from './services/cloudStorage.js';
+import documentProcessor from './services/documents/documentProcessor.js';
+import languageService from './services/documents/LanguageService.js';
+import multilingualProcessor from './services/documents/MultilingualProcessor.js';
 import LLMRouter from './services/llm/LLMRouter.js';
 import metricsRoutes from './api-metrics-endpoint.js';
 import ChatService from './services/chatService.js';
@@ -106,6 +109,11 @@ const folderService = new FolderService();
     const authConfig = getAuthConfig();
     await authManager.initialize(authConfig);
     console.log('✅ Main AuthManager initialized');
+    
+    // Initialize document processor with visual analysis
+    console.log('📄 Initializing document processor...');
+    await documentProcessor.initialize();
+    console.log('✅ Document processor initialized with visual analysis support');
     
     // Test database connection
     const dbHealth = await getSupabaseHealth();
@@ -277,59 +285,25 @@ async function generateEmbedding(text) {
 }
 
 async function extractTextFromFile(buffer, mimetype, filename) {
-  console.log(`🔍 Extracting text from ${filename} (${mimetype}, ${buffer.length} bytes)`);
+  console.log(`🔍 Processing document ${filename} (${mimetype}, ${buffer.length} bytes)`);
   
   try {
-    let extractedText = '';
+    // Use the new document processor for all document types
+    const result = await documentProcessor.processDocument({
+      buffer,
+      mimetype,
+      originalname: filename
+    }, {
+      chunkSize: 1000,
+      extractImages: true
+    });
     
-    switch (mimetype) {
-      case 'application/pdf':
-        console.log(`📄 Processing PDF: ${filename}`);
-        const pdfData = await PDFParse(buffer);
-        extractedText = pdfData.text;
-        console.log(`✅ PDF text extracted: ${extractedText.length} characters`);
-        break;
-        
-      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-      case 'application/msword':
-        console.log(`📝 Processing Word document: ${filename}`);
-        const wordResult = await mammoth.extractRawText({ buffer });
-        extractedText = wordResult.value;
-        console.log(`✅ Word text extracted: ${extractedText.length} characters`);
-        break;
-        
-      case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-      case 'application/vnd.ms-excel':
-        console.log(`📊 Processing Excel document: ${filename}`);
-        const workbook = XLSX.read(buffer);
-        let text = '';
-        workbook.SheetNames.forEach(sheetName => {
-          const sheet = workbook.Sheets[sheetName];
-          const csvData = XLSX.utils.sheet_to_csv(sheet);
-          text += `Sheet: ${sheetName}\\n${csvData}\\n\\n`;
-        });
-        extractedText = text;
-        console.log(`✅ Excel text extracted: ${extractedText.length} characters from ${workbook.SheetNames.length} sheets`);
-        break;
-        
-      case 'text/plain':
-        console.log(`📃 Processing text file: ${filename}`);
-        extractedText = buffer.toString('utf-8');
-        console.log(`✅ Text file processed: ${extractedText.length} characters`);
-        break;
-        
-      default:
-        console.error(`❌ Unsupported file type: ${mimetype} for file: ${filename}`);
-        throw new Error(`Unsupported file type: ${mimetype}`);
+    console.log(`✅ Document processed: ${result.content.length} characters extracted`);
+    if (result.type === 'visual' || result.type === 'hybrid') {
+      console.log(`🖼️ Visual content detected: ${result.visualContent?.elements?.length || 0} elements`);
     }
     
-    if (!extractedText || extractedText.trim().length === 0) {
-      console.warn(`⚠️ No text content extracted from ${filename}`);
-      throw new Error(`No text content found in ${filename}`);
-    }
-    
-    console.log(`✅ Successfully extracted ${extractedText.length} characters from ${filename}`);
-    return extractedText;
+    return result.content;
     
   } catch (error) {
     console.error(`❌ Error extracting text from ${filename}:`, error);
@@ -444,6 +418,10 @@ function saveFolders(foldersMap) {
 const folders = loadFolders();
 
 // API Routes
+
+// Email routes
+import emailRoutes from './routes/email.js';
+app.use('/api/email', emailRoutes);
 
 // Comprehensive health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -1403,6 +1381,81 @@ app.post('/api/documents/extract', upload.array('document', 10), async (req, res
   }
 });
 
+// Detect language of uploaded document
+app.post('/api/documents/detect-language', upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const file = req.file;
+    console.log(`🌍 Detecting language for file: ${file.originalname}`);
+
+    // Process the document to extract text
+    const processedDoc = await documentProcessor.processDocument({
+      buffer: file.buffer,
+      mimetype: file.mimetype,
+      originalname: file.originalname
+    }, {
+      chunkSize: 1000,
+      extractImages: false, // Skip image extraction for language detection
+      applyOCR: true // Apply OCR if needed for scanned documents
+    });
+
+    // Detect language using MultilingualProcessor
+    const languageAnalysis = await multilingualProcessor.detectDocumentLanguage({
+      content: processedDoc.content,
+      title: processedDoc.metadata?.title,
+      chunks: processedDoc.chunks
+    });
+
+    // Prepare response
+    const response = {
+      success: true,
+      filename: file.originalname,
+      fileType: file.mimetype,
+      language: {
+        code: languageAnalysis.language,
+        name: languageAnalysis.languageName,
+        confidence: languageAnalysis.confidence,
+        confidenceLevel: languageService.getConfidenceLevel(languageAnalysis.confidence)
+      },
+      alternativeLanguages: languageAnalysis.alternativeLanguages || [],
+      isMixed: languageAnalysis.isMixed || false,
+      textQuality: processedDoc.metadata?.textQuality || 'unknown',
+      ocrApplied: processedDoc.metadata?.ocrApplied || false
+    };
+
+    // Add mixed language details if applicable
+    if (languageAnalysis.isMixed && languageAnalysis.mixedLanguages) {
+      response.mixedLanguages = languageAnalysis.mixedLanguages;
+    }
+
+    // Add section analysis if available
+    if (languageAnalysis.sectionAnalysis) {
+      response.sectionAnalysis = languageAnalysis.sectionAnalysis;
+    }
+
+    // Add processing metadata
+    response.metadata = {
+      wordCount: processedDoc.metadata?.wordCount || 0,
+      characterCount: processedDoc.metadata?.characterCount || 0,
+      isScanned: processedDoc.metadata?.isScanned || false,
+      processingTime: processedDoc.processingTime || 0
+    };
+
+    console.log(`✅ Language detected: ${response.language.name} (${response.language.code}) with ${(response.language.confidence * 100).toFixed(1)}% confidence`);
+    
+    res.json(response);
+  } catch (error) {
+    console.error('Language detection error:', error);
+    res.status(500).json({ 
+      error: 'Failed to detect document language',
+      message: error.message 
+    });
+  }
+});
+
 // Upload document
 app.post('/api/documents/upload', upload.single('document'), async (req, res) => {
   try {
@@ -1519,15 +1572,29 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       console.log(`⚠️ File is not a PDF, mimetype: ${file.mimetype}`);
     }
 
-    // Extract text from file
-    const text = await extractTextFromFile(file.buffer, file.mimetype, file.originalname);
+    // Process document with visual analysis support
+    const processedDoc = await documentProcessor.processDocument({
+      buffer: file.buffer,
+      mimetype: file.mimetype,
+      originalname: file.originalname
+    }, {
+      chunkSize: 1000,
+      extractImages: true,
+      documentType: category // Use category as hint for document type
+    });
+    
+    const text = processedDoc.content;
     
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: 'No text content found in file' });
+      // For visual documents, we might still want to store them even without text
+      if (processedDoc.type !== 'visual') {
+        return res.status(400).json({ error: 'No content found in file' });
+      }
     }
 
-    // Create chunks
-    const chunks = createChunks(text);
+    // Use processed chunks or create new ones
+    const chunks = processedDoc.chunks.length > 0 ? 
+      processedDoc.chunks : createChunks(text);
     
     if (chunks.length === 0) {
       return res.status(400).json({ error: 'Failed to create chunks from document' });
@@ -1556,15 +1623,21 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
             metadata: {
               title: file.originalname,
               category: category || primaryFolder?.slug || 'general',
-              chunkIndex: chunk.metadata.chunkIndex,
-              wordCount: chunk.metadata.wordCount,
+              chunkIndex: chunk.metadata?.chunkIndex || chunk.index,
+              wordCount: chunk.metadata?.wordCount || chunk.content.split(/\s+/).length,
               headings: [], // Could be enhanced with heading extraction
               folderId: folderId || null,
               folderName: folderId ? folders.get(folderId)?.name : null,
               primaryFolderId: primaryFolderId || null,
               primaryFolderName: primaryFolder?.name || null,
               primaryFolderSlug: primaryFolder?.slug || null,
-              tags: tags ? JSON.parse(tags) : []
+              tags: tags ? JSON.parse(tags) : [],
+              // Visual document metadata
+              documentType: processedDoc.type,
+              visualElements: processedDoc.visualContent?.elements || [],
+              extractedEntities: processedDoc.entities || {},
+              hasVisualContent: processedDoc.type === 'visual' || processedDoc.type === 'hybrid',
+              visualAnalysis: processedDoc.visualContent?.analysis || null
             },
             document: {
               originalName: file.originalname,
@@ -1615,7 +1688,13 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       isAdminDocument: isAdmin === 'true',
       folderId: folderId || null,
       primaryFolderId: primaryFolderId || null,
-      primaryFolderName: primaryFolder?.name || null
+      primaryFolderName: primaryFolder?.name || null,
+      // Include visual analysis results
+      documentType: processedDoc.type,
+      hasVisualContent: processedDoc.type === 'visual' || processedDoc.type === 'hybrid',
+      visualElements: processedDoc.visualContent?.elements?.length || 0,
+      extractedEntities: processedDoc.entities || {},
+      summary: processedDoc.visualContent?.analysis || null
     });
     
   } catch (error) {

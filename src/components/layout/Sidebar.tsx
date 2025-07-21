@@ -4,6 +4,7 @@ import {
   LayoutDashboard, 
   BookOpen, 
   MessageSquare, 
+  Mail,
   Settings,
   Sparkles
 } from 'lucide-react';
@@ -13,6 +14,7 @@ const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
   { path: '/chat', icon: MessageSquare, label: 'Chat' },
+  { path: '/email', icon: Mail, label: 'Email' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

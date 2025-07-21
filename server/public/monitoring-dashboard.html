@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Monitoring Dashboard</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+        }
+        
+        .status-indicator.warning {
+            background-color: #FF9800;
+        }
+        
+        .status-indicator.error {
+            background-color: #F44336;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card h3 {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .metric-change {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .metric-change.positive {
+            color: #4CAF50;
+        }
+        
+        .metric-change.negative {
+            color: #F44336;
+        }
+        
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-card {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .chart-card h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .alerts-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .alerts-container h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .alert-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .alert-item.high {
+            background-color: #FFEBEE;
+            color: #C62828;
+        }
+        
+        .alert-item.medium {
+            background-color: #FFF3E0;
+            color: #E65100;
+        }
+        
+        .alert-item.low {
+            background-color: #E3F2FD;
+            color: #1565C0;
+        }
+        
+        .table-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        
+        .table-container h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            font-weight: 600;
+            color: #666;
+            background-color: #f5f5f5;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background-color: #eee;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: #2196F3;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #1976D2;
+        }
+        
+        button.secondary {
+            background-color: #757575;
+        }
+        
+        button.secondary:hover {
+            background-color: #616161;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>Smart Document Pipeline Monitor</h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-indicator" id="connectionStatus"></div>
+                    <span id="connectionText">Connected</span>
+                </div>
+                <div class="status-item">
+                    <span>Last Update: <span id="lastUpdate">-</span></span>
+                </div>
+                <div class="status-item">
+                    <span>Update Interval: <span id="updateInterval">5s</span></span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>Documents Processed</h3>
+                <div class="metric-value" id="totalProcessed">0</div>
+                <div class="metric-change" id="processedChange">-</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Success Rate</h3>
+                <div class="metric-value" id="successRate">0%</div>
+                <div class="metric-change" id="successChange">-</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Avg Processing Time</h3>
+                <div class="metric-value" id="avgProcessingTime">0s</div>
+                <div class="metric-change" id="processingTimeChange">-</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Current Throughput</h3>
+                <div class="metric-value" id="throughput">0/hr</div>
+                <div class="metric-change" id="throughputChange">-</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Avg Quality Score</h3>
+                <div class="metric-value" id="avgQuality">0.0</div>
+                <div class="metric-change" id="qualityChange">-</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Today's Cost</h3>
+                <div class="metric-value" id="todayCost">$0.00</div>
+                <div class="metric-change" id="costChange">-</div>
+            </div>
+        </div>
+        
+        <div class="alerts-container" id="alertsContainer">
+            <h3>Active Alerts</h3>
+            <div id="alertsList">
+                <p style="color: #666; font-size: 14px;">No active alerts</p>
+            </div>
+        </div>
+        
+        <div class="charts-container">
+            <div class="chart-card">
+                <h3>Processing Timeline</h3>
+                <div class="chart-container">
+                    <canvas id="processingChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h3>Stage Performance</h3>
+                <div class="chart-container">
+                    <canvas id="stageChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h3>Quality Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="qualityChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h3>API Cost Breakdown</h3>
+                <div class="chart-container">
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <h3>Document Type Statistics</h3>
+            <table id="documentTypeTable">
+                <thead>
+                    <tr>
+                        <th>Document Type</th>
+                        <th>Total</th>
+                        <th>Success</th>
+                        <th>Failed</th>
+                        <th>Success Rate</th>
+                        <th>Avg Time</th>
+                        <th>Avg Quality</th>
+                    </tr>
+                </thead>
+                <tbody id="documentTypeBody">
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #666;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="table-container" style="margin-top: 20px;">
+            <h3>API Usage & Quotas</h3>
+            <table id="apiUsageTable">
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Total Calls</th>
+                        <th>Failed Calls</th>
+                        <th>Quota Usage</th>
+                        <th>Total Cost</th>
+                        <th>Today's Cost</th>
+                    </tr>
+                </thead>
+                <tbody id="apiUsageBody">
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #666;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="controls">
+            <button onclick="exportMetrics('json')">Export JSON</button>
+            <button onclick="exportMetrics('csv')">Export CSV</button>
+            <button class="secondary" onclick="toggleAutoRefresh()">
+                <span id="autoRefreshText">Pause</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        const socket = io('/monitor');
+        let autoRefresh = true;
+        let charts = {};
+        let previousMetrics = null;
+        
+        // Initialize charts
+        function initCharts() {
+            // Processing Timeline Chart
+            const processingCtx = document.getElementById('processingChart').getContext('2d');
+            charts.processing = new Chart(processingCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Documents/Hour',
+                        data: [],
+                        borderColor: '#2196F3',
+                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // Stage Performance Chart
+            const stageCtx = document.getElementById('stageChart').getContext('2d');
+            charts.stage = new Chart(stageCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Avg Time (ms)',
+                        data: [],
+                        backgroundColor: '#4CAF50'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // Quality Distribution Chart
+            const qualityCtx = document.getElementById('qualityChart').getContext('2d');
+            charts.quality = new Chart(qualityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Excellent', 'Good', 'Fair', 'Poor'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#4CAF50', '#8BC34A', '#FF9800', '#F44336']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // Cost Breakdown Chart
+            const costCtx = document.getElementById('costChart').getContext('2d');
+            charts.cost = new Chart(costCtx, {
+                type: 'pie',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: ['#2196F3', '#00BCD4', '#009688', '#4CAF50']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        // Update metrics display
+        function updateMetrics(data) {
+            // Update main metrics
+            document.getElementById('totalProcessed').textContent = data.processing.total;
+            document.getElementById('successRate').textContent = data.processing.successRate.toFixed(1) + '%';
+            document.getElementById('avgProcessingTime').textContent = (data.performance.averageProcessingTime / 1000).toFixed(1) + 's';
+            document.getElementById('throughput').textContent = data.performance.currentThroughput + '/hr';
+            document.getElementById('avgQuality').textContent = data.quality.averageScore.toFixed(1);
+            document.getElementById('todayCost').textContent = '$' + data.api.costs.today.toFixed(2);
+            
+            // Update changes
+            if (previousMetrics) {
+                updateChange('processedChange', data.processing.total - previousMetrics.processing.total);
+                updateChange('successChange', data.processing.successRate - previousMetrics.processing.successRate, '%');
+                updateChange('processingTimeChange', 
+                    previousMetrics.performance.averageProcessingTime - data.performance.averageProcessingTime, 
+                    'ms', true);
+                updateChange('throughputChange', 
+                    data.performance.currentThroughput - previousMetrics.performance.currentThroughput);
+                updateChange('qualityChange', data.quality.averageScore - previousMetrics.quality.averageScore);
+                updateChange('costChange', data.api.costs.today - previousMetrics.api.costs.today, '$');
+            }
+            
+            previousMetrics = data;
+            
+            // Update alerts
+            updateAlerts(data.alerts);
+            
+            // Update last update time
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+        
+        // Update change indicators
+        function updateChange(elementId, change, suffix = '', inverse = false) {
+            const element = document.getElementById(elementId);
+            if (change === 0) {
+                element.textContent = 'No change';
+                element.className = 'metric-change';
+            } else {
+                const positive = inverse ? change < 0 : change > 0;
+                element.textContent = (positive ? '+' : '') + change.toFixed(1) + (suffix || '');
+                element.className = 'metric-change ' + (positive ? 'positive' : 'negative');
+            }
+        }
+        
+        // Update alerts display
+        function updateAlerts(alerts) {
+            const alertsList = document.getElementById('alertsList');
+            
+            if (alerts.length === 0) {
+                alertsList.innerHTML = '<p style="color: #666; font-size: 14px;">No active alerts</p>';
+            } else {
+                alertsList.innerHTML = alerts.map(alert => `
+                    <div class="alert-item ${alert.severity}">
+                        <span>${alert.message}</span>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        // Update document type table
+        function updateDocumentTypeTable(data) {
+            const tbody = document.getElementById('documentTypeBody');
+            const rows = [];
+            
+            for (const [type, stats] of Object.entries(data.processing.byDocumentType)) {
+                const quality = data.quality.byDocumentType[type] || { average: 0 };
+                const successRate = stats.total > 0 ? (stats.succeeded / stats.total) * 100 : 0;
+                
+                rows.push(`
+                    <tr>
+                        <td>${type}</td>
+                        <td>${stats.total}</td>
+                        <td>${stats.succeeded}</td>
+                        <td>${stats.failed}</td>
+                        <td>${successRate.toFixed(1)}%</td>
+                        <td>${(stats.avgTime / 1000).toFixed(1)}s</td>
+                        <td>${quality.average.toFixed(1)}</td>
+                    </tr>
+                `);
+            }
+            
+            tbody.innerHTML = rows.join('');
+        }
+        
+        // Update API usage table
+        function updateAPIUsageTable(data) {
+            const tbody = document.getElementById('apiUsageBody');
+            const rows = [];
+            
+            const services = ['geminiVision', 'ocr', 'translation'];
+            
+            for (const service of services) {
+                const usage = data.api.usage[service] || { total: 0, failed: 0, today: 0 };
+                const costs = data.api.costs.byService[service] || { total: 0, daily: 0 };
+                const quota = data.api.quotaUsage[service] || { percentage: 0 };
+                
+                rows.push(`
+                    <tr>
+                        <td>${service}</td>
+                        <td>${usage.total}</td>
+                        <td>${usage.failed}</td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${quota.percentage}%"></div>
+                            </div>
+                            ${quota.percentage.toFixed(1)}%
+                        </td>
+                        <td>$${costs.total.toFixed(2)}</td>
+                        <td>$${costs.daily.toFixed(2)}</td>
+                    </tr>
+                `);
+            }
+            
+            tbody.innerHTML = rows.join('');
+        }
+        
+        // Update charts
+        function updateCharts(data) {
+            // Update stage performance chart
+            if (data.performance.stagePerformance) {
+                const stages = Object.entries(data.performance.stagePerformance);
+                charts.stage.data.labels = stages.map(([stage]) => stage);
+                charts.stage.data.datasets[0].data = stages.map(([, metrics]) => metrics.avgTime);
+                charts.stage.update();
+            }
+            
+            // Update quality distribution
+            if (data.quality) {
+                fetch('/api/monitoring/metrics/quality')
+                    .then(res => res.json())
+                    .then(qualityData => {
+                        const dist = qualityData.distribution;
+                        charts.quality.data.datasets[0].data = [
+                            dist.excellent,
+                            dist.good,
+                            dist.fair,
+                            dist.poor
+                        ];
+                        charts.quality.update();
+                    });
+            }
+            
+            // Update cost breakdown
+            if (data.api.costs.byService) {
+                const costs = Object.entries(data.api.costs.byService);
+                charts.cost.data.labels = costs.map(([service]) => service);
+                charts.cost.data.datasets[0].data = costs.map(([, cost]) => cost.total);
+                charts.cost.update();
+            }
+        }
+        
+        // Update processing timeline
+        function updateProcessingTimeline(throughput) {
+            const now = new Date().toLocaleTimeString();
+            
+            charts.processing.data.labels.push(now);
+            charts.processing.data.datasets[0].data.push(throughput);
+            
+            // Keep only last 20 points
+            if (charts.processing.data.labels.length > 20) {
+                charts.processing.data.labels.shift();
+                charts.processing.data.datasets[0].data.shift();
+            }
+            
+            charts.processing.update();
+        }
+        
+        // Export metrics
+        async function exportMetrics(format) {
+            try {
+                const response = await fetch('/api/monitoring/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ format })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert(`Metrics exported to: ${result.filepath}`);
+                }
+            } catch (error) {
+                console.error('Export failed:', error);
+                alert('Failed to export metrics');
+            }
+        }
+        
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            document.getElementById('autoRefreshText').textContent = autoRefresh ? 'Pause' : 'Resume';
+        }
+        
+        // Socket event handlers
+        socket.on('connect', () => {
+            document.getElementById('connectionStatus').style.backgroundColor = '#4CAF50';
+            document.getElementById('connectionText').textContent = 'Connected';
+        });
+        
+        socket.on('disconnect', () => {
+            document.getElementById('connectionStatus').style.backgroundColor = '#F44336';
+            document.getElementById('connectionText').textContent = 'Disconnected';
+        });
+        
+        socket.on('initial-data', (data) => {
+            updateMetrics(data.summary);
+            updateDocumentTypeTable(data.summary);
+            updateAPIUsageTable(data.summary);
+            updateCharts(data.summary);
+        });
+        
+        socket.on('summary-update', (summary) => {
+            if (autoRefresh) {
+                updateMetrics(summary);
+                updateDocumentTypeTable(summary);
+                updateAPIUsageTable(summary);
+                updateCharts(summary);
+                updateProcessingTimeline(summary.performance.currentThroughput);
+            }
+        });
+        
+        socket.on('alert', (alert) => {
+            console.log('New alert:', alert);
+            // Could add notification here
+        });
+        
+        socket.on('processing:complete', (data) => {
+            console.log('Document processed:', data);
+        });
+        
+        // Initialize
+        initCharts();
+    </script>
+</body>
+</html>
