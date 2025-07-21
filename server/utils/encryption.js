@@ -1,155 +1,223 @@
 /**
  * Encryption Utilities
- * 
- * Provides secure encryption/decryption for sensitive data
+ * Handles encryption and decryption of sensitive data
  */
 
 import crypto from 'crypto';
 
-class EncryptionUtils {
-  constructor() {
-    // Use environment variable or generate a key
-    this.key = process.env.ENCRYPTION_KEY 
-      ? Buffer.from(process.env.ENCRYPTION_KEY, 'hex')
-      : crypto.randomBytes(32);
-    
-    this.algorithm = 'aes-256-gcm';
-    
-    // Warn if using generated key
-    if (!process.env.ENCRYPTION_KEY) {
-      console.warn('⚠️  Using generated encryption key. Set ENCRYPTION_KEY in .env for production');
+// Encryption configuration
+const ALGORITHM = 'aes-256-gcm';
+const SALT_LENGTH = 64; // Length of salt in bytes
+const TAG_LENGTH = 16; // Length of tag in bytes
+const IV_LENGTH = 16; // Length of initialization vector in bytes
+const KEY_LENGTH = 32; // Length of key in bytes
+const ITERATIONS = 100000; // Number of iterations for key derivation
+
+class Encryption {
+    constructor() {
+        // Use environment variable or fallback to a default key (change in production!)
+        this.masterKey = process.env.ENCRYPTION_KEY || 'default-encryption-key-change-in-production!';
     }
-  }
 
-  /**
-   * Encrypt text
-   * @param {string} text - Plain text to encrypt
-   * @returns {string} Encrypted text with IV and auth tag
-   */
-  encrypt(text) {
-    if (!text) return null;
-    
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
-    
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    
-    const authTag = cipher.getAuthTag();
-    
-    // Combine IV, auth tag, and encrypted data
-    return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
-  }
-
-  /**
-   * Decrypt text
-   * @param {string} encryptedText - Encrypted text with IV and auth tag
-   * @returns {string} Decrypted plain text
-   */
-  decrypt(encryptedText) {
-    if (!encryptedText) return null;
-    
-    try {
-      const parts = encryptedText.split(':');
-      if (parts.length !== 3) {
-        throw new Error('Invalid encrypted text format');
-      }
-      
-      const iv = Buffer.from(parts[0], 'hex');
-      const authTag = Buffer.from(parts[1], 'hex');
-      const encrypted = parts[2];
-      
-      const decipher = crypto.createDecipheriv(this.algorithm, this.key, iv);
-      decipher.setAuthTag(authTag);
-      
-      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
-      
-      return decrypted;
-    } catch (error) {
-      console.error('Decryption failed:', error.message);
-      throw new Error('Failed to decrypt data');
+    /**
+     * Derive key from password using PBKDF2
+     */
+    deriveKey(password, salt) {
+        return crypto.pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, 'sha256');
     }
-  }
 
-  /**
-   * Hash text (one-way)
-   * @param {string} text - Text to hash
-   * @returns {string} Hashed text
-   */
-  hash(text) {
-    return crypto
-      .createHash('sha256')
-      .update(text)
-      .digest('hex');
-  }
+    /**
+     * Encrypt data
+     */
+    encrypt(text) {
+        try {
+            // Generate random salt and IV
+            const salt = crypto.randomBytes(SALT_LENGTH);
+            const iv = crypto.randomBytes(IV_LENGTH);
+            
+            // Derive key from master key and salt
+            const key = this.deriveKey(this.masterKey, salt);
+            
+            // Create cipher
+            const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+            
+            // Encrypt data
+            const encrypted = Buffer.concat([
+                cipher.update(text, 'utf8'),
+                cipher.final()
+            ]);
+            
+            // Get auth tag
+            const tag = cipher.getAuthTag();
+            
+            // Combine salt, iv, tag, and encrypted data
+            const combined = Buffer.concat([salt, iv, tag, encrypted]);
+            
+            // Return base64 encoded string
+            return combined.toString('base64');
+        } catch (error) {
+            throw new Error(`Encryption failed: ${error.message}`);
+        }
+    }
 
-  /**
-   * Generate random token
-   * @param {number} length - Token length in bytes
-   * @returns {string} Random token
-   */
-  generateToken(length = 32) {
-    return crypto.randomBytes(length).toString('hex');
-  }
+    /**
+     * Decrypt data
+     */
+    decrypt(encryptedData) {
+        try {
+            // Decode from base64
+            const combined = Buffer.from(encryptedData, 'base64');
+            
+            // Extract components
+            const salt = combined.slice(0, SALT_LENGTH);
+            const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+            const tag = combined.slice(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+            const encrypted = combined.slice(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+            
+            // Derive key from master key and salt
+            const key = this.deriveKey(this.masterKey, salt);
+            
+            // Create decipher
+            const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+            decipher.setAuthTag(tag);
+            
+            // Decrypt data
+            const decrypted = Buffer.concat([
+                decipher.update(encrypted),
+                decipher.final()
+            ]);
+            
+            return decrypted.toString('utf8');
+        } catch (error) {
+            throw new Error(`Decryption failed: ${error.message}`);
+        }
+    }
 
-  /**
-   * Compare hashed values securely
-   * @param {string} text - Plain text
-   * @param {string} hash - Hashed text
-   * @returns {boolean} Match result
-   */
-  compareHash(text, hash) {
-    const textHash = this.hash(text);
-    return crypto.timingSafeEqual(
-      Buffer.from(textHash),
-      Buffer.from(hash)
-    );
-  }
+    /**
+     * Encrypt object (JSON)
+     */
+    encryptObject(obj) {
+        const jsonString = JSON.stringify(obj);
+        return this.encrypt(jsonString);
+    }
 
-  /**
-   * Encrypt object
-   * @param {Object} obj - Object to encrypt
-   * @returns {string} Encrypted object
-   */
-  encryptObject(obj) {
-    const jsonString = JSON.stringify(obj);
-    return this.encrypt(jsonString);
-  }
+    /**
+     * Decrypt object (JSON)
+     */
+    decryptObject(encryptedData) {
+        const jsonString = this.decrypt(encryptedData);
+        return JSON.parse(jsonString);
+    }
 
-  /**
-   * Decrypt object
-   * @param {string} encryptedText - Encrypted object
-   * @returns {Object} Decrypted object
-   */
-  decryptObject(encryptedText) {
-    const jsonString = this.decrypt(encryptedText);
-    return JSON.parse(jsonString);
-  }
+    /**
+     * Generate secure random token
+     */
+    generateToken(length = 32) {
+        return crypto.randomBytes(length).toString('hex');
+    }
 
-  /**
-   * Generate encryption key
-   * @returns {string} Hex encoded key
-   */
-  static generateKey() {
-    return crypto.randomBytes(32).toString('hex');
-  }
+    /**
+     * Hash password using bcrypt-like approach
+     */
+    hashPassword(password) {
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+        return salt + ':' + hash;
+    }
 
-  /**
-   * Derive key from password
-   * @param {string} password - Password
-   * @param {string} salt - Salt (hex)
-   * @returns {Buffer} Derived key
-   */
-  static deriveKey(password, salt) {
-    const saltBuffer = Buffer.from(salt, 'hex');
-    return crypto.pbkdf2Sync(password, saltBuffer, 100000, 32, 'sha256');
-  }
+    /**
+     * Verify password against hash
+     */
+    verifyPassword(password, hashedPassword) {
+        const [salt, hash] = hashedPassword.split(':');
+        const verifyHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+        return hash === verifyHash;
+    }
+
+    /**
+     * Create hash of data (for integrity checks)
+     */
+    createHash(data) {
+        return crypto
+            .createHash('sha256')
+            .update(data)
+            .digest('hex');
+    }
+
+    /**
+     * Create HMAC signature
+     */
+    createHmac(data, secret = null) {
+        const key = secret || this.masterKey;
+        return crypto
+            .createHmac('sha256', key)
+            .update(data)
+            .digest('hex');
+    }
+
+    /**
+     * Verify HMAC signature
+     */
+    verifyHmac(data, signature, secret = null) {
+        const key = secret || this.masterKey;
+        const expectedSignature = this.createHmac(data, key);
+        return crypto.timingSafeEqual(
+            Buffer.from(signature, 'hex'),
+            Buffer.from(expectedSignature, 'hex')
+        );
+    }
+
+    /**
+     * Encrypt sensitive fields in an object
+     */
+    encryptFields(obj, fields) {
+        const encrypted = { ...obj };
+        
+        for (const field of fields) {
+            if (encrypted[field] !== undefined && encrypted[field] !== null) {
+                encrypted[field] = this.encrypt(String(encrypted[field]));
+            }
+        }
+        
+        return encrypted;
+    }
+
+    /**
+     * Decrypt sensitive fields in an object
+     */
+    decryptFields(obj, fields) {
+        const decrypted = { ...obj };
+        
+        for (const field of fields) {
+            if (decrypted[field] !== undefined && decrypted[field] !== null) {
+                try {
+                    decrypted[field] = this.decrypt(decrypted[field]);
+                } catch (error) {
+                    // Field might not be encrypted, leave as is
+                    console.warn(`Failed to decrypt field ${field}:`, error.message);
+                }
+            }
+        }
+        
+        return decrypted;
+    }
 }
 
 // Export singleton instance
-const encryptionUtils = new EncryptionUtils();
-export default encryptionUtils;
+const encryption = new Encryption();
 
-// Also export the class for testing
-export { EncryptionUtils };
+export default encryption;
+
+// Named exports for convenience - bind to preserve context
+export const encrypt = encryption.encrypt.bind(encryption);
+export const decrypt = encryption.decrypt.bind(encryption);
+export const encryptObject = encryption.encryptObject.bind(encryption);
+export const decryptObject = encryption.decryptObject.bind(encryption);
+export const generateToken = encryption.generateToken.bind(encryption);
+export const hashPassword = encryption.hashPassword.bind(encryption);
+export const verifyPassword = encryption.verifyPassword.bind(encryption);
+export const createHash = encryption.createHash.bind(encryption);
+export const createHmac = encryption.createHmac.bind(encryption);
+export const verifyHmac = encryption.verifyHmac.bind(encryption);
+export const encryptFields = encryption.encryptFields.bind(encryption);
+export const decryptFields = encryption.decryptFields.bind(encryption);
