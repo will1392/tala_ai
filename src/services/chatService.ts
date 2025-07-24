@@ -41,7 +41,7 @@ export class ChatService {
   private userId: string;
   private isAdmin: boolean;
 
-  constructor(userId: string = 'admin-1', isAdmin: boolean = true) {
+  constructor(userId: string = 'test_user_123', isAdmin: boolean = true) {
     this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     this.userId = userId;
     this.isAdmin = isAdmin;
@@ -56,10 +56,47 @@ export class ChatService {
     maxResults: number = 5
   ): Promise<ChatResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/api/chat`, {
+      // Check if this is a task creation request
+      const isTaskCreation = this.isTaskCreationRequest(message);
+      
+      if (isTaskCreation) {
+        console.log('🎯 Detected task creation request:', message);
+        // Use direct task creation endpoint
+        const taskResponse = await fetch(`${this.baseUrl}/api/chat-tasks/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': this.userId // Use standard user header
+          },
+          body: JSON.stringify({
+            message,
+            userId: this.userId
+          }),
+        });
+        
+        if (taskResponse.ok) {
+          const taskData = await taskResponse.json();
+          console.log('✅ Task created successfully:', taskData.task);
+          // Format as chat response
+          return {
+            response: taskData.message || `Task "${taskData.task.title}" has been created successfully.`,
+            sources: [],
+            contextUsed: false,
+            conversationId: conversationId || this.generateConversationId(),
+            timestamp: new Date().toISOString(),
+            tokensUsed: 0
+          };
+        } else {
+          console.error('❌ Task creation failed:', await taskResponse.text());
+        }
+      }
+      
+      // Regular chat request - use v2 endpoint
+      const response = await fetch(`${this.baseUrl}/api/chat/v2`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-user-id': this.userId // Use standard user header
         },
         body: JSON.stringify({
           message,
@@ -76,6 +113,20 @@ export class ChatService {
       }
 
       const data = await response.json();
+      
+      // Handle v2 response format
+      if (data.success && data.response) {
+        return {
+          response: data.response,
+          sources: data.metadata?.sources || [],
+          contextUsed: data.metadata?.contextUsed || false,
+          conversationId: data.conversationId || conversationId || this.generateConversationId(),
+          timestamp: new Date().toISOString(),
+          tokensUsed: data.metadata?.tokensUsed || 0
+        };
+      }
+      
+      // Return as-is if it's already in the expected format
       return data;
     } catch (error) {
       console.error('Chat service error:', error);
@@ -204,6 +255,31 @@ export class ChatService {
       sources: this.formatSources(response.sources),
       tokensUsed: response.tokensUsed
     };
+  }
+  
+  /**
+   * Check if message is a task creation request
+   */
+  private isTaskCreationRequest(message: string): boolean {
+    const lowerMessage = message.toLowerCase();
+    
+    // Check for task creation keywords
+    const createKeywords = ['create', 'add', 'make', 'new'];
+    const taskKeywords = ['task', 'todo', 'reminder'];
+    
+    // Check if message contains both create and task keywords
+    const hasCreateKeyword = createKeywords.some(keyword => lowerMessage.includes(keyword));
+    const hasTaskKeyword = taskKeywords.some(keyword => lowerMessage.includes(keyword));
+    
+    // Also check for common task creation phrases
+    const taskPhrases = [
+      'need to', 'have to', 'must', 'should',
+      'remind me', 'don\'t forget'
+    ];
+    const hasTaskPhrase = taskPhrases.some(phrase => lowerMessage.includes(phrase));
+    
+    return (hasCreateKeyword && hasTaskKeyword) || 
+           (hasTaskPhrase && lowerMessage.length < 200); // Likely a task if short and has task phrase
   }
 }
 

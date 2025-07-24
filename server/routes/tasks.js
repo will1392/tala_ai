@@ -12,6 +12,7 @@ import TaskManager from '../services/tasks/TaskManager.js';
 import TaskWorkflow from '../services/tasks/TaskWorkflow.js';
 import TaskAutomation from '../services/tasks/TaskAutomation.js';
 import ReminderService from '../services/tasks/ReminderService.js';
+import { getSharedDb, initializeSharedDb } from '../services/db/sharedDatabase.js';
 
 const router = express.Router();
 
@@ -21,10 +22,12 @@ let taskManager, taskWorkflow, taskAutomation, reminderService;
 // Middleware to ensure services are initialized with user context
 const initializeServices = async (req, res, next) => {
   try {
+    const sharedDb = await initializeSharedDb();
+    
     const userId = req.user?.id || req.userId;
     
     if (!taskManager || taskManager.userId !== userId) {
-      taskManager = new TaskManager({ userId });
+      taskManager = new TaskManager({ userId, db: sharedDb });
       await taskManager.initialize();
     }
     
@@ -68,14 +71,9 @@ router.use(initializeServices);
 // Create task
 router.post('/', async (req, res) => {
   try {
-    const userId = req.userId || 'test_user_123';
-    const taskData = {
-      ...req.body,
-      userId
-    };
+    const { taskManager } = req.taskServices;
     
-    // Create task using TaskStore
-    const task = TaskStore.createTask(taskData);
+    const task = await taskManager.createTask(req.body);
     
     res.status(201).json({
       success: true,
@@ -93,24 +91,24 @@ router.post('/', async (req, res) => {
 // Get task by ID
 router.get('/:taskId', async (req, res) => {
   try {
+    const { taskManager } = req.taskServices;
     const { taskId } = req.params;
     
-    const task = TaskStore.getTask(taskId);
-    
-    if (!task) {
-      return res.status(404).json({
-        success: false,
-        error: 'Task not found'
-      });
-    }
+    const task = await taskManager.getTask(taskId);
     
     res.json({
       success: true,
       task
     });
   } catch (error) {
+    if (error.message === 'Task not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
     console.error('Error getting task:', error);
-    res.status(404).json({
+    res.status(500).json({
       success: false,
       error: error.message
     });
@@ -120,23 +118,23 @@ router.get('/:taskId', async (req, res) => {
 // Update task
 router.put('/:taskId', async (req, res) => {
   try {
+    const { taskManager } = req.taskServices;
     const { taskId } = req.params;
     const updates = req.body;
     
-    const task = TaskStore.updateTask(taskId, updates);
-    
-    if (!task) {
-      return res.status(404).json({
-        success: false,
-        error: 'Task not found'
-      });
-    }
+    const task = await taskManager.updateTask(taskId, updates);
     
     res.json({
       success: true,
       task
     });
   } catch (error) {
+    if (error.message === 'Task not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
     console.error('Error updating task:', error);
     res.status(400).json({
       success: false,
@@ -148,24 +146,24 @@ router.put('/:taskId', async (req, res) => {
 // Delete task
 router.delete('/:taskId', async (req, res) => {
   try {
+    const { taskManager } = req.taskServices;
     const { taskId } = req.params;
     
-    const deleted = TaskStore.deleteTask(taskId);
-    
-    if (!deleted) {
-      return res.status(404).json({
-        success: false,
-        error: 'Task not found'
-      });
-    }
+    await taskManager.deleteTask(taskId);
     
     res.json({
       success: true,
       message: 'Task deleted successfully'
     });
   } catch (error) {
+    if (error.message === 'Task not found') {
+      return res.status(404).json({
+        success: false,
+        error: 'Task not found'
+      });
+    }
     console.error('Error deleting task:', error);
-    res.status(400).json({
+    res.status(500).json({
       success: false,
       error: error.message
     });
@@ -175,19 +173,39 @@ router.delete('/:taskId', async (req, res) => {
 // List tasks with filters
 router.get('/', async (req, res) => {
   try {
-    const userId = req.userId || 'test_user_123';
-    const filters = {
-      status: req.query.status,
-      priority: req.query.priority,
-      limit: parseInt(req.query.limit) || 50
-    };
+    const { taskManager } = req.taskServices;
+    const {
+      status,
+      priority,
+      assignedTo,
+      travelType,
+      search,
+      sortBy = 'due_date',
+      sortOrder = 'asc',
+      limit = 20,
+      offset = 0
+    } = req.query;
     
-    // Get tasks from TaskStore
-    const tasks = TaskStore.getTasksByUser(userId, filters);
+    const filters = {};
+    if (status) filters.status = status;
+    if (priority) filters.priority = priority;
+    if (assignedTo) filters.assignedTo = assignedTo;
+    if (travelType) filters.travelType = travelType;
+    if (search) filters.search = search;
+    
+    // Always filter by the authenticated user
+    const result = await taskManager.listTasks({
+      ...filters,
+      createdBy: req.userId, // Only show tasks created by this user
+      sortBy,
+      sortOrder,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
     
     res.json({
       success: true,
-      tasks
+      ...result
     });
   } catch (error) {
     console.error('Error listing tasks:', error);
@@ -783,6 +801,57 @@ router.get('/overdue', async (req, res) => {
   } catch (error) {
     console.error('Error getting overdue tasks:', error);
     res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Admin Operations
+ */
+
+// Admin endpoint to clear all tasks (for development/testing)
+router.delete('/admin/clear-all', async (req, res) => {
+  try {
+    // Only allow in development or with special header
+    if (process.env.NODE_ENV === 'production' && req.headers['x-admin-key'] !== process.env.ADMIN_KEY) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden'
+      });
+    }
+    
+    const sharedDb = getSharedDb();
+    if (!sharedDb) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database not initialized'
+      });
+    }
+    
+    // Clear all task-related data from mock database
+    const tasksMap = sharedDb.mockData.get('tasks') || new Map();
+    const deletedCount = tasksMap.size;
+    
+    // Clear all collections
+    sharedDb.mockData.set('tasks', new Map());
+    sharedDb.mockData.set('task_history', new Map());
+    sharedDb.mockData.set('task_assignments', new Map());
+    sharedDb.mockData.set('task_dependencies', new Map());
+    sharedDb.mockData.set('task_reminders', new Map());
+    
+    console.log(`🗑️  Clearing all tasks...`);
+    console.log(`✅ Cleared ${deletedCount} tasks`);
+    
+    res.json({
+      success: true,
+      deletedCount,
+      message: `Cleared ${deletedCount} tasks and all related data`
+    });
+  } catch (error) {
+    console.error('Error clearing all tasks:', error);
+    res.status(500).json({
       success: false,
       error: error.message
     });

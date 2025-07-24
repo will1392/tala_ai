@@ -358,8 +358,10 @@ export class TalaIntelligence {
           type: routingDecision.taskAnalysis.type,
           content: request.content,
           context: context.contextWindow,
+          userId: request.userId,  // Pass userId to the agent
           data: {
             ...request.data,
+            userId: request.userId,  // Also include in data for compatibility
             userPreferences: context.userProfile.preferences,
             relevantMemories: context.relevantMemories
           }
@@ -554,26 +556,40 @@ export class TalaIntelligence {
       }
     }
     
-    // Email/document parsing
-    if (content.includes('email') || content.includes('parse') || 
-        content.includes('extract')) {
+    // Task creation vs extraction - CHECK THIS FIRST!
+    const createKeywords = ['create', 'add', 'make', 'new'];
+    const taskKeywords = ['task', 'todo', 'reminder'];
+    const hasCreateKeyword = createKeywords.some(keyword => content.includes(keyword));
+    const hasTaskKeyword = taskKeywords.some(keyword => content.includes(keyword));
+    
+    // Also check for task-like phrases
+    const taskPhrases = ['remind me', 'need to remember', 'don\'t forget', 'i need to'];
+    const hasTaskPhrase = taskPhrases.some(phrase => content.includes(phrase));
+    
+    if ((hasCreateKeyword && hasTaskKeyword) || hasTaskPhrase) {
+      type = 'create-task';
+      complexity = 0.3; // Keep it simple to avoid multi-agent flow
+      // Extract task details if provided
+      const taskMatch = content.match(/(?:create|add|make|remind me to|need to remember to|don't forget to|i need to)\s+(?:a\s+)?(?:task|todo|reminder)?(?:\s+(?:to|for))?\s*[:\-]?\s*(.+)/i);
+      if (taskMatch) {
+        extractedData.taskTitle = taskMatch[1].trim();
+      }
+    } else if (content.includes('extract') && content.includes('task')) {
+      type = 'extract-tasks';
+      complexity += 0.1;
+    }
+    // Email/document parsing - check AFTER task creation
+    else if (content.includes('email') || content.includes('parse') || 
+        (content.includes('extract') && !content.includes('task'))) {
       type = 'parse-email';
       complexity += 0.1;
     }
-    
-    // Document analysis
-    if (content.includes('document') || content.includes('passport') || 
+    // Document analysis - check AFTER task creation
+    else if (content.includes('document') || content.includes('passport') || 
         content.includes('analyze') || content.includes('visa') || 
-        content.includes('need') && (content.includes('document') || content.includes('requirement'))) {
+        (content.includes('need') && (content.includes('document') || content.includes('requirement')))) {
       type = 'analyze-document';
       complexity += 0.2;
-    }
-    
-    // Task extraction
-    if (content.includes('task') || content.includes('todo') || 
-        content.includes('action items')) {
-      type = 'extract-tasks';
-      complexity += 0.1;
     }
     
     // Complex queries requiring multiple capabilities
@@ -829,7 +845,11 @@ export class TalaIntelligence {
     
     const references = memories
       .slice(0, 3)
-      .map((m, i) => `[${i + 1}] ${m.summary || m.content.substring(0, 50)}...`)
+      .map((m, i) => {
+        const contentStr = m.summary || (typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''));
+        const preview = contentStr.length > 50 ? contentStr.substring(0, 50) + '...' : contentStr;
+        return `[${i + 1}] ${preview}`;
+      })
       .join('\n');
     
     if (typeof content === 'string') {
@@ -1053,6 +1073,7 @@ export class TalaIntelligence {
       'build-itinerary': 'itinerary-creation',
       'analyze-document': 'travel-document-parsing',
       'extract-tasks': 'task-extraction',
+      'create-task': 'task-creation',
       'booking-search': 'booking-extraction'
     };
     
