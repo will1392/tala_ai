@@ -110,6 +110,10 @@ qdrant_data/
 uploads/
 documents/
 
+# OAuth tokens and sensitive data
+server/data/oauth-tokens/
+server/data/tokens/
+
 # AI service keys (extra safety)
 *api_key*
 *secret*

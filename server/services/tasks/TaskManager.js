@@ -5,7 +5,7 @@
  * as well as assignment management and dependency tracking.
  */
 
-import { DatabaseService } from '../db/DatabaseService.js';
+import { getSharedDb } from '../db/sharedDatabase.js';
 import { randomUUID } from 'crypto';
 
 // Use built-in crypto.randomUUID for UUID generation
@@ -13,7 +13,7 @@ const uuidv4 = () => randomUUID();
 
 export class TaskManager {
   constructor(options = {}) {
-    this.db = options.db || new DatabaseService();
+    this.db = options.db || getSharedDb();
     this.userId = options.userId;
     this.initialized = false;
   }
@@ -423,7 +423,8 @@ export class TaskManager {
       await dbClient.query(`
         INSERT INTO task_assignments (task_id, user_id, role, assigned_by)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (task_id, user_id, role) DO NOTHING
+        ON CONFLICT (task_id, user_id) DO UPDATE 
+        SET role = $3, assigned_by = $4, assigned_at = CURRENT_TIMESTAMP
       `, [taskId, userId, role, this.userId]);
 
       // Add history entry
@@ -666,16 +667,17 @@ export class TaskManager {
    * Helper: Add history entry
    */
   async addHistory(client, taskId, action, userId, details = {}) {
-    const { fieldName, oldValue, newValue, comment, metadata } = details;
+    const { comment, ...changes } = details;
+    
+    // Store all details in the JSONB changes column
+    const changesJson = Object.keys(changes).length > 0 ? JSON.stringify(changes) : null;
 
     await client.query(`
       INSERT INTO task_history (
-        task_id, action, user_id, field_name, 
-        old_value, new_value, comment, metadata
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        task_id, action, user_id, changes, comment
+      ) VALUES ($1, $2, $3, $4, $5)
     `, [
-      taskId, action, userId, fieldName,
-      oldValue, newValue, comment, metadata
+      taskId, action, userId, changesJson, comment || null
     ]);
   }
 

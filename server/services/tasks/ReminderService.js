@@ -5,7 +5,7 @@
  * Supports multiple notification channels and recurring reminders.
  */
 
-import { DatabaseService } from '../db/DatabaseService.js';
+import { getSharedDb } from '../db/sharedDatabase.js';
 import { EventEmitter } from 'events';
 
 // Dynamic import for optional dependencies
@@ -29,7 +29,7 @@ try {
 export class ReminderService extends EventEmitter {
   constructor(options = {}) {
     super();
-    this.db = options.db || new DatabaseService();
+    this.db = options.db || getSharedDb();
     this.userId = options.userId;
     
     // Notification channel handlers
