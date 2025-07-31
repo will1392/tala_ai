@@ -1,0 +1,237 @@
+{
+  "resources": [
+    {
+      "id": "social-platform-limits",
+      "type": "quick-reference",
+      "title": "Social Media Character Limits",
+      "content": "Twitter: 280 chars. Instagram: 2,200 caption, 30 hashtags. LinkedIn: 3,000 post, 120 headline. Facebook: 63,206 post. TikTok: 2,200 caption.",
+      "category": "key-stats",
+      "tags": ["limits", "characters", "platforms"],
+      "copyable": true,
+      "priority": "high"
+    },
+    {
+      "id": "social-best-times",
+      "type": "quick-reference",
+      "title": "Best Times to Post",
+      "content": "Facebook: 9am, 1-3pm (Wed-Fri). Instagram: 11am-1pm, 5pm (Mon-Fri). Twitter: 8-9am, 5-6pm. LinkedIn: 7-8am, 12pm, 5-6pm (Tue-Thu).",
+      "category": "timing",
+      "tags": ["scheduling", "engagement", "timing"],
+      "copyable": true
+    },
+    {
+      "id": "social-hashtag-strategy",
+      "type": "quick-reference",
+      "title": "Hashtag Best Practices",
+      "content": "Instagram: 5-10 hashtags optimal. Mix popular (1M+), medium (100K-1M), and niche (<100K). Twitter: 1-2 hashtags. LinkedIn: 3-5 professional tags.",
+      "category": "hashtags",
+      "tags": ["hashtags", "strategy", "reach"],
+      "copyable": true
+    },
+    {
+      "id": "social-viral-instagram-post",
+      "type": "example",
+      "title": "Viral Instagram Post Formula",
+      "description": "Post structure that generated 50K+ engagement",
+      "content": "[Eye-catching visual/carousel]\n\n🔥 Hook: Did you know that 90% of people don't know this simple trick?\n\nStory/Value (3-4 lines):\nI discovered this by accident when...\n[Personal story that relates to audience]\n\nKey Points:\n✓ Point 1 (specific benefit)\n✓ Point 2 (addresses pain point)\n✓ Point 3 (unexpected insight)\n\nCTA: Save this for later & share with someone who needs to see this! 👇\n\n.\n.\n.\n#trending #viral #niche #branded #community",
+      "category": "instagram",
+      "tags": ["instagram", "viral", "engagement"],
+      "metrics": {
+        "performance": "95",
+        "engagement": "89",
+        "conversion": "45"
+      },
+      "industry": "Lifestyle",
+      "difficulty": "intermediate"
+    },
+    {
+      "id": "social-linkedin-post-template",
+      "type": "template",
+      "title": "LinkedIn Thought Leadership Post",
+      "description": "Professional post template for high engagement",
+      "content": "{{hook_statement}}\n\n{{personal_story_intro}}\n\n{{main_point_1}}\n\n{{main_point_2}}\n\n{{main_point_3}}\n\nHere's what I learned:\n\n→ {{lesson_1}}\n→ {{lesson_2}}\n→ {{lesson_3}}\n\n{{thought_provoking_question}}\n\n{{cta}}\n\n{{relevant_hashtags}}",
+      "category": "linkedin",
+      "tags": ["linkedin", "thought-leadership", "professional"],
+      "variables": [
+        {
+          "name": "hook_statement",
+          "description": "Opening hook to grab attention",
+          "type": "text",
+          "default": "I made a $100K mistake last year."
+        },
+        {
+          "name": "personal_story_intro",
+          "description": "Brief personal story setup",
+          "type": "text",
+          "default": "Here's what happened and how you can avoid it:"
+        },
+        {
+          "name": "thought_provoking_question",
+          "description": "Question to encourage comments",
+          "type": "text",
+          "default": "What's the biggest lesson you've learned this year?"
+        },
+        {
+          "name": "cta",
+          "description": "Call to action",
+          "type": "select",
+          "options": [
+            "Share your thoughts below 👇",
+            "Follow for more insights",
+            "What's your experience?",
+            "Repost if you found this valuable ♾️"
+          ],
+          "default": "Share your thoughts below 👇"
+        }
+      ],
+      "usage": 234
+    },
+    {
+      "id": "social-content-calendar-checklist",
+      "type": "checklist",
+      "title": "Weekly Social Media Checklist",
+      "description": "Stay consistent with your social media presence",
+      "category": "planning",
+      "priority": "medium",
+      "estimatedTime": "2 hours",
+      "tags": ["planning", "calendar", "consistency"],
+      "items": [
+        {
+          "id": "plan-content",
+          "text": "Plan next week's content themes",
+          "required": true,
+          "description": "Align with marketing calendar and campaigns",
+          "tips": [
+            "Use 80/20 rule: 80% value, 20% promotion",
+            "Plan around trending topics and holidays",
+            "Prepare content variations for A/B testing"
+          ]
+        },
+        {
+          "id": "create-visuals",
+          "text": "Create or source visuals",
+          "required": true,
+          "tips": [
+            "Batch create templates in Canva",
+            "Maintain consistent brand aesthetics",
+            "Optimize images for each platform"
+          ]
+        },
+        {
+          "id": "write-captions",
+          "text": "Write engaging captions",
+          "required": true,
+          "description": "Platform-specific copy with CTAs"
+        },
+        {
+          "id": "research-hashtags",
+          "text": "Research and update hashtag sets",
+          "required": false,
+          "tips": [
+            "Check trending hashtags weekly",
+            "Monitor competitor hashtags",
+            "Test new niche hashtags"
+          ]
+        },
+        {
+          "id": "schedule-posts",
+          "text": "Schedule posts for optimal times",
+          "required": true,
+          "description": "Use scheduling tool for consistency"
+        },
+        {
+          "id": "engage-community",
+          "text": "Engage with community (30 min daily)",
+          "required": true,
+          "tips": [
+            "Respond to comments within 2 hours",
+            "Like and comment on follower posts",
+            "Join relevant conversations"
+          ]
+        },
+        {
+          "id": "analyze-metrics",
+          "text": "Review last week's performance",
+          "required": false,
+          "description": "Identify top performing content"
+        }
+      ]
+    },
+    {
+      "id": "social-engagement-tactics",
+      "type": "quick-reference",
+      "title": "Engagement Boosting Tactics",
+      "content": "Ask questions in captions. Use polls and quizzes. Share behind-the-scenes content. Create saveable infographics. Host giveaways. Go live regularly. Respond to comments quickly.",
+      "category": "engagement",
+      "tags": ["engagement", "tactics", "growth"],
+      "copyable": true
+    },
+    {
+      "id": "social-twitter-thread-example",
+      "type": "example",
+      "title": "High-Performing Twitter Thread",
+      "description": "Thread structure that gained 10K+ likes",
+      "content": "1/ Bold claim or surprising statistic that stops scrolling\n\n2/ Context - why this matters to your audience\n\n3/ Personal story or case study\n\n4/ Problem identification\n\n5-7/ Step-by-step solution\n\n8/ Common mistakes to avoid\n\n9/ Quick recap with key takeaways\n\n10/ CTA: If you found this helpful, RT the first tweet and follow for more [topic] content",
+      "category": "twitter",
+      "tags": ["twitter", "thread", "viral"],
+      "metrics": {
+        "performance": "91",
+        "engagement": "85",
+        "conversion": "28"
+      },
+      "difficulty": "advanced"
+    },
+    {
+      "id": "social-video-hook-template",
+      "type": "template",
+      "title": "TikTok/Reels Hook Formula",
+      "description": "First 3 seconds that capture attention",
+      "content": "{{hook_type}}\n\n{{promise}}\n\n{{time_constraint}}",
+      "category": "video",
+      "tags": ["tiktok", "reels", "video"],
+      "variables": [
+        {
+          "name": "hook_type",
+          "description": "Type of hook",
+          "type": "select",
+          "options": [
+            "STOP! Don't make this mistake...",
+            "POV: You just discovered...",
+            "The secret that [industry] doesn't want you to know",
+            "I tried [X] for 30 days and...",
+            "You've been doing [X] wrong this whole time"
+          ],
+          "default": "STOP! Don't make this mistake..."
+        },
+        {
+          "name": "promise",
+          "description": "What they'll learn",
+          "type": "text",
+          "default": "Here's the right way to do it"
+        },
+        {
+          "name": "time_constraint",
+          "description": "Time to watch",
+          "type": "select",
+          "options": [
+            "Watch till the end",
+            "30 seconds to change your life",
+            "Quick tip that actually works",
+            "Wait for it..."
+          ],
+          "default": "Watch till the end"
+        }
+      ]
+    },
+    {
+      "id": "social-crisis-response",
+      "type": "quick-reference",
+      "title": "Social Media Crisis Response",
+      "content": "1. Acknowledge quickly (within 1 hour). 2. Take conversation offline if needed. 3. Never delete negative comments. 4. Respond with empathy. 5. Provide clear next steps. 6. Follow up publicly when resolved.",
+      "category": "crisis-management",
+      "tags": ["crisis", "response", "reputation"],
+      "copyable": true,
+      "priority": "high"
+    }
+  ]
+}

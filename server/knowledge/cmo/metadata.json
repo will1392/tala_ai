@@ -1,0 +1,98 @@
+{
+  "version": "1.0.0",
+  "name": "CMO Knowledge Base",
+  "description": "Marketing knowledge base for SEO, Email, Social Media, Direct Mail, and Advertising",
+  "categories": {
+    "seo": {
+      "name": "Search Engine Optimization",
+      "description": "SEO best practices, techniques, and guidelines",
+      "topics": [
+        "title_tags",
+        "meta_descriptions",
+        "keyword_research",
+        "on_page_optimization",
+        "technical_seo",
+        "link_building",
+        "content_optimization",
+        "local_seo",
+        "schema_markup",
+        "page_speed"
+      ],
+      "icon": "🔍"
+    },
+    "email": {
+      "name": "Email Marketing",
+      "description": "Email campaign strategies, templates, and best practices",
+      "topics": [
+        "subject_lines",
+        "email_copy",
+        "segmentation",
+        "deliverability",
+        "a_b_testing",
+        "automation",
+        "newsletters",
+        "transactional_emails",
+        "email_design",
+        "compliance"
+      ],
+      "icon": "✉️"
+    },
+    "social": {
+      "name": "Social Media Marketing",
+      "description": "Social media strategies, content creation, and engagement",
+      "topics": [
+        "content_strategy",
+        "platform_best_practices",
+        "hashtags",
+        "engagement",
+        "paid_social",
+        "influencer_marketing",
+        "community_management",
+        "social_listening",
+        "analytics",
+        "content_calendar"
+      ],
+      "icon": "📱"
+    },
+    "direct-mail": {
+      "name": "Direct Mail Marketing",
+      "description": "Physical mail campaigns, design, and response optimization",
+      "topics": [
+        "postcard_design",
+        "letter_copy",
+        "mailing_lists",
+        "usps_regulations",
+        "response_rates",
+        "tracking",
+        "personalization",
+        "print_design",
+        "cost_optimization",
+        "campaign_timing"
+      ],
+      "icon": "📬"
+    },
+    "ads": {
+      "name": "Paid Advertising",
+      "description": "PPC, display ads, and advertising campaign management",
+      "topics": [
+        "google_ads",
+        "facebook_ads",
+        "display_advertising",
+        "retargeting",
+        "ad_copy",
+        "landing_pages",
+        "bid_strategies",
+        "quality_score",
+        "conversion_tracking",
+        "budget_management"
+      ],
+      "icon": "📢"
+    }
+  },
+  "indexSettings": {
+    "vectorDimension": 1536,
+    "collection": "cmo_knowledge",
+    "embeddingModel": "text-embedding-ada-002"
+  },
+  "lastUpdated": "2024-01-15T00:00:00Z"
+}

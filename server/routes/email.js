@@ -8,10 +8,103 @@ import express from 'express';
 import googleOAuthService from '../services/auth/GoogleOAuthService.js';
 import emailManager from '../services/email/EmailManager.js';
 import emailSyncService from '../services/email/EmailSyncService.js';
-import { requireAuth } from '../middleware/auth.js';
+import realGmailService from '../services/auth/RealGmailService.js';
+import tokenStorageService from '../services/auth/TokenStorageService.js';
+import { requireAuth, authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 const syncService = emailSyncService;
+
+/**
+ * GET /api/email/connect/gmail
+ * Initiate Gmail OAuth flow
+ */
+router.get('/connect/gmail', (req, res) => {
+    try {
+        // Get userId from auth middleware or query param
+        const userId = req.userId || req.query.userId || 'test_user_123';
+        
+        // Store user ID in state for callback
+        const state = Buffer.from(JSON.stringify({
+            userId: userId,
+            returnUrl: req.query.returnUrl || 'http://localhost:5173/email?connected=true'
+        })).toString('base64');
+        
+        const authUrl = googleOAuthService.getAuthUrl(state);
+        
+        console.log('🔗 Redirecting to Google OAuth:', authUrl);
+        console.log('📧 Client ID:', process.env.GOOGLE_CLIENT_ID?.substring(0, 20) + '...');
+        res.redirect(authUrl);
+    } catch (error) {
+        console.error('Error initiating Gmail connection:', error);
+        res.status(500).json({ error: 'Failed to initiate Gmail connection', details: error.message });
+    }
+});
+
+/**
+ * GET /api/email/callback/gmail
+ * Gmail OAuth callback
+ */
+router.get('/callback/gmail', async (req, res) => {
+    try {
+        const { code, state, error } = req.query;
+        
+        if (error) {
+            console.error('OAuth error:', error);
+            return res.redirect('http://localhost:5173/email?error=auth_denied');
+        }
+        
+        if (!code) {
+            return res.redirect('http://localhost:5173/email?error=no_code');
+        }
+        
+        // Decode state
+        const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+        
+        try {
+            // Use real Gmail API
+            console.log('🔄 Exchanging OAuth code for tokens...');
+            const { tokens, userInfo } = await realGmailService.exchangeCodeForTokens(code);
+            console.log('✅ Gmail connected successfully for:', userInfo.email);
+            
+            // Save tokens persistently
+            await tokenStorageService.saveGmailIntegration(
+                stateData.userId,
+                userInfo.email,
+                tokens
+            );
+            
+            // Also store in GoogleOAuthService for immediate access
+            await googleOAuthService.storeUserConnection(
+                stateData.userId,
+                userInfo.email,
+                tokens,
+                userInfo
+            );
+            
+            console.log('✅ Gmail tokens saved persistently for user:', stateData.userId);
+            
+            // Test the connection
+            const testResult = await realGmailService.testConnection(tokens.access_token);
+            console.log('📧 Gmail test result:', testResult);
+            
+            // Redirect back to app with success
+            const returnUrl = stateData.returnUrl + '&email=' + encodeURIComponent(userInfo.email) + '&realGmail=true';
+            res.redirect(returnUrl);
+            
+        } catch (oauthError) {
+            console.error('📧 OAuth failed:', oauthError.message);
+            
+            // Redirect back to app with error
+            const returnUrl = stateData.returnUrl.split('?')[0] + '?error=oauth_failed&message=' + encodeURIComponent(oauthError.message);
+            res.redirect(returnUrl);
+        }
+        
+    } catch (error) {
+        console.error('OAuth callback error:', error);
+        res.redirect('http://localhost:5173/email?error=callback_failed');
+    }
+});
 
 /**
  * GET /api/email/providers
@@ -79,8 +172,28 @@ router.post('/connect', requireAuth, async (req, res) => {
  */
 router.get('/status', requireAuth, async (req, res) => {
   try {
-    // First check session
-    if (req.session && req.session.gmailConnection) {
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    
+    // First check in-memory service
+    let connections = await googleOAuthService.getUserConnections(userId);
+    
+    // If no connections in memory, try to load from persistent storage
+    if (connections.length === 0) {
+      const storedResult = await tokenStorageService.getGmailTokens(userId);
+      if (storedResult && storedResult.success && storedResult.tokens) {
+        // Restore connection to memory
+        await googleOAuthService.storeUserConnection(
+          userId,
+          storedResult.tokens.email,
+          storedResult.tokens,
+          { email: storedResult.tokens.email }
+        );
+        connections = await googleOAuthService.getUserConnections(userId);
+      }
+    }
+    
+    // Check session as fallback
+    if (connections.length === 0 && req.session && req.session.gmailConnection) {
       const conn = req.session.gmailConnection;
       return res.json({
         connected: true,
@@ -91,10 +204,6 @@ router.get('/status', requireAuth, async (req, res) => {
         }]
       });
     }
-    
-    // Then check in-memory service
-    const userId = req.userId || req.user?.id || 'test_user_123';
-    const connections = await googleOAuthService.getUserConnections(userId);
     
     res.json({
       connected: connections.length > 0,
@@ -118,18 +227,38 @@ router.get('/status', requireAuth, async (req, res) => {
 router.post('/disconnect', requireAuth, async (req, res) => {
   try {
     const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ error: 'Email address required' });
-    }
-    
     const userId = req.userId || req.user?.id || 'test_user_123';
-    await googleOAuthService.disconnect(userId, email);
     
-    res.json({ 
-      success: true, 
-      message: 'Gmail disconnected successfully' 
-    });
+    // If no email provided, disconnect all Gmail accounts for the user
+    if (!email) {
+      const connections = await googleOAuthService.getUserConnections(userId);
+      
+      if (connections.length === 0) {
+        return res.status(400).json({ error: 'No Gmail connections found' });
+      }
+      
+      // Disconnect all Gmail accounts
+      for (const conn of connections) {
+        await googleOAuthService.disconnect(userId, conn.email);
+        // Also remove from persistent storage
+        await tokenStorageService.removeGmailIntegration(userId);
+      }
+      
+      res.json({ 
+        success: true, 
+        message: 'All Gmail accounts disconnected successfully' 
+      });
+    } else {
+      // Disconnect specific email
+      await googleOAuthService.disconnect(userId, email);
+      // Also remove from persistent storage
+      await tokenStorageService.removeGmailIntegration(userId);
+      
+      res.json({ 
+        success: true, 
+        message: 'Gmail disconnected successfully' 
+      });
+    }
   } catch (error) {
     console.error('Failed to disconnect Gmail:', error);
     res.status(500).json({ error: 'Failed to disconnect Gmail' });
@@ -140,9 +269,9 @@ router.post('/disconnect', requireAuth, async (req, res) => {
  * GET /api/email/test
  * Test Gmail connection
  */
-router.get('/test/:email?', requireAuth, async (req, res) => {
+router.get('/test', requireAuth, async (req, res) => {
   try {
-    const email = req.params.email || null;
+    const email = req.query.email || null;
     const userId = req.userId || req.user?.id || 'test_user_123';
     const result = await googleOAuthService.testConnection(userId, email);
     
@@ -152,6 +281,63 @@ router.get('/test/:email?', requireAuth, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: error.message 
+    });
+  }
+});
+
+/**
+ * GET /api/email/messages
+ * Fetch user's email messages (alias for inbox)
+ */
+router.get('/messages', requireAuth, async (req, res) => {
+  try {
+    const { email, provider = 'gmail', maxResults = 20, pageToken, query } = req.query;
+    
+    // If no email specified, get the first connected account
+    let targetEmail = email;
+    const userId = req.userId || req.user?.id || 'test_user_123';
+    
+    if (!targetEmail) {
+      let connections = await googleOAuthService.getUserConnections(userId);
+      
+      // If no connections in memory, try to load from persistent storage
+      if (connections.length === 0) {
+        const storedResult = await tokenStorageService.getGmailTokens(userId);
+        if (storedResult && storedResult.success && storedResult.tokens) {
+          // Restore connection to memory
+          await googleOAuthService.storeUserConnection(
+            userId,
+            storedResult.tokens.email,
+            storedResult.tokens,
+            { email: storedResult.tokens.email }
+          );
+          connections = await googleOAuthService.getUserConnections(userId);
+        }
+      }
+      
+      if (connections.length > 0) {
+        targetEmail = connections[0].email;
+      }
+    }
+    
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'No Gmail account connected' });
+    }
+    
+    const result = await emailManager.fetchInbox(userId, provider, targetEmail, {
+      maxResults: parseInt(maxResults),
+      pageToken,
+      query
+    });
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Failed to fetch messages:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch messages',
+      details: error.message 
     });
   }
 });

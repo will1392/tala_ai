@@ -1,0 +1,78 @@
+[
+  {
+    "id": "seo-title-best-practices",
+    "type": "guide",
+    "topic": "title_tags",
+    "title": "Title Tag Best Practices",
+    "content": "Title tags are one of the most important on-page SEO elements. They appear in search results and browser tabs.",
+    "guidelines": [
+      "Keep title tags between 50-60 characters",
+      "Include primary keyword near the beginning",
+      "Make each title unique and descriptive",
+      "Include brand name at the end (optional)",
+      "Write for humans first, search engines second"
+    ],
+    "examples": {
+      "good": [
+        "SEO Guide 2024: Complete Beginner's Tutorial | Brand",
+        "Best Running Shoes for Marathon Training - Brand",
+        "How to Write Title Tags That Get Clicks (2024 Guide)"
+      ],
+      "bad": [
+        "Home | Brand",
+        "Brand | Services | About | Contact | Blog",
+        "Welcome to our website where we offer the best services in the industry"
+      ]
+    },
+    "metadata": {
+      "lastUpdated": "2024-01-15",
+      "author": "CMO Team"
+    }
+  },
+  {
+    "id": "seo-title-length-checker",
+    "type": "tool",
+    "topic": "title_tags",
+    "title": "Title Tag Length Checker",
+    "description": "Check if your title tag is the optimal length for search engines",
+    "rules": {
+      "optimal": { "min": 30, "max": 60 },
+      "warning": { "min": 25, "max": 65 },
+      "error": { "min": 0, "max": 70 }
+    },
+    "tips": [
+      "Google typically displays 50-60 characters",
+      "Mobile displays may show less",
+      "Important keywords should appear early",
+      "Test your titles in Google's search results preview"
+    ]
+  },
+  {
+    "id": "seo-title-templates",
+    "type": "template",
+    "topic": "title_tags",
+    "title": "Title Tag Templates",
+    "templates": [
+      {
+        "name": "How-to Guide",
+        "pattern": "How to {Action} in {Year}: {Benefit}",
+        "example": "How to Improve SEO in 2024: Complete Guide"
+      },
+      {
+        "name": "List Post",
+        "pattern": "{Number} {Type} for {Goal} ({Year})",
+        "example": "15 SEO Tools for Better Rankings (2024)"
+      },
+      {
+        "name": "Product Page",
+        "pattern": "{Product} - {Key Feature} | {Brand}",
+        "example": "Running Shoes - Lightweight & Durable | SportBrand"
+      },
+      {
+        "name": "Local Business",
+        "pattern": "{Service} in {City} - {Unique Value} | {Brand}",
+        "example": "Plumbing in Austin - 24/7 Emergency Service | PlumbCo"
+      }
+    ]
+  }
+]

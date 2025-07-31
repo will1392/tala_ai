@@ -6,17 +6,20 @@
 
 import express from 'express';
 import TalaIntelligence from '../services/intelligence/TalaIntelligence.js';
-import authenticate from '../middleware/auth.js';
+import { requireAuth, authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Initialize intelligence system
-const intelligence = new TalaIntelligence({
+const intelligenceConfig = {
   maxContextSize: 8000,
   compressionThreshold: 0.8,
   memoryRetrievalLimit: 10,
-  learningEnabled: true
-});
+  learningEnabled: true,
+  mockMode: false // Use real database for persistence
+};
+
+const intelligence = new TalaIntelligence(intelligenceConfig);
 
 // Initialize on startup
 (async () => {
@@ -253,6 +256,51 @@ router.get('/metrics', authenticate, async (req, res) => {
     console.error('❌ Metrics error:', error);
     res.status(500).json({
       error: 'Failed to retrieve metrics',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * GET /api/chat/context/status/:conversationId
+ * Get context status for a conversation
+ */
+router.get('/context/status/:conversationId', authenticate, async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    
+    if (!conversationId) {
+      return res.status(400).json({
+        error: 'Conversation ID is required',
+        code: 'MISSING_CONVERSATION_ID'
+      });
+    }
+    
+    // Get context status from intelligence system
+    const context = await intelligence.contextManager.getContext(conversationId);
+    const compressed = context?.compressionState || false;
+    const size = context?.currentSize || 0;
+    const maxSize = intelligenceConfig.maxContextSize || 8000;
+    
+    res.json({
+      success: true,
+      conversationId,
+      status: {
+        exists: !!context,
+        compressed,
+        size,
+        maxSize,
+        utilizationPercent: Math.round((size / maxSize) * 100),
+        topics: context?.topics || [],
+        entities: context?.entities || [],
+        lastUpdated: context?.lastUpdated || null
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Context status error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve context status',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

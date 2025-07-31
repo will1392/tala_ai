@@ -10,6 +10,7 @@
  */
 
 import { BaseService } from './baseService.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export class ConversationService extends BaseService {
   constructor(options = {}) {
@@ -629,6 +630,54 @@ export class ConversationService extends BaseService {
         success: false,
         error: {
           code: 'DUPLICATION_ERROR',
+          message: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * Add a message to a conversation
+   * @param {Object} messageData - Message data
+   * @returns {Object} Created message
+   */
+  async addMessage(messageData) {
+    try {
+      const {
+        conversation_id,
+        role,
+        content,
+        metadata = {}
+      } = messageData;
+
+      // Create message in messages table
+      const message = {
+        id: uuidv4(),
+        conversation_id,
+        role,
+        content,
+        metadata,
+        created_at: new Date().toISOString()
+      };
+
+      // In a real implementation, this would insert into a messages table
+      // For now, we'll return a success response
+      this.log(`Added message to conversation ${conversation_id}`);
+      
+      // Update conversation's updated_at timestamp
+      await this.updateConversation(conversation_id, {
+        updated_at: new Date().toISOString()
+      });
+
+      return {
+        success: true,
+        data: message
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'ADD_MESSAGE_ERROR',
           message: error.message
         }
       };

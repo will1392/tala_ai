@@ -1,0 +1,33 @@
+{
+  "corrections": [
+    {
+      "timestamp": "2025-07-29T01:47:41.409Z",
+      "query": "I need better performance",
+      "detectedContext": null,
+      "actualContext": "email",
+      "isCorrect": false,
+      "userId": "test-user"
+    }
+  ],
+  "patterns": {
+    "email": {
+      "need": 1,
+      "better": 1,
+      "performance": 1,
+      "i need": 1,
+      "need better": 1,
+      "better performance": 1
+    }
+  },
+  "statistics": {
+    "totalFeedback": 1,
+    "correctDetections": 0,
+    "corrections": 1,
+    "contextAccuracy": {
+      "null": {
+        "correct": 0,
+        "incorrect": 1
+      }
+    }
+  }
+}

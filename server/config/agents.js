@@ -145,6 +145,33 @@ export const agentsConfig = {
         autoAssignDeadlines: true,
         detectDependencies: true
       }
+    },
+
+    'task-creator': {
+      class: 'TaskCreatorAgent',
+      name: 'Task Creator Agent',
+      description: 'Creates new tasks directly from user requests, handles task management commands',
+      llm: 'gpt-4o-mini',
+      temperature: 0.3,
+      specialization: 'task-creation',
+      confidence_threshold: 0.8,
+      timeout: 20000,
+      capabilities: [
+        'task-creation',
+        'todo-creation',
+        'reminder-creation',
+        'task-management'
+      ],
+      supportedCommands: {
+        create: ['create task', 'add task', 'new task', 'make task'],
+        todo: ['create todo', 'add todo', 'new todo'],
+        reminder: ['create reminder', 'set reminder', 'remind me']
+      },
+      defaultSettings: {
+        priority: 'medium',
+        status: 'pending',
+        autoSuggestActions: true
+      }
     }
   },
 
@@ -165,6 +192,11 @@ export const agentsConfig = {
     //   preferredAgent: 'document-analyzer',
     //   fallbackAgents: []
     // },
+    {
+      condition: { type: 'create-task', keywords: ['create task', 'add task', 'new task', 'create todo'] },
+      preferredAgent: 'task-creator',
+      fallbackAgents: []
+    },
     {
       condition: { type: 'task', keywords: ['todo', 'need to', 'must'] },
       preferredAgent: 'task-extractor',

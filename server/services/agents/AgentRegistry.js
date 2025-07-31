@@ -9,6 +9,7 @@ import EmailMonitorAgent from './EmailMonitorAgent.js';
 import ItineraryBuilderAgent from './ItineraryBuilderAgent.js';
 // import DocumentAnalyzerAgent from './DocumentAnalyzerAgent.js';
 import TaskExtractorAgent from './TaskExtractorAgent.js';
+import TaskCreatorAgent from './TaskCreatorAgent.js';
 
 export class AgentRegistry extends EventEmitter {
   constructor(options = {}) {
@@ -77,6 +78,7 @@ export class AgentRegistry extends EventEmitter {
     this.agentClasses.set('ItineraryBuilderAgent', ItineraryBuilderAgent);
     // this.agentClasses.set('DocumentAnalyzerAgent', DocumentAnalyzerAgent);
     this.agentClasses.set('TaskExtractorAgent', TaskExtractorAgent);
+    this.agentClasses.set('TaskCreatorAgent', TaskCreatorAgent);
   }
 
   /**

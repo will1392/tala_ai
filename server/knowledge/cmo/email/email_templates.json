@@ -1,0 +1,65 @@
+[
+  {
+    "id": "email-welcome-series",
+    "type": "template",
+    "topic": "automation",
+    "title": "Welcome Email Series Template",
+    "description": "A 5-email welcome series to onboard new subscribers",
+    "templates": [
+      {
+        "email": 1,
+        "name": "Welcome & Thank You",
+        "subject": "Welcome to {{brand_name}}, {{first_name}}! 🎉",
+        "preview": "Here's your exclusive welcome gift...",
+        "body": "Hi {{first_name}},\n\nThank you for joining {{brand_name}}! We're thrilled to have you.\n\nAs promised, here's your welcome gift: {{welcome_offer}}\n\nOver the next few days, we'll share:\n• {{benefit_1}}\n• {{benefit_2}}\n• {{benefit_3}}\n\nBest,\n{{sender_name}}"
+      },
+      {
+        "email": 2,
+        "name": "Your Story",
+        "subject": "The story behind {{brand_name}}",
+        "preview": "Why we do what we do...",
+        "timing": "Day 2",
+        "body": "Hi {{first_name}},\n\n{{origin_story}}\n\nThis is why we're passionate about {{mission}}.\n\n{{cta_button}}"
+      },
+      {
+        "email": 3,
+        "name": "Social Proof",
+        "subject": "{{customer_name}} achieved {{result}} with us",
+        "preview": "See what's possible...",
+        "timing": "Day 4",
+        "body": "Success story content with testimonials"
+      }
+    ],
+    "best_practices": [
+      "Send email 1 immediately after signup",
+      "Space emails 2-3 days apart",
+      "Include one clear CTA per email",
+      "Personalize with subscriber data",
+      "Track open rates and adjust timing"
+    ]
+  },
+  {
+    "id": "email-reengagement-campaign",
+    "type": "template",
+    "topic": "retention",
+    "title": "Win-Back Email Campaign",
+    "description": "Re-engage inactive subscribers",
+    "templates": [
+      {
+        "name": "We Miss You",
+        "subject": "{{first_name}}, we miss you! 💔",
+        "body": "It's been {{days_inactive}} days since we've seen you. Here's what you've missed:\n\n{{recent_highlights}}\n\nCome back and get {{incentive}}."
+      },
+      {
+        "name": "Special Offer",
+        "subject": "Your exclusive comeback offer expires soon",
+        "body": "We want you back! Enjoy {{discount}}% off your next purchase.\n\nCode: {{promo_code}}\nExpires: {{expiry_date}}"
+      },
+      {
+        "name": "Last Chance",
+        "subject": "Should we say goodbye, {{first_name}}?",
+        "body": "We haven't heard from you in a while. Click here to stay subscribed, or we'll remove you from our list in 7 days."
+      }
+    ]
+  }
+]

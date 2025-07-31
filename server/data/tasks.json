@@ -1,1 +1,50 @@
-[]
+[
+  {
+    "id": "7ffffb30-318d-46fe-884c-ff06fcde9ef7",
+    "title": "Send something to him",
+    "description": "Task created from chat: just in general, note that I have to send something to him by 11pm tonight",
+    "priority": "medium",
+    "status": "pending",
+    "dueDate": null,
+    "source": "chat",
+    "sourceId": "03e583e5-205f-45c4-a828-8eae7daafc74",
+    "userId": "test_user_123",
+    "organizationId": "test_org_123",
+    "tags": [],
+    "assignee": "test_user_123",
+    "createdAt": "2025-07-24T19:08:04.503Z",
+    "updatedAt": "2025-07-24T19:08:04.503Z"
+  },
+  {
+    "id": "10470b88-87f7-454d-922a-b3785199f03a",
+    "title": "Reach out to Sam",
+    "description": "about his flight to Berlin",
+    "priority": "medium",
+    "status": "pending",
+    "dueDate": null,
+    "source": "chat",
+    "sourceId": "8388b711-1908-43f6-b972-3ace51ed6430",
+    "userId": "test_user_123",
+    "organizationId": "test_org_123",
+    "tags": [],
+    "assignee": "test_user_123",
+    "createdAt": "2025-07-24T19:52:46.680Z",
+    "updatedAt": "2025-07-24T19:52:46.680Z"
+  },
+  {
+    "id": "48000fc5-5a25-4ade-9f00-a4f167c8e3a3",
+    "title": "build a travel guide for Iceland",
+    "description": "Task created from chat: great, can you create a task to build a travel guide for Iceland?",
+    "priority": "medium",
+    "status": "pending",
+    "dueDate": null,
+    "source": "chat",
+    "sourceId": "03a5193e-0df6-43ab-98f8-7419f8a2bbec",
+    "userId": "mock-user-id",
+    "organizationId": "mock-org-id",
+    "tags": [],
+    "assignee": "mock-user-id",
+    "createdAt": "2025-07-25T00:35:22.781Z",
+    "updatedAt": "2025-07-25T00:35:22.781Z"
+  }
+]

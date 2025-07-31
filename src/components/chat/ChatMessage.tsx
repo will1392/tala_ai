@@ -10,7 +10,7 @@ import { ReferenceDocumentModal } from './ReferenceDocumentModal';
 interface Message {
   id: string;
   content: string;
-  sender: 'user' | 'tala';
+  sender: 'user' | 'tala' | 'system';
   timestamp: Date;
   sources?: Array<{ 
     title: string; 
@@ -19,6 +19,7 @@ interface Message {
     documentId?: string;
   }>;
   attachments?: Array<{ name: string; size: string; type: string }>;
+  isAnnouncement?: boolean;
 }
 
 interface ChatMessageProps {
@@ -27,6 +28,7 @@ interface ChatMessageProps {
 
 export const ChatMessage = ({ message }: ChatMessageProps) => {
   const isUser = message.sender === 'user';
+  const isSystem = message.sender === 'system';
   const [selectedReference, setSelectedReference] = useState<{ 
     title: string; 
     type: 'document' | 'website';
@@ -44,6 +46,36 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
     setShowReferenceModal(false);
     setSelectedReference(null);
   };
+
+  // Render system announcement message
+  if (isSystem) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-center my-4"
+      >
+        <div className="max-w-2xl w-full">
+          <GlassCard 
+            variant="light"
+            className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-purple-500/20"
+          >
+            <div className="prose prose-invert max-w-none text-center">
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <p className="mb-2 last:mb-0 text-white/90">{children}</p>,
+                  ul: ({ children }) => <ul className="list-none space-y-1 text-left inline-block">{children}</ul>,
+                  li: ({ children }) => <li className="text-white/80">{children}</li>,
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          </GlassCard>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

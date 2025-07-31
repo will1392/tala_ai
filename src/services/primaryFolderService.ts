@@ -32,7 +32,7 @@ class PrimaryFolderService {
       isAdmin: isAdmin.toString(),
     });
 
-    const response = await fetch(`${this.baseUrl}/api/primary-folders?${params}`);
+    const response = await fetch(`${this.baseUrl}/primary-folders?${params}`);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to fetch primary folders' }));
@@ -50,7 +50,7 @@ class PrimaryFolderService {
   async createPrimaryFolder(request: CreatePrimaryFolderRequest): Promise<PrimaryFolder> {
     console.log('🗂️ Creating primary folder:', request.name);
     
-    const response = await fetch(`${this.baseUrl}/api/primary-folders`, {
+    const response = await fetch(`${this.baseUrl}/primary-folders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ class PrimaryFolderService {
   async updatePrimaryFolder(folderId: string, updates: UpdatePrimaryFolderRequest): Promise<PrimaryFolder> {
     console.log('📝 Updating primary folder:', folderId);
     
-    const response = await fetch(`${this.baseUrl}/api/primary-folders/${folderId}`, {
+    const response = await fetch(`${this.baseUrl}/primary-folders/${folderId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -98,7 +98,7 @@ class PrimaryFolderService {
   async deletePrimaryFolder(folderId: string, userId: string): Promise<void> {
     console.log('🗑️ Deleting primary folder:', folderId);
     
-    const response = await fetch(`${this.baseUrl}/api/primary-folders/${folderId}`, {
+    const response = await fetch(`${this.baseUrl}/primary-folders/${folderId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ class PrimaryFolderService {
       isAdmin: isAdmin.toString(),
     });
 
-    const response = await fetch(`${this.baseUrl}/api/primary-folders/${primaryFolderId}/hierarchy?${params}`);
+    const response = await fetch(`${this.baseUrl}/primary-folders/${primaryFolderId}/hierarchy?${params}`);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to fetch folder hierarchy' }));

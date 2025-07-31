@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { QdrantClient } from '@qdrant/qdrant-js';
 import OpenAI from 'openai';
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
 const require = createRequire(import.meta.url);
@@ -147,7 +148,6 @@ const folderService = new FolderService();
 })();
 
 // Create uploads directory if it doesn't exist
-import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -455,6 +455,10 @@ const folders = loadFolders();
 import emailRoutes from './routes/email.js';
 app.use('/api/email', emailRoutes);
 
+// CMO Context routes
+import cmoContextRoutes from './routes/cmo-context.js';
+app.use('/api/cmo/context', cmoContextRoutes);
+
 // Comprehensive health check endpoint
 app.get('/api/health', async (req, res) => {
   const startTime = Date.now();
@@ -714,7 +718,7 @@ import emailTaskRoutes from './routes/email-tasks-simple.js';
 app.use('/api/email-tasks', emailTaskRoutes);
 
 // Task Management Routes (if using native task management)
-import taskRoutes from './routes/tasks.js';
+import taskRoutes from './routes/tasks-supabase.js'; // Using Supabase-compatible version
 app.use('/api/tasks', taskRoutes);
 
 // Admin task routes - DEVELOPMENT ONLY
@@ -728,6 +732,46 @@ app.use('/api/chat-tasks', chatTaskRoutes);
 // Intelligent Chat Routes
 import intelligentChatRoutes from './routes/intelligentChat.js';
 app.use('/api/chat', intelligentChatRoutes);
+
+// CMO Performance Monitoring Routes
+import cmoMonitoringRoutes from './routes/cmo-monitoring.js';
+app.use('/api/cmo/monitoring', cmoMonitoringRoutes);
+
+// CMO Conversation routes
+import cmoConversationRoutes from './routes/cmo-conversation.js';
+app.use('/api/cmo/conversation', cmoConversationRoutes);
+
+// CMO Health routes
+import cmoHealthRoutes from './routes/cmo-health.js';
+app.use('/api/cmo', cmoHealthRoutes);
+
+// CMO Tools routes
+import cmoToolsRoutes from './routes/api/cmo-tools.js';
+app.use('/api/cmo', cmoToolsRoutes);
+
+// CMO Resources routes
+import cmoResourcesRoutes from './routes/api/cmo-resources.js';
+app.use('/api/cmo', cmoResourcesRoutes);
+
+// CMO Generation routes
+import cmoGenerationRoutes from './routes/api/cmo-generation.js';
+app.use('/api/cmo', cmoGenerationRoutes);
+
+// CMO Feedback routes
+import cmoFeedbackRoutes from './routes/api/cmo-feedback.js';
+app.use('/api/cmo/feedback', cmoFeedbackRoutes);
+
+// CMO Analysis routes
+import cmoAnalysisRoutes from './routes/api/cmo-analysis.js';
+app.use('/api/cmo/analysis', cmoAnalysisRoutes);
+
+// Database-backed Chat Routes (v2)
+import chatV2Routes from './routes/api/chat-v2.js';
+app.use('/api/chat/v2', chatV2Routes);
+
+// Documents Routes
+import documentsRouter from './routes/documents.js';
+app.use('/api/documents', documentsRouter);
 
 // Email Connection Routes
 // import emailConnectRoutes from './routes/email-connect.js';
@@ -2606,7 +2650,11 @@ app.get('/api/chat/conversations', authenticate, asyncHandler(async (req, res) =
     });
     
     if (conversationsResult.success) {
-      userConversations = conversationsResult.data;
+      userConversations = conversationsResult.data.map(conv => ({
+        ...conv,
+        mode: conv.mode || 'travel',
+        subMode: conv.sub_mode || null
+      }));
       console.log(`📋 Retrieved ${userConversations.length} conversations from database for user ${req.userId}`);
     } else {
       throw new Error('Database query failed');
@@ -2625,7 +2673,9 @@ app.get('/api/chat/conversations', authenticate, asyncHandler(async (req, res) =
         updated_at: conv.updatedAt,
         last_message_preview: conv.lastMessagePreview || '',
         message_count: (conversationMessages.get(conv.id) || []).length,
-        lastActivity: conv.updatedAt
+        lastActivity: conv.updatedAt,
+        mode: conv.mode || 'travel',
+        subMode: conv.subMode || null
       }));
     
     console.log(`📋 Retrieved ${userConversations.length} file-based conversations for user ${req.userId}`);
@@ -3757,6 +3807,19 @@ app.post('/validate', async (req, res) => {
       details: error.message 
     });
   }
+});
+
+// Serve static files from the frontend build
+const frontendPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
+app.use(express.static(frontendPath));
+
+// Serve index.html for all non-API routes (SPA support)
+app.get('*', (req, res) => {
+  // Don't serve index.html for API routes
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 // 404 handler for unknown routes

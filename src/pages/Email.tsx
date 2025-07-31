@@ -448,8 +448,12 @@ export const Email = () => {
                 try {
                   const response = await fetch('http://localhost:3001/api/email/disconnect', {
                     method: 'POST',
-                    headers: { 'x-user-id': 'test_user_123' },
-                    credentials: 'include'
+                    headers: { 
+                      'x-user-id': 'test_user_123',
+                      'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({}) // Empty body, backend will disconnect all
                   });
                   
                   if (response.ok) {
@@ -457,9 +461,15 @@ export const Email = () => {
                     setEmails([]);
                     setSelectedEmail(null);
                     setError(null);
+                    console.log('Gmail disconnected successfully');
+                  } else {
+                    const data = await response.json();
+                    console.error('Failed to disconnect:', data.error);
+                    setError(`Failed to disconnect: ${data.error}`);
                   }
                 } catch (error) {
                   console.error('Error disconnecting Gmail:', error);
+                  setError('Failed to disconnect Gmail');
                 }
               }}
             >

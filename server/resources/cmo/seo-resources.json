@@ -1,0 +1,215 @@
+{
+  "resources": [
+    {
+      "id": "seo-title-tag-rules",
+      "type": "quick-reference",
+      "title": "Title Tag Best Practices",
+      "content": "Keep titles between 30-60 characters. Place primary keyword at the beginning. Include brand name with separator. Make each title unique and descriptive.",
+      "category": "key-stats",
+      "tags": ["title", "seo", "optimization"],
+      "copyable": true,
+      "priority": "high"
+    },
+    {
+      "id": "seo-meta-description-guide",
+      "type": "quick-reference",
+      "title": "Meta Description Guidelines",
+      "content": "Optimal length: 150-160 characters. Include primary keyword naturally. Write compelling copy that encourages clicks. Each page should have unique meta description.",
+      "category": "key-stats",
+      "tags": ["meta", "description", "seo"],
+      "copyable": true
+    },
+    {
+      "id": "seo-keyword-density",
+      "type": "quick-reference",
+      "title": "Keyword Density Targets",
+      "content": "Primary keyword: 1-2% density. Secondary keywords: 0.5-1%. Avoid keyword stuffing (>3%). Use natural variations and synonyms.",
+      "category": "optimization-rules",
+      "tags": ["keywords", "density", "content"],
+      "copyable": true
+    },
+    {
+      "id": "seo-high-converting-title",
+      "type": "example",
+      "title": "High-Converting Product Page Title",
+      "description": "E-commerce title that increased CTR by 35%",
+      "content": "Buy [Product Name] - Free Shipping | Save 20% Today | [Brand]",
+      "category": "title-tags",
+      "tags": ["ecommerce", "conversion", "title"],
+      "metrics": {
+        "performance": "85",
+        "engagement": "72",
+        "conversion": "35"
+      },
+      "industry": "E-commerce",
+      "difficulty": "beginner"
+    },
+    {
+      "id": "seo-blog-title-template",
+      "type": "template",
+      "title": "Blog Post Title Formula",
+      "description": "Proven formula for engaging blog titles",
+      "content": "{{number}} {{adjective}} Ways to {{achieve_result}} in {{timeframe}}",
+      "category": "blog",
+      "tags": ["blog", "title", "template"],
+      "variables": [
+        {
+          "name": "number",
+          "description": "Number of tips/ways (5, 7, 10, etc.)",
+          "type": "number",
+          "default": "7"
+        },
+        {
+          "name": "adjective",
+          "description": "Descriptive word (Simple, Proven, Essential)",
+          "type": "select",
+          "options": ["Simple", "Proven", "Essential", "Powerful", "Effective"],
+          "default": "Proven"
+        },
+        {
+          "name": "achieve_result",
+          "description": "What the reader will achieve",
+          "type": "text",
+          "default": "Boost Your SEO Rankings"
+        },
+        {
+          "name": "timeframe",
+          "description": "Time period for results",
+          "type": "select",
+          "options": ["2024", "30 Days", "This Month", "Today"],
+          "default": "2024"
+        }
+      ],
+      "usage": 156
+    },
+    {
+      "id": "seo-onpage-checklist",
+      "type": "checklist",
+      "title": "On-Page SEO Checklist",
+      "description": "Essential on-page optimization tasks for every page",
+      "category": "optimization",
+      "priority": "high",
+      "estimatedTime": "30 min",
+      "tags": ["onpage", "optimization", "checklist"],
+      "items": [
+        {
+          "id": "check-title",
+          "text": "Optimize title tag (30-60 characters)",
+          "description": "Include primary keyword near the beginning",
+          "required": true,
+          "tips": [
+            "Use pipe (|) or dash (-) to separate brand name",
+            "Make it compelling to increase CTR",
+            "Avoid duplicate titles across pages"
+          ]
+        },
+        {
+          "id": "check-meta",
+          "text": "Write meta description (150-160 characters)",
+          "description": "Compelling summary that includes keywords",
+          "required": true,
+          "tips": [
+            "Include a call-to-action",
+            "Use active voice",
+            "Match search intent"
+          ]
+        },
+        {
+          "id": "check-h1",
+          "text": "Set H1 tag with primary keyword",
+          "description": "One H1 per page, different from title tag",
+          "required": true
+        },
+        {
+          "id": "check-url",
+          "text": "Optimize URL structure",
+          "description": "Short, descriptive, keyword-rich URLs",
+          "required": true,
+          "tips": [
+            "Use hyphens to separate words",
+            "Keep it under 60 characters",
+            "Remove stop words"
+          ]
+        },
+        {
+          "id": "check-images",
+          "text": "Optimize images (alt text, file names)",
+          "description": "Descriptive alt text and compressed files",
+          "required": false,
+          "tips": [
+            "Include keywords naturally in alt text",
+            "Use descriptive file names",
+            "Compress images for faster loading"
+          ]
+        },
+        {
+          "id": "check-internal-links",
+          "text": "Add internal links (3-5 per page)",
+          "description": "Link to related content with keyword-rich anchor text",
+          "required": false
+        },
+        {
+          "id": "check-schema",
+          "text": "Implement schema markup",
+          "description": "Add structured data for rich snippets",
+          "required": false,
+          "tips": [
+            "Use Google's Structured Data Testing Tool",
+            "Start with basic Article or Product schema",
+            "Test implementation before publishing"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seo-header-structure",
+      "type": "quick-reference",
+      "title": "Header Tag Hierarchy",
+      "content": "H1: One per page, primary topic. H2: Main sections (2-4). H3: Subsections under H2. Use keywords naturally in headers.",
+      "category": "structure",
+      "tags": ["headers", "h1", "structure"],
+      "copyable": true
+    },
+    {
+      "id": "seo-local-formula",
+      "type": "template",
+      "title": "Local SEO Title Formula",
+      "description": "Optimized for local search results",
+      "content": "{{service}} in {{city}}, {{state}} | {{unique_value}} | {{business_name}}",
+      "category": "local",
+      "tags": ["local", "title", "geo"],
+      "variables": [
+        {
+          "name": "service",
+          "description": "Your primary service",
+          "type": "text",
+          "default": "Plumbing Services"
+        },
+        {
+          "name": "city",
+          "description": "Target city",
+          "type": "text",
+          "default": "Austin"
+        },
+        {
+          "name": "state",
+          "description": "State abbreviation",
+          "type": "text",
+          "default": "TX"
+        },
+        {
+          "name": "unique_value",
+          "description": "Your unique selling point",
+          "type": "text",
+          "default": "24/7 Emergency Service"
+        },
+        {
+          "name": "business_name",
+          "description": "Your business name",
+          "type": "text",
+          "default": "ABC Plumbing"
+        }
+      ]
+    }
+  ]
+}

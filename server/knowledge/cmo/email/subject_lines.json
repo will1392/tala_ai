@@ -1,0 +1,140 @@
+[
+  {
+    "id": "email-subject-best-practices",
+    "type": "guide",
+    "topic": "subject_lines",
+    "title": "Email Subject Line Best Practices",
+    "content": "Subject lines determine whether your email gets opened. They're your first and often only chance to capture attention.",
+    "guidelines": [
+      "Keep subject lines under 50 characters",
+      "Create urgency without being spammy",
+      "Personalize when possible (name, location, behavior)",
+      "A/B test different approaches",
+      "Avoid spam trigger words",
+      "Use emojis sparingly and test them",
+      "Be clear about the email's value"
+    ],
+    "statistics": {
+      "average_open_rate": "21.33%",
+      "personalized_increase": "26%",
+      "emoji_impact": "+56% open rate when used correctly",
+      "optimal_length": "6-10 words"
+    },
+    "metadata": {
+      "lastUpdated": "2024-01-15",
+      "source": "Industry benchmarks 2023-2024"
+    }
+  },
+  {
+    "id": "email-subject-formulas",
+    "type": "template",
+    "topic": "subject_lines",
+    "title": "High-Converting Subject Line Formulas",
+    "templates": [
+      {
+        "name": "Urgency",
+        "pattern": "{Time Limit}: {Benefit}",
+        "examples": [
+          "Last 24 Hours: 50% Off Everything",
+          "Ends Tonight: Your Exclusive Access",
+          "48 Hour Flash Sale Starts Now"
+        ],
+        "use_case": "Limited-time offers, sales, event registrations"
+      },
+      {
+        "name": "Curiosity Gap",
+        "pattern": "{Intriguing Statement} (You Won't Believe #{Number})",
+        "examples": [
+          "The Email Mistake That's Costing You Sales",
+          "This Simple Trick Doubled Our Conversions",
+          "What Amazon Doesn't Want You to Know"
+        ],
+        "use_case": "Content marketing, newsletters, educational emails"
+      },
+      {
+        "name": "Personalization",
+        "pattern": "{First_name}, {Question or Statement}",
+        "examples": [
+          "John, your cart is waiting",
+          "Sarah, you've earned a reward",
+          "Mike, quick question for you"
+        ],
+        "use_case": "Transactional, re-engagement, personal offers"
+      },
+      {
+        "name": "Benefit-Focused",
+        "pattern": "How to {Achieve Desired Outcome}",
+        "examples": [
+          "How to Save $500 on Your Next Flight",
+          "How to Write Emails That Get 50% Opens",
+          "How to Get Your First 1,000 Subscribers"
+        ],
+        "use_case": "Educational content, lead nurturing"
+      }
+    ]
+  },
+  {
+    "id": "email-spam-words",
+    "type": "reference",
+    "topic": "subject_lines",
+    "title": "Spam Trigger Words to Avoid",
+    "description": "Words and phrases that can trigger spam filters",
+    "categories": {
+      "financial": [
+        "Free money",
+        "Make $$$",
+        "Eliminate debt",
+        "Lowest price",
+        "No fees"
+      ],
+      "urgency": [
+        "Act now",
+        "Limited time",
+        "Urgent",
+        "While supplies last"
+      ],
+      "promotional": [
+        "Buy now",
+        "Click here",
+        "Special promotion",
+        "This is not spam"
+      ],
+      "suspicious": [
+        "Congratulations",
+        "You've won",
+        "Prize",
+        "Miracle",
+        "Guaranteed"
+      ]
+    },
+    "alternatives": {
+      "Free": "Complimentary, No-cost, Included",
+      "Buy now": "Shop today, Get yours, Start shopping",
+      "Click here": "Learn more, See details, Explore",
+      "Limited time": "This week only, Ends soon, Available now"
+    }
+  },
+  {
+    "id": "email-subject-ab-testing",
+    "type": "tip",
+    "topic": "subject_lines",
+    "title": "A/B Testing Subject Lines",
+    "content": "Test different subject line elements to improve open rates",
+    "testing_ideas": [
+      "Length: Short vs. Long",
+      "Personalization: With name vs. Without",
+      "Emoji: With vs. Without",
+      "Case: Sentence case vs. Title Case",
+      "Urgency: Time-sensitive vs. Evergreen",
+      "Question vs. Statement",
+      "Number/List vs. No number"
+    ],
+    "best_practices": [
+      "Test one element at a time",
+      "Use at least 1,000 recipients per variation",
+      "Run tests for at least 4 hours",
+      "Consider time zones",
+      "Document and apply learnings"
+    ]
+  }
+]

@@ -415,13 +415,17 @@ class EmailManager extends BaseService {
       includeSpam = false
     } = options;
 
+    console.log('📧 EmailManager.fetchInbox called:', { userId, provider, email, maxResults, query });
+
     // Check cache first
     const cacheKey = `inbox:${userId}:${provider}:${email}:${query}:${pageToken}`;
     const cached = this.emailCache.get(cacheKey);
     if (cached) {
+      console.log('📧 Returning cached results');
       return cached;
     }
 
+    console.log('📧 Getting email client...');
     const client = await this.getEmailClient(userId, provider, email);
 
     let result;
@@ -439,6 +443,10 @@ class EmailManager extends BaseService {
       // Get message details in parallel
       const messages = await Promise.all(
         (response.data.messages || []).map(async (message) => {
+          // Check if message is already parsed (from RealGmailService)
+          if (message.subject && message.from) {
+            return message; // Already parsed
+          }
           return this.getGmailMessage(gmail, message.id, 'metadata');
         })
       );

@@ -345,14 +345,19 @@ export const Dashboard = () => {
               Recent Activity
             </h2>
             <div className="space-y-3">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="glass rounded-lg p-3 hover:bg-white/10 transition-colors">
+              {[
+                { id: 'activity-1', title: 'New booking request', client: 'John Doe - Tokyo Trip', time: '2 min ago' },
+                { id: 'activity-2', title: 'Document uploaded', client: 'Sarah Smith - Visa Application', time: '15 min ago' },
+                { id: 'activity-3', title: 'Chat session started', client: 'Mike Johnson - Europe Tour', time: '1 hour ago' },
+                { id: 'activity-4', title: 'Task completed', client: 'Emma Wilson - Flight Booking', time: '2 hours ago' }
+              ].map((activity) => (
+                <div key={activity.id} className="glass rounded-lg p-3 hover:bg-white/10 transition-colors">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">New booking request</p>
-                      <p className="text-sm text-white/60">Client: John Doe - Tokyo Trip</p>
+                      <p className="font-medium">{activity.title}</p>
+                      <p className="text-sm text-white/60">Client: {activity.client}</p>
                     </div>
-                    <span className="text-xs text-white/50">2 min ago</span>
+                    <span className="text-xs text-white/50">{activity.time}</span>
                   </div>
                 </div>
               ))}
@@ -393,16 +398,24 @@ export const Dashboard = () => {
                       highlightedTaskId === task.id && "ring-2 ring-red-500 bg-red-500/10 animate-pulse"
                     )}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <p className="font-medium">{task.title}</p>
-                        <div className="flex items-center gap-3 mt-1">
+                        {task.description && (
+                          <p className="text-sm text-white/50 mt-1 line-clamp-2">
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2">
                           <p className="text-sm text-white/60 flex items-center gap-1">
                             <Clock size={12} />
                             {formatDueDate(task.dueDate)}
                           </p>
                           {task.source === 'email' && (
                             <span className="text-xs text-blue-400">📧 From email</span>
+                          )}
+                          {task.source === 'chat' && (
+                            <span className="text-xs text-purple-400">💬 From chat</span>
                           )}
                         </div>
                       </div>
@@ -478,12 +491,17 @@ export const Dashboard = () => {
             ) : (
               <div className="grid gap-3">
                 {completedTasks.slice(0, 10).map((task) => (
-                  <div key={task.id} className="glass rounded-lg p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle size={16} className="text-green-400 flex-shrink-0" />
-                      <div>
+                  <div key={task.id} className="glass rounded-lg p-3 flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle size={16} className="text-green-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
                         <p className="font-medium line-through text-white/70">{task.title}</p>
-                        <p className="text-sm text-white/50">
+                        {task.description && (
+                          <p className="text-sm text-white/40 mt-1 line-clamp-2">
+                            {task.description}
+                          </p>
+                        )}
+                        <p className="text-sm text-white/50 mt-1">
                           Completed {formatCompletedDate(task.updatedAt)}
                         </p>
                       </div>

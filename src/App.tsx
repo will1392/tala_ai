@@ -7,7 +7,16 @@ import { Knowledge } from './pages/Knowledge';
 import { Chat } from './pages/Chat';
 import { Email } from './pages/Email';
 import { Settings } from './pages/Settings';
-import EmailInbox from './components/email/EmailInbox';
+import CMOModeFull from './pages/CMOModeFull';
+import CMOModeDebug from './pages/CMOModeDebug';
+import CMOTest from './pages/CMOTest';
+import CMOComplete from './pages/CMOComplete';
+import CMOSimple from './pages/CMOSimple';
+import CMOBasic from './pages/CMOBasic';
+import CMODebugSimple from './pages/CMODebugSimple';
+import CMOWorking from './pages/CMOWorking';
+import CMOFull from './pages/CMOFull';
+// import EmailInbox from './components/email/EmailInbox';
 import { DueTaskBanner } from './components/notifications/DueTaskBanner';
 import { useAuthStore } from './store/authStore';
 import './styles/globals.css';
@@ -42,6 +51,13 @@ function App() {
               <Route path="chat" element={<Chat />} />
               <Route path="email" element={<Email />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="cmo" element={<CMOFull />} />
+              <Route path="cmo-debug" element={<CMOModeDebug />} />
+              <Route path="cmo-test" element={<CMOTest />} />
+              <Route path="cmo-complete" element={<CMOComplete />} />
+              <Route path="cmo-simple" element={<CMOSimple />} />
+              <Route path="cmo-basic" element={<CMOBasic />} />
+              <Route path="cmo-working" element={<CMOWorking />} />
             </Route>
           )}
         </Routes>

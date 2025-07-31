@@ -10,7 +10,7 @@ import ContextManager from '../context/ContextManager.js';
 import MemoryManager from '../memory/MemoryManager.js';
 import ProfileManager from '../profiles/ProfileManager.js';
 import AgentOrchestrator from '../agents/AgentOrchestrator.js';
-import ThreadingService from '../conversations/ThreadingService.js';
+import ThreadingServiceDB from '../conversations/ThreadingServiceDB.js';
 import { LearningEngine } from './LearningEngine.js';
 import { CompressionService } from '../compression/CompressionService.js';
 
@@ -27,7 +27,17 @@ class MockContextManager {
   }
   
   async buildContext(params) {
-    return params.conversationHistory || [];
+    // Return the expected context structure
+    return {
+      contextWindow: params.conversationHistory || [],
+      relevantMemories: [],
+      thread: { messages: [] },
+      recentMessages: [],
+      userProfile: {
+        userId: params.userId,
+        preferences: { style: 'concise', detailed: false }
+      }
+    };
   }
   
   async getContext(contextId) {
@@ -70,7 +80,7 @@ export class TalaIntelligence {
     this.memoryManager = new MemoryManager();
     this.profileManager = new ProfileManager();
     this.agentOrchestrator = new AgentOrchestrator();
-    this.threadingService = new ThreadingService();
+    this.threadingService = new ThreadingServiceDB();
     this.learningEngine = new LearningEngine();
     this.compressionService = new CompressionService();
     
@@ -139,6 +149,7 @@ export class TalaIntelligence {
       const thread = await this.threadingService.getOrCreateThread({
         userId: request.userId,
         conversationId: request.conversationId,
+        organizationId: request.organizationId || request.data?.organizationId || 'default',
         metadata: { source: request.source || 'chat' }
       });
       
@@ -322,14 +333,30 @@ export class TalaIntelligence {
         console.log(`🧠 Learning recommendation: ${recommendation.agentId} (score: ${recommendation.score})`);
         
         // Convert agentId to actual agent object
-        bestAgent = await this.agentOrchestrator.registry.getAgent(recommendation.agentId);
-        console.log(`🤖 Resolved to agent: ${bestAgent ? bestAgent.name || bestAgent.id : 'null'}`);
+        try {
+          bestAgent = await this.agentOrchestrator.registry.getAgent(recommendation.agentId);
+          console.log(`🤖 Resolved to agent: ${bestAgent ? bestAgent.name || bestAgent.id : 'null'}`);
+        } catch (error) {
+          console.log(`⚠️ Failed to get recommended agent: ${error.message}`);
+          bestAgent = null;
+        }
       } else {
         bestAgent = await this.selectBestAgent(taskAnalysis, userProfile);
         console.log(`🔍 Selected via capability search: ${bestAgent ? bestAgent.name || bestAgent.id : 'null'}`);
       }
       
-      selectedAgents = [bestAgent];
+      // If no agent found and it's a general task, set special flag
+      if (!bestAgent && taskAnalysis.type === 'general') {
+        return {
+          strategy: 'direct-response',
+          selectedAgents: [],
+          taskAnalysis,
+          confidence: 0.8,
+          reasoning: 'General chat request - responding directly without specialized agent'
+        };
+      }
+      
+      selectedAgents = bestAgent ? [bestAgent] : [];
     }
     
     return {
@@ -347,7 +374,70 @@ export class TalaIntelligence {
   async executeWithAgents(routingDecision, request, context) {
     const { strategy, selectedAgents } = routingDecision;
     
-    if (strategy === 'single') {
+    if (strategy === 'direct-response') {
+      // No agent needed - use LLM router for general chat
+      console.log(`💬 Handling general chat request via LLM router`);
+      
+      try {
+        // Initialize LLM router if needed
+        if (!this.llmRouter) {
+          const { default: LLMRouter } = await import('../llm/LLMRouter.js');
+          this.llmRouter = new LLMRouter({
+            enableLogging: false,
+            costOptimization: true
+          });
+        }
+        
+        // Route the query through LLM
+        const llmResponse = await this.llmRouter.routeQuery(
+          request.content,
+          {
+            userId: request.userId,
+            conversationHistory: context.contextWindow.slice(-5), // Last 5 messages
+            userPreferences: context.userProfile.preferences
+          },
+          {
+            maxTokens: 1000,
+            temperature: 0.7
+          }
+        );
+        
+        return {
+          result: {
+            response: llmResponse.content,
+            type: 'general-response'
+          },
+          metadata: {
+            strategy: 'direct-response',
+            model: llmResponse.metadata?.model,
+            timestamp: new Date(),
+            ...llmResponse.routing
+          }
+        };
+      } catch (error) {
+        console.error('LLM router failed, using fallback response:', error);
+        
+        // Fallback to a helpful response
+        return {
+          result: {
+            response: `I understand you're asking: "${request.content}". I'm here to help with various tasks including:
+            
+            • Creating tasks or reminders
+            • Planning travel itineraries
+            • Parsing travel emails and documents
+            • Extracting action items from conversations
+            
+            Could you please provide more details about what you need help with?`,
+            type: 'general-response'
+          },
+          metadata: {
+            strategy: 'direct-response',
+            error: error.message,
+            timestamp: new Date()
+          }
+        };
+      }
+    } else if (strategy === 'single') {
       // Single agent execution
       const agent = selectedAgents[0];
       console.log(`🤖 Executing with single agent: ${agent.name}`);
@@ -394,6 +484,11 @@ export class TalaIntelligence {
    */
   async enhanceResponse(agentResponse, context, userProfile) {
     let enhancedContent = agentResponse.result;
+    
+    // Handle direct-response format
+    if (enhancedContent && typeof enhancedContent === 'object' && enhancedContent.response) {
+      enhancedContent = enhancedContent.response;
+    }
     
     // Apply user preferences
     if (userProfile.preferences.responseStyle) {
@@ -631,15 +726,19 @@ export class TalaIntelligence {
     const capability = this.mapTaskTypeToCapability(taskAnalysis.type);
     console.log(`🔍 Looking for agents with capability: ${capability} for task type: ${taskAnalysis.type}`);
     
+    // If no capability mapping or it's a general chat, return null to trigger fallback
+    if (!capability || taskAnalysis.type === 'general') {
+      console.log(`ℹ️ No specific agent needed for ${taskAnalysis.type} - will use direct response`);
+      return null;
+    }
+    
     const candidates = await this.agentOrchestrator.registry.findAgentsByCapability(capability);
     console.log(`🎯 Found ${candidates.length} candidate agents`);
     
     if (candidates.length === 0) {
-      console.log(`⚠️ No agents found for capability ${capability}, falling back to any available agent`);
-      // Fallback to general agent
-      const allAgents = await this.agentOrchestrator.registry.getAllAgents();
-      console.log(`📋 Available agents: ${allAgents.length}`);
-      return allAgents[0] || null;
+      console.log(`⚠️ No agents found for capability ${capability}`);
+      // Don't fallback to any random agent - return null
+      return null;
     }
     
     // Score candidates based on various factors
@@ -1074,10 +1173,12 @@ export class TalaIntelligence {
       'analyze-document': 'travel-document-parsing',
       'extract-tasks': 'task-extraction',
       'create-task': 'task-creation',
-      'booking-search': 'booking-extraction'
+      'booking-search': 'booking-extraction',
+      'general': 'general-assistance'  // Add mapping for general chat
     };
     
-    return mapping[taskType] || 'travel-document-parsing';
+    // Return null for unmapped types instead of defaulting to travel-document-parsing
+    return mapping[taskType] || null;
   }
   
   /**

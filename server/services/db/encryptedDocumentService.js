@@ -890,6 +890,5 @@ export class EncryptedDocumentService extends DocumentService {
   }
 }
 
-// Export both services
-export { EncryptedDocumentService };
+// Export as default
 export default EncryptedDocumentService;

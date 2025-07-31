@@ -1,0 +1,89 @@
+[
+  {
+    "id": "seo-keyword-research-guide",
+    "type": "guide",
+    "topic": "keyword_research",
+    "title": "Keyword Research Fundamentals",
+    "content": "Keyword research is the foundation of SEO. It helps you understand what your audience is searching for and how to optimize your content.",
+    "guidelines": [
+      "Start with seed keywords related to your business",
+      "Use keyword research tools (Google Keyword Planner, Ahrefs, SEMrush)",
+      "Look for long-tail keywords with lower competition",
+      "Consider search intent (informational, transactional, navigational)",
+      "Analyze competitor keywords",
+      "Group keywords by topic and intent"
+    ],
+    "tools": [
+      "Google Keyword Planner (free)",
+      "Ubersuggest (free/paid)",
+      "Answer The Public (questions)",
+      "Google Trends (seasonality)",
+      "Also Asked (related questions)"
+    ],
+    "metadata": {
+      "lastUpdated": "2024-01-15",
+      "author": "CMO Team"
+    }
+  },
+  {
+    "id": "seo-keyword-types",
+    "type": "reference",
+    "topic": "keyword_research",
+    "title": "Types of Keywords",
+    "content": "Understanding different keyword types helps create a balanced SEO strategy.",
+    "categories": {
+      "by_length": {
+        "short_tail": {
+          "description": "1-2 words, high volume, high competition",
+          "examples": ["marketing", "SEO tools"],
+          "use_case": "Brand awareness, difficult to rank"
+        },
+        "long_tail": {
+          "description": "3+ words, lower volume, easier to rank",
+          "examples": ["best SEO tools for small business", "how to do keyword research for blog"],
+          "use_case": "Targeted traffic, higher conversion"
+        }
+      },
+      "by_intent": {
+        "informational": {
+          "description": "Users seeking information",
+          "examples": ["how to", "what is", "guide to"],
+          "content_type": "Blog posts, guides, tutorials"
+        },
+        "transactional": {
+          "description": "Users ready to buy",
+          "examples": ["buy", "price", "discount", "deal"],
+          "content_type": "Product pages, landing pages"
+        },
+        "navigational": {
+          "description": "Users looking for specific sites",
+          "examples": ["facebook login", "amazon prime"],
+          "content_type": "Homepage, brand pages"
+        }
+      }
+    }
+  },
+  {
+    "id": "seo-keyword-research-template",
+    "type": "template",
+    "topic": "keyword_research",
+    "title": "Keyword Research Template",
+    "description": "A structured approach to keyword research",
+    "template": {
+      "step1": "Define Your Niche: {{your_niche}}",
+      "step2": "List Seed Keywords: {{seed_keyword_1}}, {{seed_keyword_2}}, {{seed_keyword_3}}",
+      "step3": "Expand with Tools: Use {{tool_name}} to find variations",
+      "step4": "Analyze Metrics: Volume ({{min_volume}}+), Difficulty (<{{max_difficulty}})",
+      "step5": "Group by Intent: {{intent_category}}",
+      "step6": "Prioritize: Focus on {{priority_keywords}}"
+    },
+    "example": {
+      "step1": "Define Your Niche: Organic Dog Food",
+      "step2": "List Seed Keywords: organic dog food, natural pet food, healthy dog diet",
+      "step3": "Expand with Tools: Use Ubersuggest to find variations",
+      "step4": "Analyze Metrics: Volume (100+), Difficulty (<40)",
+      "step5": "Group by Intent: Informational (70%), Transactional (30%)",
+      "step6": "Prioritize: Focus on 'best organic dog food for puppies', 'grain-free dog food benefits'"
+    }
+  }
+]

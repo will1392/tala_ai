@@ -6,7 +6,8 @@ import {
   MessageSquare, 
   Mail,
   Settings,
-  Sparkles
+  Sparkles,
+  Target
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -15,6 +16,7 @@ const navItems = [
   { path: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
   { path: '/chat', icon: MessageSquare, label: 'Chat' },
   { path: '/email', icon: Mail, label: 'Email' },
+  { path: '/cmo', icon: Target, label: 'CMO Mode' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 

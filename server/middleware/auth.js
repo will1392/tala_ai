@@ -7,8 +7,11 @@
  * Authenticate user (mock implementation for testing)
  */
 export const authenticate = (req, res, next) => {
-    // Get user ID from headers or mock it for testing
-    const userId = req.headers['x-user-id'] || req.headers.authorization?.replace('Bearer ', '') || 'test_user_123';
+    // Get user ID from headers - support both x-user-id and x-mock-user-id
+    const userId = req.headers['x-user-id'] || 
+                   req.headers['x-mock-user-id'] || 
+                   req.headers.authorization?.replace('Bearer ', '') || 
+                   'test_user_123';
     
     if (!userId) {
         return res.status(401).json({ error: 'Authentication required' });

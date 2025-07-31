@@ -1,0 +1,115 @@
+[
+  {
+    "id": "social-content-pillars",
+    "type": "guide",
+    "topic": "content_strategy",
+    "title": "Content Pillars Strategy",
+    "content": "Content pillars are 3-5 core topics that your brand consistently talks about on social media.",
+    "framework": {
+      "educational": {
+        "percentage": "40%",
+        "description": "Teach your audience something valuable",
+        "examples": ["How-to posts", "Tips and tricks", "Industry insights", "Tutorials"]
+      },
+      "inspirational": {
+        "percentage": "30%",
+        "description": "Motivate and inspire your audience",
+        "examples": ["Success stories", "Quotes", "Behind-the-scenes", "Team highlights"]
+      },
+      "promotional": {
+        "percentage": "20%",
+        "description": "Promote your products/services",
+        "examples": ["Product features", "Special offers", "Case studies", "Testimonials"]
+      },
+      "entertaining": {
+        "percentage": "10%",
+        "description": "Entertain and build community",
+        "examples": ["Memes", "Polls", "Challenges", "User-generated content"]
+      }
+    },
+    "implementation": [
+      "Identify 3-5 pillars relevant to your brand",
+      "Create a content calendar with pillar distribution",
+      "Develop templates for each pillar type",
+      "Track engagement by pillar to optimize mix"
+    ]
+  },
+  {
+    "id": "social-platform-best-practices",
+    "type": "reference",
+    "topic": "platform_best_practices",
+    "title": "Platform-Specific Best Practices",
+    "platforms": {
+      "instagram": {
+        "post_frequency": "1-2 posts per day",
+        "best_times": "11am-1pm, 7-9pm",
+        "hashtags": "5-10 relevant hashtags",
+        "content_types": ["Photos", "Reels", "Stories", "IGTV"],
+        "tips": [
+          "Use all 2200 characters in captions",
+          "Include a call-to-action",
+          "Respond to comments within 2 hours",
+          "Use location tags for local discovery"
+        ]
+      },
+      "linkedin": {
+        "post_frequency": "3-5 posts per week",
+        "best_times": "7-8am, 12pm, 5-6pm (weekdays)",
+        "hashtags": "3-5 professional hashtags",
+        "content_types": ["Articles", "Native video", "Polls", "Documents"],
+        "tips": [
+          "Share industry insights",
+          "Celebrate team achievements",
+          "Use native video for 5x more engagement",
+          "Engage with others' content before posting"
+        ]
+      },
+      "twitter": {
+        "post_frequency": "3-5 tweets per day",
+        "best_times": "9am, 12-1pm, 5-6pm",
+        "hashtags": "1-2 hashtags max",
+        "content_types": ["Text", "Images", "Threads", "Polls"],
+        "tips": [
+          "Join trending conversations",
+          "Use threads for longer content",
+          "Retweet with commentary",
+          "Respond quickly to mentions"
+        ]
+      }
+    }
+  },
+  {
+    "id": "social-content-calendar-template",
+    "type": "template",
+    "topic": "content_calendar",
+    "title": "Weekly Content Calendar Template",
+    "description": "A balanced weekly posting schedule",
+    "weekly_template": {
+      "monday": {
+        "theme": "Motivation Monday",
+        "content_type": "Inspirational quote or success story",
+        "example": "Share a customer success story with their permission"
+      },
+      "tuesday": {
+        "theme": "Tutorial Tuesday",
+        "content_type": "Educational how-to content",
+        "example": "Quick tip or mini-tutorial related to your product"
+      },
+      "wednesday": {
+        "theme": "Behind the Scenes",
+        "content_type": "Company culture or process",
+        "example": "Team member spotlight or office tour"
+      },
+      "thursday": {
+        "theme": "Throwback Thursday",
+        "content_type": "Company milestones or evolution",
+        "example": "Before/after transformation or company history"
+      },
+      "friday": {
+        "theme": "Feature Friday",
+        "content_type": "Product highlight or new feature",
+        "example": "Showcase a specific product benefit"
+      }
+    }
+  }
+]

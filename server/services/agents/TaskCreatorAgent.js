@@ -7,6 +7,9 @@
 import BaseAgent from './BaseAgent.js';
 import TaskManager from '../tasks/TaskManager.js';
 import { getSharedDb, initializeSharedDb } from '../db/sharedDatabase.js';
+import userResolver from '../auth/UserResolver.js';
+import { getSupabaseService } from '../../db/supabaseClient.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export class TaskCreatorAgent extends BaseAgent {
   constructor(options = {}) {
@@ -24,13 +27,18 @@ export class TaskCreatorAgent extends BaseAgent {
 
   async initialize() {
     if (!this.initialized) {
+      console.log('🔧 TaskCreatorAgent initializing...');
       const sharedDb = await initializeSharedDb();
+      console.log('🔧 Got shared DB instance:', !!sharedDb);
+      console.log('🔧 DB mockData has tasks:', sharedDb.mockData?.has('tasks'));
+      
       this.taskManager = new TaskManager({ 
         userId: this.userId,
         db: sharedDb 
       });
       await this.taskManager.initialize();
       this.initialized = true;
+      console.log('🔧 TaskCreatorAgent initialized with TaskManager');
     }
   }
 
@@ -124,14 +132,18 @@ export class TaskCreatorAgent extends BaseAgent {
     
     try {
       // Get userId from task object if not already set
-      const userId = task.userId || task.data?.userId || this.userId;
-      console.log(`👤 Using userId for task creation: ${userId}`);
+      const originalUserId = task.userId || task.data?.userId || this.userId;
+      console.log(`👤 Original userId: ${originalUserId}`);
       
-      if (!userId) {
+      if (!originalUserId) {
         throw new Error('No userId provided for task creation');
       }
       
-      // Ensure task manager has the correct userId
+      // Resolve to proper UUID
+      const userId = await userResolver.resolveUserId(originalUserId);
+      console.log(`🔄 Resolved to UUID: ${userId}`);
+      
+      // Ensure task manager has the correct UUID
       if (this.taskManager && this.taskManager.userId !== userId) {
         console.log(`🔄 Updating TaskManager userId from ${this.taskManager.userId} to ${userId}`);
         this.taskManager.userId = userId;
@@ -141,7 +153,46 @@ export class TaskCreatorAgent extends BaseAgent {
       const taskDetails = await this.extractTaskDetails(task, context);
       
       // Create the task
-      const createdTask = await this.taskManager.createTask(taskDetails);
+      // Create task directly in Supabase
+      const supabase = getSupabaseService();
+      const taskId = uuidv4();
+      
+      const supabaseTask = {
+        id: taskId,
+        title: taskDetails.title,
+        description: taskDetails.description || '',
+        status: taskDetails.status || 'pending',
+        priority: taskDetails.priority || 'medium',
+        due_date: taskDetails.dueDate ? new Date(taskDetails.dueDate).toISOString() : null,
+        created_by: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        tags: taskDetails.tags || []
+        // TODO: Add metadata once column is added to database
+        // metadata: {
+        //   source: 'chat',
+        //   originalUserId: originalUserId,
+        //   agentId: this.id,
+        //   ...(taskDetails.metadata || {})
+        // }
+      };
+      
+      console.log('📝 Creating task in Supabase:', supabaseTask);
+      
+      const { data: createdTask, error } = await supabase
+        .from('tasks')
+        .insert([supabaseTask])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Supabase task creation error:', error);
+        throw new Error(`Failed to create task: ${error.message}`);
+      }
+      
+      console.log('✅ Task created in Supabase:', createdTask.id);
+      
+      // Task is now stored in Supabase PostgreSQL database
       
       // Return the task directly - BaseAgent will wrap it
       return {
@@ -182,6 +233,9 @@ export class TaskCreatorAgent extends BaseAgent {
       // Simple extraction without LLM for now
       taskDetails.title = this.extractSimpleTitle(content);
       
+      // Set the full content as description
+      taskDetails.description = this.fullTaskContent || content;
+      
       // Extract priority from keywords
       if (content.toLowerCase().includes('urgent') || content.toLowerCase().includes('asap')) {
         taskDetails.priority = 'high';
@@ -189,17 +243,26 @@ export class TaskCreatorAgent extends BaseAgent {
         taskDetails.priority = 'low';
       }
       
-      // Extract due date patterns
+      // Extract due date patterns with time
+      const timePattern = /(\d{1,2})(:\d{2})?\s*(am|pm|AM|PM)/;
+      const timeMatch = content.match(timePattern);
+      
       const tomorrowMatch = content.match(/tomorrow/i);
-      const todayMatch = content.match(/today/i);
+      const todayMatch = content.match(/today|tonight/i);
       const nextWeekMatch = content.match(/next week/i);
       
       if (todayMatch) {
         taskDetails.dueDate = new Date();
+        if (timeMatch) {
+          this.setTimeFromMatch(taskDetails.dueDate, timeMatch);
+        }
       } else if (tomorrowMatch) {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         taskDetails.dueDate = tomorrow;
+        if (timeMatch) {
+          this.setTimeFromMatch(taskDetails.dueDate, timeMatch);
+        }
       } else if (nextWeekMatch) {
         const nextWeek = new Date();
         nextWeek.setDate(nextWeek.getDate() + 7);
@@ -227,30 +290,136 @@ export class TaskCreatorAgent extends BaseAgent {
    * Extract simple title from content
    */
   extractSimpleTitle(content) {
-    // Remove common prefixes
-    let title = content
-      .replace(/^(please\s+)?(create|add|make)\s+(a\s+)?(new\s+)?(task|todo|reminder)(\s+to|\s+for)?\s*/i, '')
+    // Save the full content for description
+    this.fullTaskContent = content;
+    
+    // Remove common prefixes - be more specific to avoid removing too much
+    let cleanContent = content
+      .replace(/^(can you\s+|could you\s+|please\s+|would you\s+)?/i, '') // Remove polite prefixes
+      .replace(/^(create|add|make)\s+(a\s+)?(new\s+)?(task|todo|reminder)\s+(to\s+|for\s+|that\s+|about\s+)?/i, '') // Remove task creation phrases
+      .replace(/^remind me to\s+/i, '') // Remove "remind me to"
       .trim();
     
-    // Remove trailing punctuation
-    title = title.replace(/[.!?]+$/, '');
+    // If we removed too much and have nothing left, try a simpler approach
+    if (!cleanContent || cleanContent.length < 5) {
+      // Try to find the actual task content after common patterns
+      const patterns = [
+        /(?:create|add|make)\s+(?:a\s+)?(?:task|todo|reminder)\s+(?:to|for|that|about)\s+(.+)/i,
+        /remind me to\s+(.+)/i,
+        /(?:can you|could you|please)\s+(.+)/i,
+        /(?:i need to|need to|have to)\s+(.+)/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = content.match(pattern);
+        if (match && match[1]) {
+          cleanContent = match[1].trim();
+          break;
+        }
+      }
+    }
+    
+    // Extract the main action/subject for the title
+    let title = this.extractConciseTitle(cleanContent);
     
     // Capitalize first letter
     if (title.length > 0) {
       title = title.charAt(0).toUpperCase() + title.slice(1);
     }
     
-    // Limit length
-    if (title.length > 100) {
-      title = title.substring(0, 97) + '...';
+    return title || 'New Task';
+  }
+  
+  /**
+   * Extract a concise title from the task content
+   */
+  extractConciseTitle(content) {
+    // Common patterns to extract concise titles
+    const patterns = [
+      // "reach out to X" -> "Reach out to X"
+      /^(reach out to|contact|call|email|message|text)\s+([^\s]+(?:\s+[^\s]+)?)/i,
+      // "book/schedule X" -> "Book X" or "Schedule X"
+      /^(book|schedule|reserve|arrange)\s+([^\s]+(?:\s+[^\s]+)?)/i,
+      // "review/check X" -> "Review X" or "Check X"
+      /^(review|check|verify|confirm|look at|go over)\s+([^\s]+(?:\s+[^\s]+)?)/i,
+      // "send/submit X" -> "Send X" or "Submit X"
+      /^(send|submit|deliver|forward)\s+([^\s]+(?:\s+[^\s]+)?)/i,
+      // "prepare/create X" -> "Prepare X" or "Create X"
+      /^(prepare|create|write|draft|make)\s+([^\s]+(?:\s+[^\s]+)?)/i,
+      // "follow up on/with X" -> "Follow up with X"
+      /^(follow up (?:on|with))\s+([^\s]+(?:\s+[^\s]+)?)/i,
+      // "X needs to be done" -> "X"
+      /^([^\s]+(?:\s+[^\s]+)?)\s+needs?\s+to\s+be/i,
+      // "need to X" -> "X"
+      /^need(?:s)?\s+to\s+(.+)/i,
+      // "have to X" -> "X"
+      /^(?:I\s+)?(?:have|need)\s+to\s+(.+)/i
+    ];
+    
+    // Try each pattern
+    for (const pattern of patterns) {
+      const match = content.match(pattern);
+      if (match) {
+        // Get the captured groups
+        if (match[2]) {
+          // Pattern with action + object
+          const action = match[1];
+          const object = match[2];
+          
+          // Clean up the object part - remove time/date info
+          const cleanObject = object
+            .replace(/\s+(by|before|after|at|on|tomorrow|today|tonight|this\s+\w+|next\s+\w+).*$/i, '')
+            .replace(/\s+\d{1,2}(:\d{2})?\s*(am|pm)?.*$/i, '')
+            .trim();
+          
+          return `${action} ${cleanObject}`.toLowerCase();
+        } else if (match[1]) {
+          // Pattern with just the main part
+          const mainPart = match[1]
+            .replace(/\s+(by|before|after|at|on|tomorrow|today|tonight|this\s+\w+|next\s+\w+).*$/i, '')
+            .replace(/\s+\d{1,2}(:\d{2})?\s*(am|pm)?.*$/i, '')
+            .trim();
+          
+          return mainPart.toLowerCase();
+        }
+      }
     }
     
-    return title || 'New Task';
+    // If no pattern matches, extract first few important words
+    const words = content.split(' ');
+    const importantWords = [];
+    const skipWords = ['the', 'a', 'an', 'to', 'for', 'and', 'or', 'but', 'in', 'on', 'at', 'by'];
+    
+    for (const word of words) {
+      if (!skipWords.includes(word.toLowerCase())) {
+        importantWords.push(word);
+        if (importantWords.length >= 3) break;
+      }
+    }
+    
+    return importantWords.join(' ').toLowerCase();
   }
 
   /**
    * Suggest next actions for created task
    */
+  /**
+   * Set time from regex match
+   */
+  setTimeFromMatch(date, timeMatch) {
+    let hours = parseInt(timeMatch[1]);
+    const minutes = timeMatch[2] ? parseInt(timeMatch[2].substring(1)) : 0;
+    const isPM = timeMatch[3].toLowerCase() === 'pm';
+    
+    if (isPM && hours !== 12) {
+      hours += 12;
+    } else if (!isPM && hours === 12) {
+      hours = 0;
+    }
+    
+    date.setHours(hours, minutes, 0, 0);
+  }
+  
   suggestNextActions(task) {
     const actions = [];
     

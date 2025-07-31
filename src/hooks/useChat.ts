@@ -9,7 +9,7 @@ interface UseChatOptions {
 
 export const useChat = (options: UseChatOptions = {}) => {
   const {
-    userId = 'admin-1',
+    userId = 'test_user_123', // Standardized user ID across the app
     isAdmin = true,
     initialConversationId
   } = options;

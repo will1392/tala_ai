@@ -1,0 +1,229 @@
+{
+  "resources": [
+    {
+      "id": "marketing-metrics-glossary",
+      "type": "quick-reference",
+      "title": "Key Marketing Metrics",
+      "content": "CTR: Click-through rate (clicks/impressions). CPC: Cost per click. CPM: Cost per thousand impressions. CPA: Cost per acquisition. ROAS: Return on ad spend. LTV: Lifetime value. CAC: Customer acquisition cost.",
+      "category": "metrics",
+      "tags": ["metrics", "kpi", "analytics"],
+      "copyable": true,
+      "priority": "high"
+    },
+    {
+      "id": "content-marketing-rule",
+      "type": "quick-reference",
+      "title": "The 80/20 Content Rule",
+      "content": "80% of content should provide value (educate, entertain, inspire). 20% can be promotional. Focus on solving problems, answering questions, and building relationships before selling.",
+      "category": "strategy",
+      "tags": ["content", "strategy", "value"],
+      "copyable": true
+    },
+    {
+      "id": "buyer-journey-stages",
+      "type": "quick-reference",
+      "title": "Buyer Journey Stages",
+      "content": "Awareness: Problem identification, educational content. Consideration: Solution research, comparison content. Decision: Vendor evaluation, case studies, demos. Retention: Onboarding, support, loyalty programs.",
+      "category": "strategy",
+      "tags": ["buyer-journey", "funnel", "content"],
+      "copyable": true
+    },
+    {
+      "id": "campaign-brief-template",
+      "type": "template",
+      "title": "Marketing Campaign Brief",
+      "description": "Comprehensive campaign planning template",
+      "content": "CAMPAIGN BRIEF: {{campaign_name}}\n\nOBJECTIVE:\n{{primary_objective}}\n\nTARGET AUDIENCE:\n- Demographics: {{demographics}}\n- Psychographics: {{psychographics}}\n- Pain Points: {{pain_points}}\n\nKEY MESSAGES:\n1. {{key_message_1}}\n2. {{key_message_2}}\n3. {{key_message_3}}\n\nCHANNELS:\n{{channels}}\n\nBUDGET: {{budget}}\n\nTIMELINE:\n- Launch: {{launch_date}}\n- Duration: {{duration}}\n\nSUCCESS METRICS:\n- {{metric_1}}: {{target_1}}\n- {{metric_2}}: {{target_2}}\n- {{metric_3}}: {{target_3}}\n\nCREATIVE REQUIREMENTS:\n{{creative_requirements}}\n\nAPPROVALS NEEDED:\n{{approvals}}",
+      "category": "planning",
+      "tags": ["campaign", "brief", "planning"],
+      "variables": [
+        {
+          "name": "campaign_name",
+          "description": "Campaign name/title",
+          "type": "text",
+          "default": "Q1 Product Launch Campaign"
+        },
+        {
+          "name": "primary_objective",
+          "description": "Main campaign goal",
+          "type": "select",
+          "options": [
+            "Increase brand awareness",
+            "Generate qualified leads",
+            "Drive sales/conversions",
+            "Launch new product",
+            "Improve customer retention"
+          ],
+          "default": "Generate qualified leads"
+        },
+        {
+          "name": "budget",
+          "description": "Campaign budget",
+          "type": "text",
+          "default": "$50,000"
+        },
+        {
+          "name": "duration",
+          "description": "Campaign duration",
+          "type": "select",
+          "options": ["2 weeks", "1 month", "3 months", "6 months", "Ongoing"],
+          "default": "3 months"
+        }
+      ],
+      "usage": 342
+    },
+    {
+      "id": "marketing-launch-checklist",
+      "type": "checklist",
+      "title": "Product Launch Checklist",
+      "description": "Complete marketing checklist for product launches",
+      "category": "launch",
+      "priority": "high",
+      "estimatedTime": "4 weeks",
+      "tags": ["launch", "product", "campaign"],
+      "items": [
+        {
+          "id": "market-research",
+          "text": "Complete market research and competitive analysis",
+          "required": true,
+          "description": "Understand market positioning and differentiators",
+          "tips": [
+            "Analyze top 5 competitors",
+            "Identify unique value propositions",
+            "Survey target customers"
+          ]
+        },
+        {
+          "id": "messaging",
+          "text": "Develop key messaging and positioning",
+          "required": true,
+          "tips": [
+            "Create messaging hierarchy",
+            "Test with focus groups",
+            "Align with brand voice"
+          ]
+        },
+        {
+          "id": "content-creation",
+          "text": "Create launch content assets",
+          "required": true,
+          "description": "Website, blog posts, videos, social media",
+          "tips": [
+            "Develop content calendar",
+            "Create multimedia assets",
+            "Prepare FAQ content"
+          ]
+        },
+        {
+          "id": "email-sequence",
+          "text": "Set up email launch sequence",
+          "required": true,
+          "description": "Pre-launch, launch day, follow-up emails"
+        },
+        {
+          "id": "pr-outreach",
+          "text": "Execute PR and influencer outreach",
+          "required": false,
+          "tips": [
+            "Prepare press release",
+            "Create media kit",
+            "Schedule embargo briefings"
+          ]
+        },
+        {
+          "id": "paid-campaigns",
+          "text": "Launch paid advertising campaigns",
+          "required": false,
+          "description": "PPC, social ads, display advertising"
+        },
+        {
+          "id": "analytics-setup",
+          "text": "Set up tracking and analytics",
+          "required": true,
+          "tips": [
+            "Configure conversion tracking",
+            "Set up dashboards",
+            "Test all tracking pixels"
+          ]
+        },
+        {
+          "id": "team-training",
+          "text": "Train sales and support teams",
+          "required": true,
+          "description": "Ensure teams are prepared for launch"
+        },
+        {
+          "id": "launch-day",
+          "text": "Execute launch day plan",
+          "required": true,
+          "tips": [
+            "Monitor social media closely",
+            "Have crisis plan ready",
+            "Celebrate with team!"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "content-calendar-example",
+      "type": "example",
+      "title": "Monthly Content Calendar Structure",
+      "description": "Balanced content mix across channels",
+      "content": "WEEK 1:\n• Monday: Educational blog post\n• Tuesday: Instagram carousel (tips)\n• Wednesday: LinkedIn thought leadership\n• Thursday: Email newsletter\n• Friday: User-generated content feature\n\nWEEK 2:\n• Monday: How-to video\n• Tuesday: Twitter thread\n• Wednesday: Case study publication\n• Thursday: Instagram Stories Q&A\n• Friday: Podcast episode\n\nWEEK 3:\n• Monday: Infographic share\n• Tuesday: Customer testimonial\n• Wednesday: Industry news commentary\n• Thursday: Product feature highlight\n• Friday: Behind-the-scenes content\n\nWEEK 4:\n• Monday: Monthly roundup\n• Tuesday: Live event/webinar\n• Wednesday: Partner content\n• Thursday: Seasonal campaign\n• Friday: Community celebration",
+      "category": "content-planning",
+      "tags": ["calendar", "content", "planning"],
+      "metrics": {
+        "performance": "87",
+        "engagement": "73"
+      },
+      "difficulty": "intermediate"
+    },
+    {
+      "id": "ab-testing-framework",
+      "type": "quick-reference",
+      "title": "A/B Testing Framework",
+      "content": "1. Form hypothesis. 2. Choose one variable. 3. Split audience 50/50. 4. Run for statistical significance (usually 2-4 weeks). 5. Measure primary metric. 6. Implement winner. 7. Document learnings.",
+      "category": "optimization",
+      "tags": ["testing", "optimization", "data"],
+      "copyable": true
+    },
+    {
+      "id": "crisis-communication-template",
+      "type": "template",
+      "title": "Crisis Communication Template",
+      "description": "Quick response template for PR crises",
+      "content": "We are aware of {{issue_description}} and take this matter seriously.\n\n{{acknowledgment_statement}}\n\nWhat we're doing:\n• {{action_1}}\n• {{action_2}}\n• {{action_3}}\n\n{{commitment_statement}}\n\nWe will provide updates as we have more information. For immediate concerns, please contact {{contact_method}}.\n\n{{signature}}",
+      "category": "crisis",
+      "tags": ["crisis", "pr", "communication"],
+      "variables": [
+        {
+          "name": "issue_description",
+          "description": "Brief description of the issue",
+          "type": "text",
+          "default": "the concerns raised by our community"
+        },
+        {
+          "name": "acknowledgment_statement",
+          "description": "Empathy and acknowledgment",
+          "type": "text",
+          "default": "We understand the frustration this has caused and sincerely apologize."
+        },
+        {
+          "name": "commitment_statement",
+          "description": "Future commitment",
+          "type": "text",
+          "default": "We are committed to resolving this issue and preventing it from happening again."
+        }
+      ]
+    },
+    {
+      "id": "marketing-budget-allocation",
+      "type": "quick-reference",
+      "title": "Typical Marketing Budget Allocation",
+      "content": "Content Marketing: 25-30%. Paid Advertising: 20-25%. Events/Conferences: 15-20%. Technology/Tools: 10-15%. PR/Influencers: 10-15%. Team/Training: 10-15%. Testing/Innovation: 5-10%.",
+      "category": "budgeting",
+      "tags": ["budget", "allocation", "planning"],
+      "copyable": true
+    }
+  ]
+}

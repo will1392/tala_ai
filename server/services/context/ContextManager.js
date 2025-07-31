@@ -524,6 +524,127 @@ export class ContextManager {
   }
 
   /**
+   * Get context for a conversation
+   * @param {string} conversationId - Conversation ID
+   * @returns {Object} Context object
+   */
+  async getContext(conversationId) {
+    try {
+      // Retrieve context from database
+      const { data: contextData, error } = await this.supabase
+        .from('conversation_contexts')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+        throw error;
+      }
+      
+      if (!contextData) {
+        // Return empty context if none exists
+        return {
+          conversationId,
+          contextSummary: '',
+          keyEntities: {},
+          lastUpdated: null,
+          metadata: {}
+        };
+      }
+      
+      return {
+        conversationId,
+        contextSummary: contextData.context_summary || '',
+        keyEntities: contextData.key_entities || {},
+        lastUpdated: contextData.updated_at,
+        metadata: contextData.metadata || {}
+      };
+    } catch (error) {
+      console.error('Error getting context:', error);
+      // Return empty context on error
+      return {
+        conversationId,
+        contextSummary: '',
+        keyEntities: {},
+        lastUpdated: null,
+        metadata: {}
+      };
+    }
+  }
+  
+  /**
+   * Build context for a conversation request
+   * @param {Object} params - Context parameters
+   * @returns {Object} Built context with all necessary information
+   */
+  async buildContext(params) {
+    try {
+      const { 
+        conversationId, 
+        userId, 
+        message, 
+        conversationHistory = [],
+        metadata = {}
+      } = params;
+      
+      // Get context for the conversation
+      const contextData = await this.getContextForPrompt(
+        conversationId || 'default',
+        userId,
+        message
+      );
+      
+      // Build the context window from conversation history
+      const contextWindow = conversationHistory.slice(-10); // Last 10 messages
+      
+      // Get recent messages
+      const recentMessages = conversationHistory.slice(-5);
+      
+      // Build thread structure
+      const thread = {
+        messages: conversationHistory.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+          timestamp: msg.timestamp
+        }))
+      };
+      
+      // Build user profile
+      const userProfile = {
+        userId,
+        preferences: contextData.userProfile?.travelPreferences || { style: 'concise', detailed: false },
+        ...contextData.userProfile
+      };
+      
+      return {
+        contextWindow,
+        relevantMemories: contextData.relevantMemories || [],
+        thread,
+        recentMessages,
+        userProfile,
+        metadata: {
+          conversationId,
+          ...metadata
+        }
+      };
+    } catch (error) {
+      console.error('Error building context:', error);
+      // Return minimal context on error
+      return {
+        contextWindow: params.conversationHistory || [],
+        relevantMemories: [],
+        thread: { messages: [] },
+        recentMessages: [],
+        userProfile: {
+          userId: params.userId,
+          preferences: { style: 'concise', detailed: false }
+        },
+        metadata: params.metadata || {}
+      };
+    }
+  }
+  
+  /**
    * Get context for a conversation to include in LLM prompts
    * @param {string} conversationId - Conversation ID
    * @param {string} userId - User ID

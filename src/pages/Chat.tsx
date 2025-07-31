@@ -1,13 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { MessageSquare, Plus, AlertCircle, Loader2, Settings, Mic, ChevronDown } from 'lucide-react';
+import { MessageSquare, Plus, AlertCircle, Loader2, Settings, Mic, ChevronDown, BarChart3 } from 'lucide-react';
 import { GlassCard } from '../components/layout/GlassCard';
 import { Button } from '../components/shared/Button';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ConversationContextIndicator } from '../components/chat/ConversationContextIndicator';
+import { ConversationModeIndicator } from '../components/chat/ConversationModeIndicator';
+import { ModeSelector } from '../components/chat/ModeSelector';
 import { VoiceSettings } from '../components/chat/VoiceSettings';
+import { ConversationBreadcrumbs } from '../components/chat/ConversationBreadcrumbs';
+import { FollowUpSuggestions } from '../components/chat/FollowUpSuggestions';
+import { MarketingHealthDashboard } from '../components/chat/MarketingHealthDashboard';
 import { useConversationContext } from '../hooks/useConversationContext';
+import { useMode } from '../hooks/useMode';
+import { useModeAnnouncements } from '../hooks/useModeAnnouncements';
+import { useContextAwareMode } from '../hooks/useContextAwareMode';
+import { useConversationFlow } from '../hooks/useConversationFlow';
 import { cn } from '../utils/cn';
 import { speechService } from '../services/speechService';
 
@@ -19,17 +28,19 @@ interface Conversation {
   messageCount: number;
   userId: string;
   createdAt: string;
+  mode?: 'travel' | 'cmo';
+  subMode?: string | null;
 }
 
 
 // Simple chat service with conversation support
 const chatService = {
-  async sendMessage(content: string, conversationId?: string | null) {
-    const response = await fetch('http://localhost:3001/api/chat', {
+  async sendMessage(content: string, conversationId?: string | null, mode?: string, subMode?: string | null) {
+    const response = await fetch('http://localhost:3001/api/chat/v2', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': 'test_user_123' // TODO: Get from auth context
+        'x-user-id': 'admin-1' // Consistent with body userId
       },
       credentials: 'include',
       body: JSON.stringify({
@@ -37,7 +48,9 @@ const chatService = {
         userId: 'admin-1',
         isAdmin: true,
         maxResults: 5,
-        conversationId: conversationId
+        conversationId: conversationId,
+        mode: mode || 'travel',
+        subMode: subMode
       }),
     });
 
@@ -50,10 +63,15 @@ const chatService = {
 };
 
 export const Chat = () => {
+  const { mode, subMode } = useMode();
+  const { getAnnouncement, formatAnnouncementMessage } = useModeAnnouncements();
+  const { processMessageContext } = useContextAwareMode();
   const [messages, setMessages] = useState<any[]>([
     {
       id: 'welcome',
-      content: "Hello! I'm Tala, your AI travel assistant. I can help you with visa requirements, travel documents, airline policies, and destination information from your knowledge base. How can I assist you today?",
+      content: mode === 'cmo' 
+        ? "Hello! I'm Tala, your AI marketing assistant. I can help you with SEO, email marketing, social media, paid ads, and direct mail campaigns. How can I assist you today?"
+        : "Hello! I'm Tala, your AI travel assistant. I can help you with visa requirements, travel documents, airline policies, and destination information from your knowledge base. How can I assist you today?",
       sender: 'tala' as const,
       timestamp: new Date(),
     }
@@ -69,10 +87,15 @@ export const Chat = () => {
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [voiceLanguage, setVoiceLanguage] = useState('en-US');
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [marketingHealthData, setMarketingHealthData] = useState<any>(null);
+  const [showMarketingHealth, setShowMarketingHealth] = useState(false);
+  const [loadingHealth, setLoadingHealth] = useState(false);
   
   // Ref for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const previousModeRef = useRef<string>(mode);
+  const previousSubModeRef = useRef<string | null>(subMode);
   
   // Initialize conversation context
   const { context, processMessage, resetContext } = useConversationContext({
@@ -80,11 +103,75 @@ export const Chat = () => {
     userId: 'admin-1',
     conversationId: currentConversationId || 'default'
   });
+  
+  // Initialize conversation flow for CMO mode
+  const {
+    conversationState,
+    updateFromResponse,
+    navigateToBreadcrumb,
+    goBack,
+    processFollowUp,
+    clearConversation
+  } = useConversationFlow();
 
   // Load conversations on component mount
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // Function to load marketing health
+  const loadMarketingHealth = async () => {
+    setLoadingHealth(true);
+    try {
+      const response = await fetch(`http://localhost:3001/api/cmo/health?userId=admin-1`, {
+        headers: {
+          'x-user-id': 'admin-1'
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setMarketingHealthData(data.health);
+      }
+    } catch (err) {
+      console.error('Failed to load marketing health:', err);
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
+  // Check for marketing health queries
+  const checkForHealthQuery = (content: string) => {
+    const healthKeywords = ['marketing health', 'health assessment', 'performance overview', 'marketing performance', 'channel performance', 'marketing status'];
+    const lowerContent = content.toLowerCase();
+    return healthKeywords.some(keyword => lowerContent.includes(keyword));
+  };
+
+  // Handle mode changes
+  useEffect(() => {
+    // Check if mode actually changed
+    if (previousModeRef.current !== mode || previousSubModeRef.current !== subMode) {
+      const announcement = getAnnouncement(mode, subMode);
+      
+      if (announcement) {
+        // Add announcement message
+        const announcementMessage = {
+          id: `announcement_${Date.now()}`,
+          content: formatAnnouncementMessage(announcement),
+          sender: 'system' as const,
+          timestamp: new Date(),
+          isAnnouncement: true
+        };
+        
+        setMessages(prev => [...prev, announcementMessage]);
+      }
+      
+      // Update refs
+      previousModeRef.current = mode;
+      previousSubModeRef.current = subMode;
+    }
+  }, [mode, subMode, getAnnouncement, formatAnnouncementMessage]);
   
   // Load context status when conversation changes
   useEffect(() => {
@@ -115,7 +202,7 @@ export const Chat = () => {
       setLoadingConversations(true);
       const response = await fetch('http://localhost:3001/api/chat/conversations?userId=admin-1', {
         headers: {
-          'x-user-id': 'test_user_123' // TODO: Get from auth context
+          'x-user-id': 'admin-1' // Consistent with userId
         },
         credentials: 'include'
       });
@@ -137,7 +224,7 @@ export const Chat = () => {
       
       const response = await fetch(`http://localhost:3001/api/chat/history/${conversationId}?userId=admin-1`, {
         headers: {
-          'x-user-id': 'test_user_123' // TODO: Get from auth context
+          'x-user-id': 'admin-1' // Consistent with userId
         },
         credentials: 'include'
       });
@@ -166,7 +253,9 @@ export const Chat = () => {
     setMessages([
       {
         id: 'welcome_new',
-        content: "Hello! I'm Tala, your AI travel assistant. How can I help you today?",
+        content: mode === 'cmo' 
+          ? "Hello! I'm Tala, your AI marketing assistant. How can I help you with your marketing today?"
+          : "Hello! I'm Tala, your AI travel assistant. How can I help you today?",
         sender: 'tala' as const,
         timestamp: new Date(),
       }
@@ -187,7 +276,7 @@ export const Chat = () => {
         method: 'DELETE',
         headers: { 
           'Content-Type': 'application/json',
-          'x-user-id': 'test_user_123' // TODO: Get from auth context
+          'x-user-id': 'admin-1' // Consistent with userId
         },
         credentials: 'include',
         body: JSON.stringify({ userId: 'admin-1' })
@@ -221,6 +310,15 @@ export const Chat = () => {
         }
       }
       
+      // Process message for CMO context detection
+      if (mode === 'cmo') {
+        const contextResult = await processMessageContext(content);
+        if (contextResult?.enhancedResponse) {
+          // We'll use this enhanced response data later if needed
+          console.log('Context analysis:', contextResult);
+        }
+      }
+      
       // Add user message immediately
       const userMessage = {
         id: `user_${Date.now()}`,
@@ -232,8 +330,8 @@ export const Chat = () => {
       setMessages(prev => [...prev, userMessage]);
       setIsLoading(true);
 
-      // Call the real Tala AI API
-      const response = await chatService.sendMessage(content, currentConversationId);
+      // Call the real Tala AI API with mode information
+      const response = await chatService.sendMessage(content, currentConversationId, mode, subMode);
       
       // Update current conversation ID if this was a new conversation
       if (!currentConversationId && response.conversationId) {
@@ -241,17 +339,51 @@ export const Chat = () => {
       }
       
       // Add AI response with sources
+      // Handle different response structures from v2 endpoint
+      let responseContent = '';
+      
+      if (typeof response.response === 'string') {
+        responseContent = response.response;
+      } else if (response.response?.emailType) {
+        // Handle email extraction response format
+        const emailData = response.response;
+        if (emailData.actionItems?.length > 0) {
+          responseContent = `I found the following action items:\n${emailData.actionItems.join('\n')}`;
+        } else if (emailData.bookingDetails?.confirmationNumbers?.length > 0) {
+          responseContent = `I found booking information:\nConfirmation: ${emailData.bookingDetails.confirmationNumbers.join(', ')}`;
+        } else {
+          responseContent = "I'm processing your request. Please note that I'm currently in email processing mode. Try asking about travel documents, visa requirements, or flight bookings for better assistance.";
+        }
+      } else if (response.response?.message) {
+        responseContent = response.response.message;
+      } else {
+        responseContent = "I apologize, but I'm having trouble processing your request. Please try rephrasing or ask about travel-related topics.";
+      }
+      
+      // Update conversation flow if in CMO mode
+      if (mode === 'cmo' && response.conversation) {
+        updateFromResponse(response);
+      }
+      
+      // Check for marketing health queries in CMO mode
+      if (mode === 'cmo' && (checkForHealthQuery(content) || response.marketingHealth)) {
+        setShowMarketingHealth(true);
+        if (!marketingHealthData) {
+          await loadMarketingHealth();
+        }
+      }
+      
       const aiMessage = {
         id: `ai_${Date.now()}`,
-        content: response.response,
+        content: responseContent,
         sender: 'tala' as const,
-        timestamp: new Date(response.timestamp),
-        sources: response.sources.map((source: any) => ({
+        timestamp: new Date(),
+        sources: response.sources?.map((source: any) => ({
           title: source.title,
           type: source.type,
           score: source.score
-        })),
-        tokensUsed: response.tokensUsed,
+        })) || [],
+        tokensUsed: response.tokensUsed || 0,
         taskCreated: response.taskCreated
       };
       
@@ -296,7 +428,7 @@ export const Chat = () => {
         `http://localhost:3001/api/chat/context/status/${conversationId}?userId=admin-1`,
         {
           headers: {
-            'x-user-id': 'test_user_123' // TODO: Get from auth context
+            'x-user-id': 'admin-1' // Consistent with userId
           },
           credentials: 'include'
         }
@@ -319,7 +451,7 @@ export const Chat = () => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-user-id': 'test_user_123' // TODO: Get from auth context
+          'x-user-id': 'admin-1' // Consistent with userId
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -348,7 +480,7 @@ export const Chat = () => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-user-id': 'test_user_123' // TODO: Get from auth context
+          'x-user-id': 'admin-1' // Consistent with userId
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -372,12 +504,33 @@ export const Chat = () => {
     <div className="flex gap-4 h-[calc(100vh-6rem)]">
       {/* Main Chat Area - Full Screen */}
       <div className="flex-1 flex flex-col min-h-0">
-        {/* Chat Header - Minimal */}
-        <div className="glass-dark p-4 border-b border-white/10 rounded-t-xl">
+        {/* Chat Header - With Mode Selector */}
+        <div className="glass-dark p-4 border-b border-white/10 rounded-t-xl relative">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Chat with Tala</h2>
-              <p className="text-sm text-white/60">AI Travel Assistant</p>
+            <div className="flex items-center gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">Chat with Tala</h2>
+                <p className="text-sm text-white/60">
+                  {mode === 'cmo' ? 'AI Marketing Assistant' : 'AI Travel Assistant'}
+                </p>
+              </div>
+              <ModeSelector />
+              {mode === 'cmo' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowMarketingHealth(!showMarketingHealth);
+                    if (!marketingHealthData) {
+                      loadMarketingHealth();
+                    }
+                  }}
+                  className="gap-2"
+                >
+                  <BarChart3 size={16} />
+                  Marketing Health
+                </Button>
+              )}
             </div>
             {error && (
               <div className="flex items-center gap-2 text-red-400 text-sm">
@@ -389,6 +542,16 @@ export const Chat = () => {
               </div>
             )}
           </div>
+          
+          {/* Conversation Breadcrumbs for CMO mode */}
+          {mode === 'cmo' && conversationState.breadcrumbs.length > 0 && (
+            <ConversationBreadcrumbs
+              breadcrumbs={conversationState.breadcrumbs}
+              onNavigate={navigateToBreadcrumb}
+              onGoBack={goBack}
+              className="mt-3 pb-2"
+            />
+          )}
         </div>
 
         {/* Messages Area - Full Height */}
@@ -413,6 +576,44 @@ export const Chat = () => {
             <div className="flex items-center gap-2 text-white/50 text-sm">
               <Loader2 size={16} className="animate-spin" />
               <span>Tala is searching knowledge base...</span>
+            </div>
+          )}
+          
+          {/* Marketing Health Dashboard for CMO mode */}
+          {mode === 'cmo' && showMarketingHealth && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mb-6"
+            >
+              <MarketingHealthDashboard
+                healthData={marketingHealthData}
+                isLoading={loadingHealth}
+                onChannelClick={(channel) => {
+                  handleSendMessage(`Tell me more about my ${channel} performance`);
+                }}
+                onRecommendationClick={(recommendation) => {
+                  handleSendMessage(`Help me with: ${recommendation.title}`);
+                }}
+                className="max-w-4xl mx-auto"
+              />
+            </motion.div>
+          )}
+          
+          {/* Follow-up suggestions for CMO mode */}
+          {mode === 'cmo' && conversationState.followUpSuggestions.length > 0 && !isLoading && (
+            <div className="mt-6 mb-4">
+              <FollowUpSuggestions
+                suggestions={conversationState.followUpSuggestions}
+                onSelect={async (suggestion) => {
+                  const response = await processFollowUp(suggestion);
+                  if (response) {
+                    handleSendMessage(suggestion.text);
+                  }
+                }}
+                isLoading={isLoading}
+              />
             </div>
           )}
           
@@ -476,7 +677,16 @@ export const Chat = () => {
                     }`}
                     onClick={() => loadConversation(conversation.id)}
                   >
-                    <div className="font-medium truncate pr-6">{conversation.title}</div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="font-medium truncate flex-1 pr-6">{conversation.title}</div>
+                      {conversation.mode && (
+                        <ConversationModeIndicator 
+                          mode={conversation.mode} 
+                          subMode={conversation.subMode}
+                          size="sm"
+                        />
+                      )}
+                    </div>
                     <div className="text-xs text-white/50 mt-1 truncate">
                       {conversation.lastMessage}
                     </div>

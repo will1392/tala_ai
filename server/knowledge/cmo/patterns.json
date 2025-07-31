@@ -1,0 +1,144 @@
+{
+  "seo": {
+    "keywords": [
+      "seo", "search engine", "google", "ranking", "serp", "organic",
+      "keyword", "backlink", "link building", "page rank", "crawl",
+      "index", "sitemap", "robots.txt", "canonical", "redirect",
+      "meta tag", "title tag", "h1", "alt text", "schema markup"
+    ],
+    "phrases": [
+      "search engine optimization", "on-page seo", "off-page seo",
+      "technical seo", "local seo", "keyword research", "content optimization",
+      "site speed", "mobile optimization", "core web vitals",
+      "domain authority", "page authority", "search visibility",
+      "organic traffic", "keyword density", "long tail keywords",
+      "meta description", "url structure", "internal linking"
+    ],
+    "entities": [
+      "google", "bing", "yahoo", "duckduckgo", "ahrefs", "semrush",
+      "moz", "screaming frog", "google search console", "google analytics"
+    ],
+    "actions": [
+      "rank", "optimize", "index", "crawl", "audit", "research",
+      "analyze", "improve", "target", "track"
+    ],
+    "metrics": [
+      "rankings", "traffic", "impressions", "clicks", "ctr",
+      "bounce rate", "dwell time", "page speed", "domain rating"
+    ]
+  },
+  "email": {
+    "keywords": [
+      "email", "newsletter", "campaign", "subscriber", "list",
+      "automation", "drip", "broadcast", "segment", "personalization",
+      "template", "esp", "smtp", "bounce", "unsubscribe",
+      "opt-in", "double opt-in", "spam", "deliverability"
+    ],
+    "phrases": [
+      "email marketing", "email campaign", "open rate", "click rate",
+      "click through rate", "conversion rate", "subject line",
+      "call to action", "email list", "list building", "email design",
+      "responsive email", "a/b testing", "email automation",
+      "welcome series", "abandoned cart", "re-engagement campaign",
+      "email segmentation", "email personalization", "sender reputation"
+    ],
+    "entities": [
+      "mailchimp", "constant contact", "klaviyo", "sendgrid",
+      "mailgun", "convertkit", "activecampaign", "hubspot",
+      "salesforce", "marketo", "brevo", "sendinblue"
+    ],
+    "actions": [
+      "send", "schedule", "segment", "personalize", "automate",
+      "test", "design", "track", "analyze", "optimize"
+    ],
+    "metrics": [
+      "open rate", "click rate", "bounce rate", "unsubscribe rate",
+      "list growth", "roi", "revenue per email", "list quality"
+    ]
+  },
+  "social": {
+    "keywords": [
+      "social media", "post", "share", "like", "comment", "follow",
+      "engagement", "reach", "impression", "hashtag", "mention",
+      "story", "reel", "video", "live", "influencer", "viral",
+      "trending", "algorithm", "feed", "profile", "bio"
+    ],
+    "phrases": [
+      "social media marketing", "content calendar", "social listening",
+      "community management", "user generated content", "social proof",
+      "brand awareness", "social media strategy", "paid social",
+      "organic social", "social media analytics", "engagement rate",
+      "follower growth", "social media advertising", "influencer marketing",
+      "social media roi", "content curation", "social media trends"
+    ],
+    "entities": [
+      "facebook", "instagram", "twitter", "x", "linkedin", "tiktok",
+      "youtube", "pinterest", "snapchat", "reddit", "threads",
+      "hootsuite", "buffer", "sprout social", "later", "canva"
+    ],
+    "actions": [
+      "post", "share", "engage", "schedule", "monitor", "respond",
+      "create", "curate", "analyze", "grow"
+    ],
+    "metrics": [
+      "followers", "engagement rate", "reach", "impressions",
+      "shares", "comments", "likes", "saves", "clicks", "conversions"
+    ]
+  },
+  "directMail": {
+    "keywords": [
+      "direct mail", "postcard", "letter", "flyer", "brochure",
+      "catalog", "mail piece", "postal", "usps", "address",
+      "mailing list", "print", "design", "paper", "envelope",
+      "qr code", "purl", "response rate", "mail merge"
+    ],
+    "phrases": [
+      "direct mail campaign", "direct mail marketing", "postal marketing",
+      "print marketing", "physical mail", "mail design", "variable data printing",
+      "every door direct mail", "targeted mailing", "mail tracking",
+      "response tracking", "cost per piece", "mail house", "list hygiene",
+      "ncoa update", "cass certification", "postal regulations"
+    ],
+    "entities": [
+      "usps", "fedex", "ups", "vistaprint", "moo", "printful",
+      "click2mail", "lob", "postgrid", "postalytics"
+    ],
+    "actions": [
+      "mail", "print", "design", "target", "track", "measure",
+      "personalize", "segment", "test", "fulfill"
+    ],
+    "metrics": [
+      "response rate", "cost per acquisition", "roi", "delivery rate",
+      "mail volume", "cost per piece", "conversion rate"
+    ]
+  },
+  "ads": {
+    "keywords": [
+      "ads", "advertising", "ppc", "cpc", "cpm", "cpa", "roas",
+      "ad copy", "creative", "landing page", "conversion", "bid",
+      "budget", "campaign", "ad group", "keyword", "audience",
+      "targeting", "retargeting", "remarketing", "display", "video"
+    ],
+    "phrases": [
+      "paid advertising", "pay per click", "cost per click",
+      "cost per acquisition", "return on ad spend", "quality score",
+      "ad rank", "impression share", "click through rate",
+      "conversion tracking", "attribution model", "lookalike audience",
+      "custom audience", "negative keywords", "ad extensions",
+      "responsive ads", "dynamic ads", "shopping ads", "search ads"
+    ],
+    "entities": [
+      "google ads", "facebook ads", "instagram ads", "linkedin ads",
+      "twitter ads", "tiktok ads", "amazon ads", "microsoft ads",
+      "youtube ads", "pinterest ads", "snapchat ads"
+    ],
+    "actions": [
+      "bid", "target", "optimize", "test", "track", "convert",
+      "retarget", "scale", "pause", "launch"
+    ],
+    "metrics": [
+      "cpc", "cpm", "ctr", "cpa", "roas", "impressions", "clicks",
+      "conversions", "quality score", "ad spend", "revenue"
+    ]
+  }
+}

@@ -1,14 +1,1 @@
-{
-  "analyze-document:email-monitor": {
-    "attempts": 10,
-    "successes": 10,
-    "averageTime": 0,
-    "satisfactionScores": []
-  },
-  "booking-search:email-monitor": {
-    "attempts": 1,
-    "successes": 1,
-    "averageTime": 0,
-    "satisfactionScores": []
-  }
-}
+{}

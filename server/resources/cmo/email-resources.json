@@ -1,0 +1,209 @@
+{
+  "resources": [
+    {
+      "id": "email-subject-line-stats",
+      "type": "quick-reference",
+      "title": "Subject Line Statistics",
+      "content": "Optimal length: 30-50 characters. Mobile cutoff: 35 characters. Personalized subjects: 26% higher open rates. Emojis can increase opens by 56% (test with audience).",
+      "category": "key-stats",
+      "tags": ["subject", "statistics", "open-rates"],
+      "copyable": true,
+      "priority": "high"
+    },
+    {
+      "id": "email-spam-triggers",
+      "type": "quick-reference",
+      "title": "Common Spam Trigger Words",
+      "content": "Avoid: FREE, GUARANTEE, NO OBLIGATION, ACT NOW, LIMITED TIME, CLICK HERE, BUY NOW, SAVE $$$, 100% SATISFIED. Use sparingly: Discount, Deal, Offer, Sale.",
+      "category": "spam-prevention",
+      "tags": ["spam", "deliverability", "words"],
+      "copyable": true,
+      "link": "https://www.example.com/spam-words-list"
+    },
+    {
+      "id": "email-best-send-times",
+      "type": "quick-reference",
+      "title": "Best Email Send Times",
+      "content": "Tuesday-Thursday: Highest engagement. Best times: 10 AM, 2 PM, 8 PM (recipient's timezone). Avoid: Monday mornings, Friday afternoons.",
+      "category": "timing",
+      "tags": ["send-time", "engagement", "scheduling"],
+      "copyable": true
+    },
+    {
+      "id": "email-welcome-series-example",
+      "type": "example",
+      "title": "High-Converting Welcome Email",
+      "description": "Welcome email that achieved 68% open rate and 12% conversion",
+      "content": "Subject: Welcome to [Brand]! Here's your exclusive 20% off 🎉\n\nHi {{first_name}},\n\nWe're thrilled to have you join our community of [number] happy customers!\n\nAs promised, here's your exclusive welcome discount:\n🎁 Code: WELCOME20 (20% off your first order)\n\nWhat makes us different:\n✓ [Unique value prop 1]\n✓ [Unique value prop 2]\n✓ [Unique value prop 3]\n\n[CTA Button: Shop Now & Save 20%]\n\nQuestions? Just reply to this email - we read every message!\n\nWarmly,\n[Founder name]\nFounder, [Brand]",
+      "category": "welcome",
+      "tags": ["welcome", "onboarding", "conversion"],
+      "metrics": {
+        "performance": "92",
+        "engagement": "68",
+        "conversion": "12"
+      },
+      "industry": "E-commerce",
+      "difficulty": "beginner"
+    },
+    {
+      "id": "email-re-engagement-template",
+      "type": "template",
+      "title": "Win-Back Campaign Template",
+      "description": "Re-engage inactive subscribers",
+      "content": "Subject: We miss you, {{first_name}} 💔 ({{incentive}} inside)\n\nHi {{first_name}},\n\nIt's been {{time_period}} since we've seen you, and we want to make sure everything's okay.\n\nWe've been busy making improvements:\n{{improvement_1}}\n{{improvement_2}}\n{{improvement_3}}\n\nTo welcome you back, here's {{incentive}}:\n[Use code: {{discount_code}}]\n\n[CTA: {{cta_text}}]\n\nNot interested anymore? No hard feelings - you can [unsubscribe here].\n\n{{signature}}",
+      "category": "re-engagement",
+      "tags": ["winback", "retention", "inactive"],
+      "variables": [
+        {
+          "name": "time_period",
+          "description": "How long they've been inactive",
+          "type": "select",
+          "options": ["3 months", "6 months", "a while", "too long"],
+          "default": "3 months"
+        },
+        {
+          "name": "incentive",
+          "description": "What you're offering",
+          "type": "text",
+          "default": "25% off your next order"
+        },
+        {
+          "name": "discount_code",
+          "description": "Discount code",
+          "type": "text",
+          "default": "COMEBACK25"
+        },
+        {
+          "name": "cta_text",
+          "description": "Call-to-action button text",
+          "type": "text",
+          "default": "Come Back & Save 25%"
+        }
+      ],
+      "usage": 89
+    },
+    {
+      "id": "email-campaign-checklist",
+      "type": "checklist",
+      "title": "Email Campaign Pre-Send Checklist",
+      "description": "Essential checks before hitting send",
+      "category": "quality-assurance",
+      "priority": "high",
+      "estimatedTime": "15 min",
+      "tags": ["checklist", "qa", "campaign"],
+      "items": [
+        {
+          "id": "check-subject",
+          "text": "Subject line optimized (30-50 chars, no spam words)",
+          "required": true,
+          "tips": [
+            "Test with subject line tester tool",
+            "A/B test 2-3 variations",
+            "Include personalization if possible"
+          ]
+        },
+        {
+          "id": "check-preview",
+          "text": "Preview text compelling and complete",
+          "required": true,
+          "description": "Shows after subject line in inbox"
+        },
+        {
+          "id": "check-from",
+          "text": "From name and email recognizable",
+          "required": true,
+          "tips": [
+            "Use person's name for higher open rates",
+            "Ensure reply-to address is monitored"
+          ]
+        },
+        {
+          "id": "check-mobile",
+          "text": "Tested on mobile devices",
+          "required": true,
+          "description": "60% of emails opened on mobile"
+        },
+        {
+          "id": "check-links",
+          "text": "All links tested and tracked",
+          "required": true,
+          "tips": [
+            "Test every CTA button",
+            "Ensure UTM parameters are added",
+            "Check unsubscribe link works"
+          ]
+        },
+        {
+          "id": "check-images",
+          "text": "Images have alt text",
+          "required": false,
+          "description": "Important for when images are blocked"
+        },
+        {
+          "id": "check-segment",
+          "text": "Sending to correct segment",
+          "required": true,
+          "tips": [
+            "Double-check segment criteria",
+            "Verify list size makes sense",
+            "Exclude recent recipients if needed"
+          ]
+        },
+        {
+          "id": "check-personalization",
+          "text": "Personalization tokens tested",
+          "required": false,
+          "description": "Send test email to verify merge tags work"
+        }
+      ]
+    },
+    {
+      "id": "email-power-words",
+      "type": "quick-reference",
+      "title": "Email Power Words",
+      "content": "Urgency: Limited, Ending, Last chance, Today only. Exclusivity: Exclusive, VIP, Members only, Invitation. Value: Save, Free, Bonus, Gift. Action: Discover, Unlock, Get, Claim.",
+      "category": "copywriting",
+      "tags": ["power-words", "copywriting", "conversion"],
+      "copyable": true
+    },
+    {
+      "id": "email-abandoned-cart-series",
+      "type": "example",
+      "title": "3-Email Abandoned Cart Series",
+      "description": "Series that recovers 35% of abandoned carts",
+      "content": "EMAIL 1 (2 hours after):\nSubject: You left something behind...\nReminder of items + easy checkout link\n\nEMAIL 2 (24 hours after):\nSubject: Still thinking about it? (10% off inside)\nUrgency + small discount\n\nEMAIL 3 (72 hours after):\nSubject: Last chance - your cart expires soon\nFinal urgency + social proof",
+      "category": "automation",
+      "tags": ["abandoned-cart", "ecommerce", "series"],
+      "metrics": {
+        "performance": "88",
+        "engagement": "45",
+        "conversion": "35"
+      },
+      "industry": "E-commerce",
+      "difficulty": "intermediate"
+    },
+    {
+      "id": "email-newsletter-template",
+      "type": "template",
+      "title": "Engaging Newsletter Template",
+      "description": "Weekly newsletter format that drives engagement",
+      "content": "Subject: {{newsletter_title}} - {{date}}\n\n{{hero_section}}\n\n📰 This Week's Highlights:\n1. {{highlight_1}}\n2. {{highlight_2}}\n3. {{highlight_3}}\n\n💡 Featured Article:\n{{article_title}}\n{{article_preview}}\n[Read More →]\n\n🎯 Quick Tips:\n• {{tip_1}}\n• {{tip_2}}\n• {{tip_3}}\n\n📅 Upcoming:\n{{upcoming_content}}\n\n{{cta_section}}\n\n{{footer}}",
+      "category": "newsletter",
+      "tags": ["newsletter", "content", "weekly"],
+      "variables": [
+        {
+          "name": "newsletter_title",
+          "description": "Newsletter name/title",
+          "type": "text",
+          "default": "Weekly Insights"
+        },
+        {
+          "name": "hero_section",
+          "description": "Opening message",
+          "type": "text",
+          "default": "Your weekly dose of industry insights and updates"
+        }
+      ]
+    }
+  ]
+}

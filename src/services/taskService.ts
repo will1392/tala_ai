@@ -34,7 +34,7 @@ export interface CreateTaskInput {
 class TaskService {
   private headers = {
     'Content-Type': 'application/json',
-    'x-user-id': 'test_user_123' // TODO: Get from auth context
+    'x-user-id': 'admin-1' // TODO: Get from auth context
   };
 
   async getTasks(filters?: {

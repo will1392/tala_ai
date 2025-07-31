@@ -212,7 +212,10 @@ class TokenStorageServiceTemp {
 
             return {
                 success: true,
-                tokens: integration.tokens,
+                tokens: {
+                    ...integration.tokens,
+                    email: integration.email // Include email in tokens
+                },
                 needsRefresh,
                 integrationId: integration.id
             };
