@@ -148,6 +148,74 @@ router.post('/v2', authenticate, async (req, res) => {
             openaiClient: openai
           });
           
+          // Save the conversation messages to ThreadingService
+          let finalConversationId = conversationId;
+          
+          try {
+            // Create thread if needed
+            if (!conversationId) {
+              const newThread = await intelligence.threadingService.createThread({
+                userId: req.userId,
+                organizationId: req.organizationId,
+                title: `Travel Query: ${message.substring(0, 50)}...`,
+                metadata: {
+                  mode: 'travel',
+                  source: 'chat'
+                }
+              });
+              finalConversationId = newThread.id;
+              console.log('📝 Created new thread:', finalConversationId);
+            } else {
+              // Ensure thread exists
+              try {
+                await intelligence.threadingService.getThread(conversationId);
+              } catch (err) {
+                // Thread doesn't exist, create it
+                const newThread = await intelligence.threadingService.createThread({
+                  id: conversationId,
+                  userId: req.userId,
+                  organizationId: req.organizationId,
+                  title: `Travel Query: ${message.substring(0, 50)}...`,
+                  metadata: {
+                    mode: 'travel',
+                    source: 'chat'
+                  }
+                });
+                finalConversationId = newThread.id;
+                console.log('📝 Created thread for existing ID:', finalConversationId);
+              }
+            }
+            
+            // Save user message
+            await intelligence.threadingService.addMessage(finalConversationId, {
+              role: 'user',
+              content: message,
+              timestamp: new Date(),
+              metadata: {
+                userId: req.userId,
+                mode: 'travel'
+              }
+            });
+            
+            // Save assistant response
+            await intelligence.threadingService.addMessage(finalConversationId, {
+              role: 'assistant',
+              content: response,
+              timestamp: new Date(),
+              model_used: 'gpt-4o-mini',
+              provider: 'openai',
+              metadata: {
+                sourcesUsed: sourcesUsed?.length || 0,
+                mode: 'travel'
+              }
+            });
+            
+            console.log('💾 Saved conversation messages to ThreadingService');
+          } catch (saveError) {
+            console.error('⚠️ Failed to save messages to ThreadingService:', saveError.message);
+            // Continue - don't fail the response just because saving failed
+          }
+          
           // Return in the expected format
           return res.json({
             success: true,
@@ -158,7 +226,7 @@ router.post('/v2', authenticate, async (req, res) => {
               score: source.score,
               sectionsUsed: source.sectionsUsed
             })),
-            conversationId: conversationId || req.userId + '_' + Date.now(),
+            conversationId: finalConversationId,
             metadata: {
               model: 'gpt-4o-mini',
               mode: 'travel',
@@ -170,11 +238,68 @@ router.post('/v2', authenticate, async (req, res) => {
           });
         } else {
           // No results found
+          let finalConversationId = conversationId;
+          const noResultsResponse = "I couldn't find specific information about that destination in my travel guides. Could you please be more specific about what you'd like to know?";
+          
+          // Save messages even when no results found
+          try {
+            // Create thread if needed
+            if (!conversationId) {
+              const newThread = await intelligence.threadingService.createThread({
+                userId: req.userId,
+                organizationId: req.organizationId,
+                title: `Travel Query: ${message.substring(0, 50)}...`,
+                metadata: {
+                  mode: 'travel',
+                  source: 'chat'
+                }
+              });
+              finalConversationId = newThread.id;
+            } else {
+              // Ensure thread exists
+              try {
+                await intelligence.threadingService.getThread(conversationId);
+              } catch (err) {
+                const newThread = await intelligence.threadingService.createThread({
+                  id: conversationId,
+                  userId: req.userId,
+                  organizationId: req.organizationId,
+                  title: `Travel Query: ${message.substring(0, 50)}...`,
+                  metadata: {
+                    mode: 'travel',
+                    source: 'chat'
+                  }
+                });
+                finalConversationId = newThread.id;
+              }
+            }
+            
+            await intelligence.threadingService.addMessage(finalConversationId, {
+              role: 'user',
+              content: message,
+              timestamp: new Date(),
+              metadata: { userId: req.userId, mode: 'travel' }
+            });
+            
+            await intelligence.threadingService.addMessage(finalConversationId, {
+              role: 'assistant',
+              content: noResultsResponse,
+              timestamp: new Date(),
+              model_used: 'gpt-4o-mini',
+              provider: 'openai',
+              metadata: { mode: 'travel' }
+            });
+            
+            console.log('💾 Saved no-results conversation to ThreadingService');
+          } catch (saveError) {
+            console.error('⚠️ Failed to save no-results messages:', saveError.message);
+          }
+          
           return res.json({
             success: true,
-            response: "I couldn't find specific information about that destination in my travel guides. Could you please be more specific about what you'd like to know?",
+            response: noResultsResponse,
             sources: [],
-            conversationId: conversationId || req.userId + '_' + Date.now()
+            conversationId: finalConversationId
           });
         }
       } catch (simpleError) {
