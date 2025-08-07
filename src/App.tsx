@@ -9,6 +9,8 @@ import { ModernDashboard } from './pages/ModernDashboard';
 import { PremiumDashboard } from './pages/PremiumDashboard';
 import { Knowledge } from './pages/Knowledge';
 import { Chat } from './pages/Chat';
+import { PremiumChat } from './pages/PremiumChat';
+import { ClaudeStyleChat } from './pages/ClaudeStyleChat';
 import { Email } from './pages/Email';
 import { Settings } from './pages/Settings';
 import CMOModeFull from './pages/CMOModeFull';
@@ -53,6 +55,7 @@ function App() {
               <Route path="/dashboard" element={<PremiumDashboard />} />
               <Route path="/" element={<PremiumLayout />}>
                 <Route path="chat" element={<Chat />} />
+                <Route path="chat-claude" element={<ClaudeStyleChat />} />
                 <Route path="email" element={<Email />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="knowledge" element={<Knowledge />} />

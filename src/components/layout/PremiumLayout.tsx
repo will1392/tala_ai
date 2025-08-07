@@ -21,6 +21,7 @@ import {
   Bell
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { GlobalSearch } from './GlobalSearch';
 
 // UI Components
 const Input = ({ className = '', ...props }: { className?: string; [key: string]: any }) => (
@@ -127,6 +128,7 @@ interface SidebarItem {
     title: string;
     id: string;
     badge?: string;
+    path?: string;
   }[];
 }
 
@@ -153,7 +155,10 @@ const sidebarItems: SidebarItem[] = [
     icon: <MessageSquare className="h-5 w-5" />,
     id: "chat",
     isExternal: true,
-    path: "/chat"
+    items: [
+      { title: "Classic Chat", id: "chat-classic", path: "/chat" },
+      { title: "Claude Style", id: "chat-claude", path: "/chat-claude" },
+    ],
   },
   {
     title: "Email",
@@ -251,13 +256,17 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
                       <button
                         key={subItem.id}
                         onClick={() => {
-                          if (onNavigate) {
+                          if (subItem.path) {
+                            navigate(subItem.path);
+                            onClose?.();
+                          } else if (onNavigate) {
                             onNavigate(`${item.id}-${subItem.id}`);
                             onClose?.();
                           }
                         }}
                         className={cn(
                           "flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm",
+                          subItem.path === location.pathname ? "bg-primary/10 text-primary" : 
                           activeTab === `${item.id}-${subItem.id}` ? "bg-primary/10 text-primary" : "hover:bg-muted"
                         )}
                       >
@@ -418,6 +427,7 @@ export const PremiumLayout = () => {
           <div className="flex flex-1 items-center justify-between">
             <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
             <div className="flex items-center gap-3">
+              <GlobalSearch />
               <Button variant="ghost" size="icon" className="rounded-2xl relative">
                 <Bell className="h-5 w-5" />
                 {notifications > 0 && (
