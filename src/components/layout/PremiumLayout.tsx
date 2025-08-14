@@ -18,10 +18,13 @@ import {
   X,
   Search,
   Wand2,
-  Bell
+  Bell,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { GlobalSearch } from './GlobalSearch';
+import { useTheme } from '../../context/ThemeContextNew';
 
 // UI Components
 const Input = ({ className = '', ...props }: { className?: string; [key: string]: any }) => (
@@ -72,6 +75,22 @@ const Button = ({
       {...props}
     >
       {children}
+    </button>
+  );
+};
+
+// Theme Toggle Component
+const ThemeToggle = () => {
+  const { theme, toggle } = useTheme();
+  
+  return (
+    <button
+      aria-label="Toggle theme"
+      onClick={toggle}
+      className="rounded-xl border border-gray-200 dark:border-gray-700 p-2 hover:border-primary/60 focus:ring-2 focus:ring-primary/50 transition-colors"
+      title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
 };
@@ -143,11 +162,10 @@ const sidebarItems: SidebarItem[] = [
     title: "Tasks",
     icon: <CheckSquare className="h-5 w-5" />,
     id: "tasks",
-    badge: "24",
     items: [
-      { title: "My Tasks", id: "my-tasks", badge: "12" },
-      { title: "Team Tasks", id: "team-tasks", badge: "8" },
-      { title: "Completed", id: "completed", badge: "4" },
+      { title: "My Tasks", id: "my-tasks" },
+      { title: "Team Tasks", id: "team-tasks" },
+      { title: "Completed", id: "completed" },
     ],
   },
   {
@@ -155,10 +173,14 @@ const sidebarItems: SidebarItem[] = [
     icon: <MessageSquare className="h-5 w-5" />,
     id: "chat",
     isExternal: true,
-    items: [
-      { title: "Classic Chat", id: "chat-classic", path: "/chat" },
-      { title: "Claude Style", id: "chat-claude", path: "/chat-claude" },
-    ],
+    path: "/chat"
+  },
+  {
+    title: "Marketing",
+    icon: <Target className="h-5 w-5" />,
+    id: "marketing",
+    isExternal: true,
+    path: "/marketing"
   },
   {
     title: "Email",
@@ -428,6 +450,7 @@ export const PremiumLayout = () => {
             <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
             <div className="flex items-center gap-3">
               <GlobalSearch />
+              <ThemeToggle />
               <Button variant="ghost" size="icon" className="rounded-2xl relative">
                 <Bell className="h-5 w-5" />
                 {notifications > 0 && (

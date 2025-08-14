@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom"
 import { UserProfileOnboarding, type UserProfile } from "../components/onboarding/UserProfileOnboarding"
 import { ExpertiseOnboarding, type ExpertiseProfile } from "../components/cmo/onboarding/ExpertiseOnboarding"
 import { OnboardingComplete } from "../components/onboarding/OnboardingComplete"
+import { GlobalSearch } from "../components/layout/GlobalSearch"
 import {
   Award,
   Bell,
@@ -306,12 +307,13 @@ const sidebarItems: SidebarItem[] = [
     title: "Tasks",
     icon: <CheckSquare />,
     id: "tasks",
-    badge: "24",
-    items: [
-      { title: "My Tasks", id: "my-tasks", badge: "12" },
-      { title: "Team Tasks", id: "team-tasks", badge: "8" },
-      { title: "Completed", id: "completed", badge: "4" },
-    ],
+    badge: "20",
+  },
+  {
+    title: "Completed Tasks",
+    icon: <CheckCircle />,
+    id: "completed",
+    badge: "4",
   },
   {
     title: "Chat",
@@ -319,6 +321,13 @@ const sidebarItems: SidebarItem[] = [
     id: "chat",
     isExternal: true,
     path: "/chat"
+  },
+  {
+    title: "Marketing",
+    icon: <Target />,
+    id: "marketing",
+    isExternal: true,
+    path: "/marketing"
   },
   {
     title: "Email",
@@ -340,7 +349,6 @@ export function PremiumDashboard() {
   const [progress, setProgress] = useState(0)
   const [notifications, setNotifications] = useState(5)
   const [activeTab, setActiveTab] = useState("home")
-  const [activeSidebarItem, setActiveSidebarItem] = useState("home")
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
@@ -496,8 +504,8 @@ export function PremiumDashboard() {
         <SidebarContent
           expandedItems={expandedItems}
           toggleExpanded={toggleExpanded}
-          activeTab={activeSidebarItem}
-          setActiveTab={setActiveSidebarItem}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
           userProfile={userProfile}
           onClose={() => setMobileMenuOpen(false)}
         />
@@ -513,8 +521,8 @@ export function PremiumDashboard() {
         <SidebarContent
           expandedItems={expandedItems}
           toggleExpanded={toggleExpanded}
-          activeTab={activeSidebarItem}
-          setActiveTab={setActiveSidebarItem}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
           userProfile={userProfile}
         />
       </div>
@@ -531,6 +539,7 @@ export function PremiumDashboard() {
           <div className="flex flex-1 items-center justify-between">
             <h1 className="text-xl font-semibold">Tala Marketing Suite</h1>
             <div className="flex items-center gap-3">
+              <GlobalSearch />
               <Button variant="ghost" size="icon" className="rounded-2xl relative">
                 <Bell className="h-5 w-5" />
                 {notifications > 0 && (
@@ -550,17 +559,33 @@ export function PremiumDashboard() {
         <main className="flex-1 p-4 md:p-6">
           <Tabs defaultValue="home" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <TabsList className="grid w-full max-w-[400px] grid-cols-3 rounded-2xl p-1">
-                <TabsTrigger value="home" className="rounded-xl data-[state=active]:rounded-xl">
-                  Overview
-                </TabsTrigger>
-                <TabsTrigger value="analytics" className="rounded-xl data-[state=active]:rounded-xl">
-                  Analytics
-                </TabsTrigger>
-                <TabsTrigger value="tasks" className="rounded-xl data-[state=active]:rounded-xl">
-                  Tasks
-                </TabsTrigger>
-              </TabsList>
+              {activeTab === "completed" ? (
+                // Show back button when viewing completed tasks
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="outline"
+                    className="rounded-2xl"
+                    onClick={() => setActiveTab("tasks")}
+                  >
+                    <ArrowUpDown className="mr-2 h-4 w-4 rotate-90" />
+                    Back to Tasks
+                  </Button>
+                  <h2 className="text-xl font-semibold">Completed Tasks</h2>
+                </div>
+              ) : (
+                // Show regular tabs for other views
+                <TabsList className="grid w-full max-w-[400px] grid-cols-3 rounded-2xl p-1">
+                  <TabsTrigger value="home" className="rounded-xl data-[state=active]:rounded-xl">
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="analytics" className="rounded-xl data-[state=active]:rounded-xl">
+                    Analytics
+                  </TabsTrigger>
+                  <TabsTrigger value="tasks" className="rounded-xl data-[state=active]:rounded-xl">
+                    Tasks
+                  </TabsTrigger>
+                </TabsList>
+              )}
               <div className="hidden md:flex gap-2">
                 <Button variant="outline" className="rounded-2xl">
                   <Download className="mr-2 h-4 w-4" />
@@ -595,6 +620,10 @@ export function PremiumDashboard() {
 
                 <TabsContent value="tasks" className="space-y-8 mt-0">
                   <TasksTabContent />
+                </TabsContent>
+
+                <TabsContent value="completed" className="space-y-8 mt-0">
+                  <CompletedTasksContent />
                 </TabsContent>
               </motion.div>
             </AnimatePresence>
@@ -650,6 +679,8 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, setActiveTab
                   navigate(item.path)
                 } else if (item.items) {
                   toggleExpanded(item.id)
+                  // Also set the active tab when clicking parent items with subitems
+                  setActiveTab(item.id)
                 } else {
                   setActiveTab(item.id)
                   onClose?.()
@@ -1064,10 +1095,10 @@ const TasksTabContent = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card className="rounded-3xl hover:border-primary/20 transition-all cursor-pointer">
+            <Card className="rounded-3xl hover:border-primary/20 transition-all">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2 flex-1">
                     <h3 className="font-semibold text-lg">{task.title}</h3>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
@@ -1080,17 +1111,26 @@ const TasksTabContent = () => {
                       </span>
                     </div>
                   </div>
-                  <Badge 
-                    variant={task.priority === "high" ? "destructive" : task.priority === "medium" ? "secondary" : "outline"}
-                    className="rounded-xl"
-                  >
-                    {task.priority}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant={task.priority === "high" ? "destructive" : task.priority === "medium" ? "secondary" : "outline"}
+                      className="rounded-xl"
+                    >
+                      {task.priority}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-xl h-8 w-8"
+                    >
+                      <MoreHorizontal size={16} />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span>Progress</span>
-                    <span>{task.progress}%</span>
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium">{task.progress}%</span>
                   </div>
                   <Progress value={task.progress} className="h-2 rounded-full" />
                 </div>
@@ -1160,6 +1200,78 @@ const AnalyticsTabContent = () => {
                         <span className="text-sm text-muted-foreground">{metric.split(' ').slice(1).join(' ')}</span>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
+// Completed Tasks Tab Content
+const CompletedTasksContent = () => {
+  const completedTasks = [
+    { id: 1, title: "Q2 Marketing Report", completedDate: "2024-06-30", completedBy: "John D." },
+    { id: 2, title: "Email Campaign Launch", completedDate: "2024-06-28", completedBy: "Sarah M." },
+    { id: 3, title: "Website Redesign", completedDate: "2024-06-25", completedBy: "Mike R." },
+    { id: 4, title: "SEO Optimization", completedDate: "2024-06-20", completedBy: "Lisa K." },
+  ]
+
+  return (
+    <>
+      <section>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 p-8 text-white"
+        >
+          <div className="space-y-4">
+            <h2 className="text-3xl font-bold">Completed Tasks</h2>
+            <p className="max-w-[600px] text-white/80">
+              Review and archive your completed marketing tasks
+            </p>
+          </div>
+        </motion.div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold">Recently Completed</h2>
+          <Button variant="outline" className="rounded-2xl">
+            <Archive className="mr-2 h-4 w-4" />
+            Archive All
+          </Button>
+        </div>
+        
+        <div className="space-y-4">
+          {completedTasks.map((task, index) => (
+            <motion.div
+              key={task.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="rounded-3xl">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-900/20">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">{task.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Completed on {new Date(task.completedDate).toLocaleDateString()} by {task.completedBy}
+                        </p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="rounded-xl">
+                      <MoreHorizontal size={16} />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
