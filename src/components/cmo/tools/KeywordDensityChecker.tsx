@@ -553,7 +553,7 @@ export const KeywordDensityChecker: React.FC<KeywordDensityCheckerProps> = ({
                 <li>• Target keyword density: 1-2%</li>
                 <li>• Place primary keyword in first 100 words</li>
                 <li>• Use keyword variations and synonyms</li>
-                <li>• Avoid keyword stuffing (>3% density)</li>
+                <li>• Avoid keyword stuffing (&gt;3% density)</li>
                 <li>• Focus on natural, readable content</li>
               </ul>
             </div>

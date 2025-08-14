@@ -827,6 +827,96 @@ Create a dependency graph showing the relationships.`;
     
     return { valid: true };
   }
+
+  /**
+   * Estimate total hours for tasks
+   */
+  estimateTaskHours(tasks) {
+    if (!Array.isArray(tasks)) return 0;
+    
+    return tasks.reduce((total, task) => {
+      // Simple estimation based on task complexity
+      const baseHours = {
+        'high': 4,
+        'medium': 2,
+        'low': 1
+      };
+      
+      const hours = baseHours[task.priority] || 2;
+      return total + hours;
+    }, 0);
+  }
+
+  /**
+   * Find next deadline from tasks
+   */
+  findNextDeadline(tasks) {
+    if (!Array.isArray(tasks)) return null;
+    
+    const tasksWithDeadlines = tasks.filter(t => t.deadline || t.dueDate);
+    if (tasksWithDeadlines.length === 0) return null;
+    
+    return tasksWithDeadlines
+      .map(t => t.deadline || t.dueDate)
+      .sort()[0];
+  }
+
+  /**
+   * Check if task is urgent
+   */
+  isUrgent(task) {
+    if (!task.deadline && !task.dueDate) return false;
+    
+    const deadline = new Date(task.deadline || task.dueDate);
+    const now = new Date();
+    const daysDiff = (deadline - now) / (1000 * 60 * 60 * 24);
+    
+    return daysDiff <= 3; // Urgent if due within 3 days
+  }
+
+  /**
+   * Organize tasks by category and priority
+   */
+  organizeTasks(tasks) {
+    if (!Array.isArray(tasks)) return {};
+    
+    const organized = {
+      byCategory: {},
+      byPriority: {
+        high: [],
+        medium: [],
+        low: []
+      },
+      byStatus: {
+        pending: [],
+        inProgress: [],
+        completed: []
+      }
+    };
+    
+    tasks.forEach(task => {
+      // Organize by category
+      const category = task.category || 'uncategorized';
+      if (!organized.byCategory[category]) {
+        organized.byCategory[category] = [];
+      }
+      organized.byCategory[category].push(task);
+      
+      // Organize by priority
+      const priority = task.priority || 'medium';
+      if (organized.byPriority[priority]) {
+        organized.byPriority[priority].push(task);
+      }
+      
+      // Organize by status
+      const status = task.status || 'pending';
+      if (organized.byStatus[status]) {
+        organized.byStatus[status].push(task);
+      }
+    });
+    
+    return organized;
+  }
 }
 
 export default TaskExtractorAgent;

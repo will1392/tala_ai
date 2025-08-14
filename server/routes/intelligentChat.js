@@ -98,6 +98,19 @@ router.post('/v2', authenticate, async (req, res) => {
       });
       
       try {
+        // Get user learning context if available
+        let userLearningContext = null;
+        if (intelligence.userLearningHub) {
+          try {
+            userLearningContext = await intelligence.userLearningHub.getEnhancedContext(req.userId);
+            if (userLearningContext) {
+              console.log('🧠 User learning context loaded for CMO mode');
+            }
+          } catch (err) {
+            console.warn('⚠️ Could not load user learning context:', err.message);
+          }
+        }
+        
         // For CMO mode, use the intelligence system directly without travel validation
         const intelligentResponse = await intelligence.processRequest({
           userId: req.userId,
@@ -119,6 +132,8 @@ router.post('/v2', authenticate, async (req, res) => {
             },
             // Include any marketing metadata
             requestMetadata: req.body.requestMetadata,
+            // Include user learning context
+            userLearningContext,
             // Skip travel validation
             skipTaskExtraction: true,
             skipTravelValidation: true
@@ -766,10 +781,24 @@ router.post('/v2', authenticate, async (req, res) => {
     const fullContent = conversationContextSummary || message;
     const enhancedContent = fullContent + knowledgeContext + userContext;
     
+    // Get user learning context for travel mode
+    let userLearningContext = null;
+    if (intelligence.userLearningHub) {
+      try {
+        userLearningContext = await intelligence.userLearningHub.getEnhancedContext(req.userId);
+        if (userLearningContext) {
+          console.log('🧠 User learning context loaded for travel mode');
+        }
+      } catch (err) {
+        console.warn('⚠️ Could not load user learning context:', err.message);
+      }
+    }
+    
     console.log('🚀 Sending to intelligence layer:');
     console.log('  - Original message:', message);
     console.log('  - Has conversation context:', conversationHistory.length > 0);
     console.log('  - Has knowledge context:', !!knowledgeContext);
+    console.log('  - Has user learning context:', !!userLearningContext);
     console.log('  - Knowledge context length:', knowledgeContext.length);
     console.log('  - Mode:', mode);
     console.log('  - Enhanced content length:', enhancedContent.length);
@@ -802,7 +831,9 @@ router.post('/v2', authenticate, async (req, res) => {
         hasKnowledgeContext: !!knowledgeContext,
         hasConversationContext: conversationHistory.length > 0,
         knowledgeResults,
-        originalMessage: message
+        originalMessage: message,
+        // Include user learning context
+        userLearningContext
       }
     });
     

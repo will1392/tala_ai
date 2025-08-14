@@ -148,47 +148,47 @@ export class FallbackManager {
     // Circuit breakers for each service
     this.circuitBreakers = new Map();
     
-    // Fallback chain configurations for different query types
+    // Fallback chain configurations for different query types (Updated with GPT-5)
     this.fallbackChains = {
       complexPlanning: [
-        'claude-opus-4-20250514',
-        'claude-sonnet-4-20250514', 
-        'gpt-4o-mini',
-        'gemini-2.5-pro'
+        'gpt-5-2025-08-07',           // GPT-5 for heavy-duty work
+        'gpt-5-mini-2025-08-07',      // Fallback to GPT-5 Mini
+        'claude-opus-4-20250514',     // Then Claude 4 Opus
+        'gemini-2.5-pro'              // Finally Gemini 2.5 Pro
       ],
       realTime: [
-        'grok-3-latest',
-        'gpt-4o-mini',
-        'claude-sonnet-4-20250514',
-        'gemini-2.5-flash'
+        'gpt-5-nano-2025-08-07',      // GPT-5 Nano for fast responses
+        'grok-3-latest',              // Grok for real-time
+        'gemini-2.5-flash',           // Gemini Flash for speed
+        'claude-sonnet-4-20250514'    // Claude as backup
       ],
       documentAnalysis: [
-        'claude-sonnet-4-20250514',
-        'gpt-4o-mini',
-        'gemini-2.5-pro',
-        'claude-opus-4-20250514'
+        'gpt-5-2025-08-07',           // GPT-5 for best analysis
+        'gpt-5-mini-2025-08-07',      // GPT-5 Mini as fallback
+        'claude-sonnet-4-20250514',   // Claude 4 for analysis
+        'gemini-2.5-pro'              // Gemini 2.5 Pro
       ],
       multimodal: [
-        'gemini-2.5-pro',
-        'gpt-4o-mini',
-        'claude-sonnet-4-20250514'
+        'gpt-5-mini-2025-08-07',      // GPT-5 Mini for multimodal
+        'gemini-2.5-pro',             // Gemini 2.5 Pro for vision
+        'claude-sonnet-4-20250514'    // Claude 4 as backup
       ],
       creative: [
-        'claude-opus-4-20250514',
-        'claude-sonnet-4-20250514',
-        'gpt-4o-mini',
-        'gemini-2.5-flash'
+        'claude-opus-4-20250514',     // Keep Claude for creative (pending GPT-5 testing)
+        'gpt-5-mini-2025-08-07',      // Try GPT-5 Mini for creative
+        'claude-sonnet-4-20250514',   // Claude Sonnet
+        'gemini-2.5-flash'            // Gemini Flash
       ],
       factual: [
-        'gpt-4o-mini',
-        'gemini-2.5-flash',
-        'claude-sonnet-4-20250514'
+        'gpt-5-nano-2025-08-07',      // GPT-5 Nano for quick facts
+        'gemini-2.5-flash',           // Gemini Flash
+        'claude-sonnet-4-20250514'    // Claude as backup
       ],
       costOptimized: [
-        'gpt-4o-mini',
-        'gemini-2.5-flash',
-        'claude-sonnet-4-20250514',
-        'grok-3-latest'
+        'gpt-5-nano-2025-08-07',      // GPT-5 Nano is cost-effective
+        'gemini-2.5-flash',           // Gemini Flash is cheap
+        'gpt-4o-mini',                // Legacy GPT-4o Mini
+        'grok-3-latest'               // Grok as final fallback
       ]
     };
 
@@ -382,7 +382,8 @@ export class FallbackManager {
    */
   shouldContinueFallback(error) {
     // Don't continue for these error types
-    if (error instanceof ContextLengthExceededError) {
+    // Check for context length errors by name since class might not be defined
+    if (error && error.name === 'ContextLengthExceededError') {
       return false; // Need to modify input, not try different model
     }
     

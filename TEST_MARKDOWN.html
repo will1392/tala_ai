@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Markdown Rendering</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { 
+            background: #0a0a0a; 
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .message-box {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .raw {
+            background: #000;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .rendered h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .rendered ul {
+            margin: 0.5rem 0;
+        }
+        .rendered li {
+            display: flex;
+            gap: 0.5rem;
+            margin: 0.25rem 0;
+        }
+        .rendered p {
+            margin: 0.5rem 0;
+            line-height: 1.6;
+        }
+        .rendered strong {
+            font-weight: 600;
+            color: #00b4d8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto py-8">
+        <h1 class="text-3xl font-bold text-center mb-8" style="color: #00b4d8">Markdown Rendering Test</h1>
+        
+        <div class="message-box">
+            <h2 class="text-xl font-semibold mb-4">Raw Markdown (What backend sends):</h2>
+            <div class="raw" id="raw"></div>
+            
+            <h2 class="text-xl font-semibold mb-4">Rendered (How it should look):</h2>
+            <div class="rendered" id="rendered"></div>
+        </div>
+        
+        <div class="text-center mt-8">
+            <button onclick="testAPI()" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg">
+                Test Live API
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const sampleMarkdown = `Greece is a captivating destination, rich in history, culture, and stunning landscapes. Here's a comprehensive overview based on the available information:
+
+### Culture and Traditions
+
+Greece is renowned for its vibrant culture, which is deeply rooted in history and tradition. Music plays a significant role, with various regional styles.
+
+### Culinary Delights
+
+Greek cuisine is a delightful exploration of flavors and traditions. Here are a few must-try dishes:
+
+- **Bougatsa**: A delicious pastry filled with semolina, custard, soft goat cheese, or minced meat, commonly enjoyed for breakfast.
+
+- **Baklava**: A sweet pastry made of layers of phyllo dough, nuts (such as walnuts, almonds, or pistachios), and honey syrup.
+
+### Practical Travel Tips
+
+- **Water**: In major cities like Athens, tap water is generally safe to drink.
+
+- **Name Days**: In Greece, name days are considered more important than birthdays.`;
+
+        function renderMarkdown(content) {
+            const lines = content.split('\n');
+            let html = '';
+            let inList = false;
+            
+            lines.forEach(line => {
+                // Headers
+                if (line.startsWith('### ')) {
+                    if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                    }
+                    html += `<h3>${line.replace('### ', '')}</h3>`;
+                }
+                // Bullet points
+                else if (line.trim().startsWith('- ')) {
+                    if (!inList) {
+                        html += '<ul>';
+                        inList = true;
+                    }
+                    const content = line.replace(/^[\s]*-\s+/, '')
+                        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                    html += `<li><span style="color: #00b4d8">•</span> <span>${content}</span></li>`;
+                }
+                // Regular paragraphs
+                else if (line.trim()) {
+                    if (inList) {
+                        html += '</ul>';
+                        inList = false;
+                    }
+                    const content = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                    html += `<p>${content}</p>`;
+                }
+            });
+            
+            if (inList) {
+                html += '</ul>';
+            }
+            
+            return html;
+        }
+        
+        // Display sample
+        document.getElementById('raw').textContent = sampleMarkdown;
+        document.getElementById('rendered').innerHTML = renderMarkdown(sampleMarkdown);
+        
+        // Test real API
+        async function testAPI() {
+            try {
+                const response = await fetch('http://localhost:3001/api/chat/v2', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': 'admin-1'
+                    },
+                    body: JSON.stringify({
+                        message: 'Tell me about Greece',
+                        mode: 'travel',
+                        searchKnowledge: true
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.response) {
+                    document.getElementById('raw').textContent = data.response;
+                    document.getElementById('rendered').innerHTML = renderMarkdown(data.response);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

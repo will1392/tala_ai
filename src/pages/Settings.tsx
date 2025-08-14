@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, 
@@ -10,12 +10,17 @@ import {
   CreditCard,
   Users,
   Key,
-  Save
+  Save,
+  Settings as SettingsIcon
 } from 'lucide-react';
-import { GlassCard } from '../components/layout/GlassCard';
-import { Button } from '../components/shared/Button';
-import { Input } from '../components/shared/Input';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { Label } from '../components/ui/Label';
+import { Select } from '../components/ui/Select';
 import { cn } from '../utils/cn';
+import type { UserProfile } from '../components/onboarding/UserProfileOnboarding';
+import CreditsDashboard from '../components/credits/CreditsDashboard';
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -31,9 +36,11 @@ const settingsSections = [
 
 export const Settings = () => {
   const [activeSection, setActiveSection] = useState('profile');
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState({
     // Profile
-    agencyName: 'Wanderlust Travel Agency',
+    userName: '',
+    agencyName: '',
     email: 'admin@wanderlust.com',
     phone: '+1 (555) 123-4567',
     timezone: 'America/New_York',
@@ -55,10 +62,49 @@ export const Settings = () => {
     currency: 'USD',
   });
 
+  // Load user profile on mount
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      // In development, check localStorage
+      if (process.env.NODE_ENV === 'development') {
+        const storedProfile = localStorage.getItem('tala_user_profile');
+        if (storedProfile) {
+          const profile = JSON.parse(storedProfile);
+          setUserProfile(profile);
+          setSettings(prev => ({
+            ...prev,
+            userName: profile.name || '',
+            agencyName: profile.companyName || ''
+          }));
+        }
+        return;
+      }
+
+      // Production: load from API
+      const userId = 'test_user_123'; // This would come from auth context
+      const response = await fetch(`/api/user-profile/${userId}`);
+      if (response.ok) {
+        const profile = await response.json();
+        setUserProfile(profile);
+        setSettings(prev => ({
+          ...prev,
+          userName: profile.name || '',
+          agencyName: profile.companyName || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
   const renderSection = () => {
     switch (activeSection) {
       case 'profile':
-        return <ProfileSettings settings={settings} setSettings={setSettings} />;
+        return <ProfileSettings settings={settings} setSettings={setSettings} userProfile={userProfile} setUserProfile={setUserProfile} />;
       case 'notifications':
         return <NotificationSettings settings={settings} setSettings={setSettings} />;
       case 'appearance':
@@ -69,6 +115,12 @@ export const Settings = () => {
         return <TeamSettings />;
       case 'api':
         return <APISettings />;
+      case 'billing':
+        return <CreditsDashboard />;
+      case 'data':
+        return <DataSettings />;
+      case 'language':
+        return <LanguageSettings />;
       default:
         return <div>Section under construction</div>;
     }
@@ -78,25 +130,29 @@ export const Settings = () => {
     <div className="flex gap-6 h-[calc(100vh-8rem)]">
       {/* Sidebar */}
       <div className="w-64">
-        <GlassCard className="h-full p-4">
-          <h2 className="text-xl font-semibold mb-4">Settings</h2>
-          <nav className="space-y-1">
-            {settingsSections.map((section) => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
-                  'hover:bg-white/10',
-                  activeSection === section.id && 'bg-primary/20 text-primary'
-                )}
-              >
-                <section.icon size={18} />
-                <span>{section.label}</span>
-              </button>
-            ))}
-          </nav>
-        </GlassCard>
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <nav className="space-y-1">
+              {settingsSections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
+                    'hover:bg-[var(--muted)]',
+                    activeSection === section.id && 'bg-[var(--primary)]/20 text-[var(--primary)]'
+                  )}
+                >
+                  <section.icon size={18} />
+                  <span>{section.label}</span>
+                </button>
+              ))}
+            </nav>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content */}
@@ -115,133 +171,288 @@ export const Settings = () => {
 };
 
 // Profile Settings Component
-const ProfileSettings = ({ settings, setSettings }: any) => {
+const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }: any) => {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  const timezoneOptions = [
+    { value: 'America/New_York', label: 'Eastern Time' },
+    { value: 'America/Chicago', label: 'Central Time' },
+    { value: 'America/Denver', label: 'Mountain Time' },
+    { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  ];
+
+  const saveProfile = async () => {
+    setIsSaving(true);
+    setSaveMessage('');
+
+    try {
+      // Update user profile if name or agency changed
+      if (userProfile && (settings.userName !== userProfile.name || settings.agencyName !== userProfile.companyName)) {
+        const updatedProfile = {
+          ...userProfile,
+          name: settings.userName,
+          companyName: settings.agencyName
+        };
+
+        // In development, save to localStorage
+        if (process.env.NODE_ENV === 'development') {
+          localStorage.setItem('tala_user_profile', JSON.stringify(updatedProfile));
+          setUserProfile(updatedProfile);
+          setSaveMessage('Profile saved successfully!');
+        } else {
+          // Production: save to API
+          const userId = 'test_user_123'; // This would come from auth context
+          const response = await fetch('/api/user-profile/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-user-id': userId
+            },
+            body: JSON.stringify(updatedProfile)
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            setUserProfile(result.profile);
+            setSaveMessage('Profile saved successfully!');
+          } else {
+            setSaveMessage('Failed to save profile');
+          }
+        }
+      }
+
+      // Save other settings (email, phone, etc.) - would go to a separate endpoint
+      setSaveMessage('Settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setSaveMessage('Error saving profile');
+    } finally {
+      setIsSaving(false);
+      // Clear message after 3 seconds
+      setTimeout(() => setSaveMessage(''), 3000);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <GlassCard>
-        <h3 className="text-lg font-semibold mb-6">Agency Profile</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium mb-2">Agency Name</label>
-            <Input 
-              value={settings.agencyName}
-              onChange={(e) => setSettings({ ...settings, agencyName: e.target.value })}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-2">Email</label>
-            <Input 
-              type="email"
-              value={settings.email}
-              onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-2">Phone</label>
-            <Input 
-              type="tel"
-              value={settings.phone}
-              onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-2">Timezone</label>
-            <select 
-              className="glass-input w-full px-4 py-3 rounded-xl"
-              value={settings.timezone}
-              onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
-            >
-              <option value="America/New_York">Eastern Time</option>
-              <option value="America/Chicago">Central Time</option>
-              <option value="America/Denver">Mountain Time</option>
-              <option value="America/Los_Angeles">Pacific Time</option>
-            </select>
-          </div>
-        </div>
-        
-        <div className="mt-6 flex justify-end">
-          <Button variant="primary" className="flex items-center gap-2">
-            <Save size={18} />
-            Save Changes
-          </Button>
-        </div>
-      </GlassCard>
-
-      <GlassCard>
-        <h3 className="text-lg font-semibold mb-6">Agency Logo</h3>
-        
-        <div className="flex items-center gap-6">
-          <div className="w-24 h-24 bg-gradient-to-br from-primary to-primary-dark rounded-xl flex items-center justify-center">
-            <span className="text-3xl font-bold text-white">WT</span>
-          </div>
-          
-          <div className="flex-1">
-            <p className="text-sm text-white/60 mb-3">
-              Upload your agency logo. Recommended size: 400x400px
-            </p>
-            <div className="flex gap-3">
-              <Button variant="primary" size="sm">Upload New Logo</Button>
-              <Button variant="ghost" size="sm">Remove</Button>
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="userName">Your Name</Label>
+              <Input 
+                id="userName"
+                value={settings.userName}
+                onChange={(e) => setSettings({ ...settings, userName: e.target.value })}
+                placeholder="Enter your name"
+              />
+              <p className="text-xs text-[var(--muted)] mt-1">Tala will address you by this name</p>
+            </div>
+            
+            <div>
+              <Label htmlFor="agencyName">Agency Name</Label>
+              <Input 
+                id="agencyName"
+                value={settings.agencyName}
+                onChange={(e) => setSettings({ ...settings, agencyName: e.target.value })}
+                placeholder="Enter your agency name"
+              />
+              <p className="text-xs text-[var(--muted)] mt-1">Your business name</p>
             </div>
           </div>
-        </div>
-      </GlassCard>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Contact Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input 
+                id="email"
+                type="email"
+                value={settings.email}
+                onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="phone">Phone</Label>
+              <Input 
+                id="phone"
+                type="tel"
+                value={settings.phone}
+                onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="timezone">Timezone</Label>
+              <Select
+                id="timezone"
+                value={settings.timezone}
+                onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+                options={timezoneOptions}
+              />
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex items-center justify-between">
+          {saveMessage && (
+            <p className={cn(
+              "text-sm",
+              saveMessage.includes('successfully') ? 'text-green-400' : 'text-red-400'
+            )}>
+              {saveMessage}
+            </p>
+          )}
+          <Button 
+            variant="primary" 
+            className="flex items-center gap-2 ml-auto"
+            onClick={saveProfile}
+            disabled={isSaving}
+          >
+            <Save size={18} />
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Agency Logo</CardTitle>
+          <CardDescription>Upload your agency logo. Recommended size: 400x400px</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6">
+            <div className="w-24 h-24 bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 rounded-xl flex items-center justify-center">
+              <span className="text-3xl font-bold text-white">WT</span>
+            </div>
+            
+            <div className="flex gap-3">
+              <Button variant="primary" size="sm">Upload New Logo</Button>
+              <Button variant="secondary" size="sm">Remove</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card variant="bordered">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <SettingsIcon size={20} className="text-[var(--primary)]" />
+            Onboarding & Preferences
+          </CardTitle>
+          <CardDescription>
+            Your profile helps Tala provide personalized marketing advice tailored to your business and expertise level.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3">
+              <Button 
+                variant="primary" 
+                size="sm"
+                onClick={() => {
+                  if (confirm('This will reset all your profile and expertise settings. Are you sure you want to start over?')) {
+                    // Clear all onboarding data
+                    localStorage.removeItem('tala_user_profile_completed');
+                    localStorage.removeItem('tala_user_profile');
+                    localStorage.removeItem('tala_expertise_onboarding_completed');
+                    localStorage.removeItem('tala_expertise_profile');
+                    
+                    // Reload page to trigger onboarding
+                    window.location.reload();
+                  }
+                }}
+              >
+                Retake Onboarding
+              </Button>
+              <Button variant="secondary" size="sm">
+                Update Marketing Expertise
+              </Button>
+            </div>
+            
+            <div className="pt-4 border-t border-[var(--border)]">
+              <div className="flex items-start gap-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full mt-2 animate-pulse"></div>
+                <div className="text-sm">
+                  <p className="text-[var(--fg)]">Profile Status: <span className="text-green-600 font-medium">Complete</span></p>
+                  <p className="text-[var(--muted)]">Last updated: {new Date().toLocaleDateString()}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
 // Notification Settings Component
 const NotificationSettings = ({ settings, setSettings }: any) => {
+  const reminderOptions = [
+    { value: 'hourly', label: 'Every Hour' },
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'custom', label: 'Custom' },
+  ];
+
   return (
     <div className="space-y-6">
-      <GlassCard>
-        <h3 className="text-lg font-semibold mb-6">Notification Preferences</h3>
-        
-        <div className="space-y-4">
-          <ToggleOption
-            label="Email Notifications"
-            description="Receive updates and alerts via email"
-            checked={settings.emailNotifications}
-            onChange={(checked: boolean) => setSettings({ ...settings, emailNotifications: checked })}
-          />
-          
-          <ToggleOption
-            label="Push Notifications"
-            description="Get instant notifications in your browser"
-            checked={settings.pushNotifications}
-            onChange={(checked: boolean) => setSettings({ ...settings, pushNotifications: checked })}
-          />
-          
-          <ToggleOption
-            label="SMS Notifications"
-            description="Receive critical alerts via text message"
-            checked={settings.smsNotifications}
-            onChange={(checked: boolean) => setSettings({ ...settings, smsNotifications: checked })}
-          />
-        </div>
-      </GlassCard>
+      <Card>
+        <CardHeader>
+          <CardTitle>Notification Preferences</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <ToggleOption
+              label="Email Notifications"
+              description="Receive updates and alerts via email"
+              checked={settings.emailNotifications}
+              onChange={(checked: boolean) => setSettings({ ...settings, emailNotifications: checked })}
+            />
+            
+            <ToggleOption
+              label="Push Notifications"
+              description="Get instant notifications in your browser"
+              checked={settings.pushNotifications}
+              onChange={(checked: boolean) => setSettings({ ...settings, pushNotifications: checked })}
+            />
+            
+            <ToggleOption
+              label="SMS Notifications"
+              description="Receive critical alerts via text message"
+              checked={settings.smsNotifications}
+              onChange={(checked: boolean) => setSettings({ ...settings, smsNotifications: checked })}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      <GlassCard>
-        <h3 className="text-lg font-semibold mb-6">Reminder Settings</h3>
-        
-        <div>
-          <label className="block text-sm font-medium mb-2">Task Reminder Frequency</label>
-          <select 
-            className="glass-input w-full px-4 py-3 rounded-xl"
-            value={settings.reminderFrequency}
-            onChange={(e) => setSettings({ ...settings, reminderFrequency: e.target.value })}
-          >
-            <option value="hourly">Every Hour</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-      </GlassCard>
+      <Card>
+        <CardHeader>
+          <CardTitle>Reminder Settings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div>
+            <Label htmlFor="reminderFrequency">Task Reminder Frequency</Label>
+            <Select
+              id="reminderFrequency"
+              value={settings.reminderFrequency}
+              onChange={(e) => setSettings({ ...settings, reminderFrequency: e.target.value })}
+              options={reminderOptions}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -259,53 +470,61 @@ const AppearanceSettings = ({ settings, setSettings }: any) => {
 
   return (
     <div className="space-y-6">
-      <GlassCard>
-        <h3 className="text-lg font-semibold mb-6">Theme</h3>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <button
-            onClick={() => setSettings({ ...settings, theme: 'light' })}
-            className={cn(
-              'glass rounded-xl p-4 text-left transition-all',
-              settings.theme === 'light' ? 'ring-2 ring-primary' : 'hover:bg-white/10'
-            )}
-          >
-            <div className="w-full h-20 bg-white rounded-lg mb-3" />
-            <p className="font-medium">Light Theme</p>
-            <p className="text-sm text-white/60">Clean and bright</p>
-          </button>
-          
-          <button
-            onClick={() => setSettings({ ...settings, theme: 'dark' })}
-            className={cn(
-              'glass rounded-xl p-4 text-left transition-all',
-              settings.theme === 'dark' ? 'ring-2 ring-primary' : 'hover:bg-white/10'
-            )}
-          >
-            <div className="w-full h-20 bg-secondary-900 rounded-lg mb-3" />
-            <p className="font-medium">Dark Theme</p>
-            <p className="text-sm text-white/60">Easy on the eyes</p>
-          </button>
-        </div>
-      </GlassCard>
-
-      <GlassCard>
-        <h3 className="text-lg font-semibold mb-6">Primary Color</h3>
-        
-        <div className="grid grid-cols-6 gap-3">
-          {colors.map((color) => (
+      <Card>
+        <CardHeader>
+          <CardTitle>Theme</CardTitle>
+          <CardDescription>Choose your preferred color scheme</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
             <button
-              key={color}
-              onClick={() => setSettings({ ...settings, primaryColor: color })}
+              onClick={() => setSettings({ ...settings, theme: 'light' })}
               className={cn(
-                'w-full aspect-square rounded-xl transition-all',
-                settings.primaryColor === color ? 'ring-4 ring-white/50 scale-110' : 'hover:scale-105'
+                'border border-[var(--border)] rounded-xl p-4 text-left transition-all',
+                settings.theme === 'light' ? 'ring-2 ring-[var(--primary)]' : 'hover:bg-[var(--muted)]'
               )}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
-      </GlassCard>
+            >
+              <div className="w-full h-20 bg-white rounded-lg mb-3" />
+              <p className="font-medium">Light Theme</p>
+              <p className="text-sm text-[var(--muted)]">Clean and bright</p>
+            </button>
+            
+            <button
+              onClick={() => setSettings({ ...settings, theme: 'dark' })}
+              className={cn(
+                'border border-[var(--border)] rounded-xl p-4 text-left transition-all',
+                settings.theme === 'dark' ? 'ring-2 ring-[var(--primary)]' : 'hover:bg-[var(--muted)]'
+              )}
+            >
+              <div className="w-full h-20 bg-gray-900 rounded-lg mb-3" />
+              <p className="font-medium">Dark Theme</p>
+              <p className="text-sm text-[var(--muted)]">Easy on the eyes</p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Primary Color</CardTitle>
+          <CardDescription>Select your accent color</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-6 gap-3">
+            {colors.map((color) => (
+              <button
+                key={color}
+                onClick={() => setSettings({ ...settings, primaryColor: color })}
+                className={cn(
+                  'w-full aspect-square rounded-xl transition-all',
+                  settings.primaryColor === color ? 'ring-4 ring-[var(--ring)] scale-110' : 'hover:scale-105'
+                )}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
@@ -313,16 +532,16 @@ const AppearanceSettings = ({ settings, setSettings }: any) => {
 // Toggle Option Component
 const ToggleOption = ({ label, description, checked, onChange }: any) => {
   return (
-    <div className="flex items-center justify-between p-4 glass rounded-xl">
+    <div className="flex items-center justify-between p-4 border border-[var(--border)] rounded-xl">
       <div>
         <p className="font-medium">{label}</p>
-        <p className="text-sm text-white/60">{description}</p>
+        <p className="text-sm text-[var(--muted)]">{description}</p>
       </div>
       <button
         onClick={() => onChange(!checked)}
         className={cn(
           'relative w-12 h-6 rounded-full transition-colors',
-          checked ? 'bg-primary' : 'bg-white/20'
+          checked ? 'bg-[var(--primary)]' : 'bg-[var(--muted)]'
         )}
       >
         <div className={cn(
@@ -335,6 +554,62 @@ const ToggleOption = ({ label, description, checked, onChange }: any) => {
 };
 
 // Placeholder components for other sections
-const SecuritySettings = () => <div>Security settings coming soon...</div>;
-const TeamSettings = () => <div>Team settings coming soon...</div>;
-const APISettings = () => <div>API settings coming soon...</div>;
+const SecuritySettings = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Security Settings</CardTitle>
+      <CardDescription>Manage your account security</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-[var(--muted)]">Security settings coming soon...</p>
+    </CardContent>
+  </Card>
+);
+
+const DataSettings = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Data & Storage</CardTitle>
+      <CardDescription>Manage your data and storage preferences</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-[var(--muted)]">Data & Storage settings coming soon...</p>
+    </CardContent>
+  </Card>
+);
+
+const LanguageSettings = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Language Settings</CardTitle>
+      <CardDescription>Set your language and regional preferences</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-[var(--muted)]">Language settings coming soon...</p>
+    </CardContent>
+  </Card>
+);
+
+const TeamSettings = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Team Settings</CardTitle>
+      <CardDescription>Manage your team members and permissions</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-[var(--muted)]">Team settings coming soon...</p>
+    </CardContent>
+  </Card>
+);
+
+const APISettings = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle>API Keys</CardTitle>
+      <CardDescription>Manage your API keys and integrations</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-[var(--muted)]">API settings coming soon...</p>
+    </CardContent>
+  </Card>
+);

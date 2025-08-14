@@ -72,22 +72,22 @@ export const TaskEditModal = ({
     >
       <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
         {editedTasks.map((task, index) => (
-          <div key={index} className="bg-gray-800 rounded-lg p-4 space-y-3 border border-gray-700">
+          <div key={index} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3 border border-gray-200 dark:border-gray-700">
             {/* Title */}
             <div>
-              <label className="text-sm text-white/60 mb-1 block">Title</label>
+              <label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">Title</label>
               <input
                 type="text"
                 value={task.title}
                 onChange={(e) => handleTaskChange(index, 'title', e.target.value)}
-                className="w-full bg-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:bg-gray-600 transition-colors outline-none focus:ring-2 focus:ring-primary/50"
+                className="w-full bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 transition-colors outline-none focus:ring-2 focus:ring-primary/50"
                 placeholder="Task title..."
               />
             </div>
 
             {/* Description */}
             <div>
-              <label className="text-sm text-white/60 mb-1 block">Description</label>
+              <label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block">Description</label>
               <textarea
                 value={task.description || ''}
                 onChange={(e) => handleTaskChange(index, 'description', e.target.value)}
@@ -100,14 +100,14 @@ export const TaskEditModal = ({
             {/* Priority and Due Date */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm text-white/60 mb-1 block flex items-center gap-1">
+                <label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block flex items-center gap-1">
                   <AlertCircle size={14} />
                   Priority
                 </label>
                 <select
                   value={task.priority}
                   onChange={(e) => handleTaskChange(index, 'priority', e.target.value)}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:bg-gray-600 transition-colors outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 transition-colors outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   {priorityOptions.map(option => (
                     <option key={option.value} value={option.value}>
@@ -118,7 +118,7 @@ export const TaskEditModal = ({
               </div>
 
               <div>
-                <label className="text-sm text-white/60 mb-1 block flex items-center gap-1">
+                <label className="text-sm text-gray-600 dark:text-gray-400 mb-1 block flex items-center gap-1">
                   <Calendar size={14} />
                   Due Date
                 </label>
@@ -148,7 +148,7 @@ export const TaskEditModal = ({
                     }
                   })()}
                   onChange={(e) => handleTaskChange(index, 'dueDate', e.target.value)}
-                  className="w-full bg-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:bg-gray-600 transition-colors outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 transition-colors outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
             </div>

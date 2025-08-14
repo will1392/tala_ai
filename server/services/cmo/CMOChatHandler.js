@@ -338,14 +338,9 @@ class CMOChatHandler {
    * Get response when no knowledge is found
    */
   getNoResultsResponse(query, subMode) {
-    const subModeName = this.getSubModeName(subMode);
-    
-    return `I don't have specific information about that${subModeName ? ` in ${subModeName}` : ' marketing topic'}, but I can help you with:\n\n` +
-           `• General marketing best practices\n` +
-           `• Creating custom templates\n` +
-           `• Analyzing your current approach\n` +
-           `• Finding relevant resources\n\n` +
-           `Would you like me to help with any of these alternatives?`;
+    // Don't provide a generic response when no results found
+    // Let the system handle knowledge base queries properly
+    return '';
   }
 
   /**

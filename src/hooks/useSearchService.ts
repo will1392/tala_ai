@@ -131,9 +131,9 @@ export const useSearchService = (): UseSearchServiceReturn => {
         limit
       );
       
-      setSearchResults(response.results);
-      setTotalResults(response.totalResults);
-      setProcessingTime(response.processingTime);
+      setSearchResults(response.results || []); // Ensure results is always an array
+      setTotalResults(response.totalResults || 0);
+      setProcessingTime(response.processingTime || 0);
       setSuggestions(response.suggestions || []);
       
       console.log(`🔍 Search completed: "${query}" - ${response.totalResults} results in ${response.processingTime}ms`);

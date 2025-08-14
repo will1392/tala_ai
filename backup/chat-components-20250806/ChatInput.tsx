@@ -1,0 +1,464 @@
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
+import { Send, Paperclip, Mic, MicOff, Sparkles, AlertCircle, Database, X, FileText } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '../shared/Button';
+import { cn } from '../../utils/cn';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
+import { VoiceCategorySelector } from './VoiceCategorySelector';
+import { CategoryDetectionService, type Category } from '../../services/categoryDetectionService';
+import { DocumentUploadOptions, type DocumentUploadDecision } from './DocumentUploadOptions';
+import { DocumentExtractionService, type ExtractionResult } from '../../services/documentExtractionService';
+
+interface ChatInputProps {
+  onSend: (message: string, attachments?: File[], wasVoiceInput?: boolean) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your message..." }: ChatInputProps) => {
+  const [message, setMessage] = useState('');
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [showVoiceError, setShowVoiceError] = useState(false);
+  const [wasVoiceInput, setWasVoiceInput] = useState(false);
+  const [showKnowledgePrompt, setShowKnowledgePrompt] = useState(false);
+  const [lastVoiceMessage, setLastVoiceMessage] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [suggestedCategory, setSuggestedCategory] = useState<Category | null>(null);
+  const [showDocumentOptions, setShowDocumentOptions] = useState(false);
+  const [isProcessingDocuments, setIsProcessingDocuments] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Speech recognition integration
+  const {
+    isListening,
+    isSupported: isSpeechSupported,
+    transcript,
+    interimTranscript,
+    error: speechError,
+    startListening,
+    stopListening,
+    resetTranscript
+  } = useSpeechRecognition({
+    onTranscript: (text, isFinal) => {
+      if (isFinal) {
+        setMessage(text);
+        setWasVoiceInput(true);
+        setLastVoiceMessage(text);
+        
+        // Detect category for voice input
+        const detectedCategory = CategoryDetectionService.detectCategory(text);
+        setSuggestedCategory(detectedCategory);
+        setSelectedCategory(detectedCategory);
+        
+        // Auto-focus textarea after speech recognition
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      }
+    },
+    onError: (error) => {
+      setShowVoiceError(true);
+      setTimeout(() => setShowVoiceError(false), 5000);
+    }
+  });
+
+  const handleSend = () => {
+    // Don't send if documents need to be processed
+    if (attachments.length > 0) {
+      setShowDocumentOptions(true);
+      return;
+    }
+    
+    if (message.trim()) {
+      const messageToSend = message.trim();
+      onSend(messageToSend, [], wasVoiceInput);
+      
+      // Show knowledge base prompt if this was voice input
+      if (wasVoiceInput && messageToSend) {
+        setShowKnowledgePrompt(true);
+      }
+      
+      setMessage('');
+      setWasVoiceInput(false);
+      resetTranscript();
+      textareaRef.current?.focus();
+    }
+  };
+  
+  const handleStoreInKnowledgeBase = async () => {
+    if (!lastVoiceMessage) return;
+    
+    try {
+      const response = await fetch('http://localhost:3001/api/voice/store', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: lastVoiceMessage,
+          userId: 'admin-1',
+          title: `Voice Input - ${new Date().toLocaleDateString()}`,
+          primaryFolderId: selectedCategory?.id,
+          category: selectedCategory?.slug
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to store voice input');
+      }
+
+      const result = await response.json();
+      console.log('Voice input stored successfully:', result);
+      
+      setShowKnowledgePrompt(false);
+      setLastVoiceMessage('');
+      setSelectedCategory(null);
+      setSuggestedCategory(null);
+    } catch (error) {
+      console.error('Failed to store in knowledge base:', error);
+    }
+  };
+  
+  const handleDismissKnowledgePrompt = () => {
+    setShowKnowledgePrompt(false);
+    setLastVoiceMessage('');
+    setSelectedCategory(null);
+    setSuggestedCategory(null);
+  };
+
+  const handleCategorySelect = (category: Category | null) => {
+    if (category === null) {
+      // Auto-detect was triggered
+      const detectedCategory = CategoryDetectionService.detectCategory(lastVoiceMessage);
+      setSelectedCategory(detectedCategory);
+      setSuggestedCategory(detectedCategory);
+    } else {
+      setSelectedCategory(category);
+    }
+  };
+  
+  const handleVoiceToggle = async () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      await startListening();
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setAttachments(files);
+      setShowDocumentOptions(true);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDocumentUploadDecision = async (decision: DocumentUploadDecision) => {
+    setIsProcessingDocuments(true);
+    setShowDocumentOptions(false);
+    
+    try {
+      let extractionResult: ExtractionResult | null = null;
+      let storageResult: any = null;
+
+      // Handle extraction
+      if (decision.action === 'extract' || decision.action === 'both') {
+        extractionResult = await DocumentExtractionService.extractData(
+          attachments, 
+          decision.extractOptions?.extractType || 'summary'
+        );
+      }
+
+      // Handle storage
+      if (decision.action === 'store' || decision.action === 'both') {
+        storageResult = await DocumentExtractionService.uploadAndStore(
+          attachments,
+          decision.storeOptions || {}
+        );
+      }
+
+      // Send results as a message
+      let resultMessage = '';
+      
+      if (extractionResult) {
+        resultMessage += DocumentExtractionService.formatExtractionForDisplay(
+          extractionResult, 
+          decision.extractOptions?.extractType || 'summary'
+        );
+      }
+
+      if (storageResult) {
+        if (resultMessage) resultMessage += '\n\n---\n\n';
+        if (storageResult.success) {
+          resultMessage += `✅ **Documents stored successfully!**\n\n`;
+          storageResult.results.forEach((result: any) => {
+            resultMessage += `• **${result.fileName}** - ${result.chunksStored} chunks stored\n`;
+          });
+        } else {
+          resultMessage += `❌ **Storage failed:** ${storageResult.error}`;
+        }
+      }
+
+      // Send the formatted results as a message
+      if (resultMessage) {
+        onSend(resultMessage);
+      }
+
+      // Clear attachments
+      setAttachments([]);
+      
+    } catch (error) {
+      console.error('Document processing error:', error);
+      onSend(`❌ **Document processing failed:** ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setAttachments([]);
+    } finally {
+      setIsProcessingDocuments(false);
+    }
+  };
+
+  const handleCancelDocumentUpload = () => {
+    setShowDocumentOptions(false);
+    setAttachments([]);
+  };
+
+  return (
+    <div className="glass-dark border-t border-white/10 p-4 space-y-3">
+      {/* Note: Attachments are now handled by DocumentUploadOptions component */}
+
+      {/* Input Area */}
+      <div className="flex items-end gap-3">
+        <div className="flex-1 relative">
+          <textarea
+            ref={textareaRef}
+            value={isListening ? `${message}${interimTranscript}` : message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isListening ? "Listening... Speak now" : placeholder}
+            disabled={disabled || isListening}
+            rows={1}
+            className={cn(
+              'w-full resize-none rounded-xl px-4 py-3 pr-12',
+              'glass-input min-h-[48px] max-h-[120px]',
+              'focus:outline-none focus:ring-2 focus:ring-primary',
+              isListening && 'bg-primary/10 border-primary/30'
+            )}
+            style={{
+              height: 'auto',
+              overflowY: message.split('\n').length > 3 ? 'auto' : 'hidden'
+            }}
+          />
+          
+          {/* AI Enhance Button */}
+          <button className="absolute right-2 bottom-2 p-2 rounded-lg hover:bg-white/10 transition-colors">
+            <Sparkles size={18} className="text-primary" />
+          </button>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-3"
+            disabled={disabled}
+          >
+            <Paperclip size={20} />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleVoiceToggle}
+            className={cn(
+              'p-3 relative',
+              isListening && 'text-red-500 bg-red-500/10',
+              !isSpeechSupported && 'opacity-50 cursor-not-allowed'
+            )}
+            disabled={disabled || !isSpeechSupported}
+            title={!isSpeechSupported ? 'Speech recognition not supported' : isListening ? 'Stop listening' : 'Start voice input'}
+          >
+            {isListening ? (
+              <>
+                <MicOff size={20} />
+                <motion.div
+                  className="absolute inset-0 rounded-lg border-2 border-red-500"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                />
+              </>
+            ) : (
+              <Mic size={20} />
+            )}
+          </Button>
+          
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSend}
+            disabled={disabled || (!message.trim() && attachments.length === 0) || isProcessingDocuments}
+            className="p-3"
+          >
+            <Send size={20} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Voice Error Display */}
+      <AnimatePresence>
+        {showVoiceError && speechError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400"
+          >
+            <AlertCircle size={16} />
+            <span>{speechError}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Voice Listening Indicator */}
+      <AnimatePresence>
+        {isListening && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex items-center gap-2 px-3 py-2 bg-primary/10 border border-primary/20 rounded-lg text-sm text-primary"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            >
+              <Mic size={16} />
+            </motion.div>
+            <span>Listening... Speak clearly</span>
+            <button
+              onClick={stopListening}
+              className="ml-auto text-xs text-primary/70 hover:text-primary"
+            >
+              Stop
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Knowledge Base Storage Prompt */}
+      <AnimatePresence>
+        {showKnowledgePrompt && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg"
+          >
+            <div className="flex items-center gap-3">
+              <Database size={16} className="text-blue-400 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-blue-400 font-medium text-sm">Store voice input in knowledge base?</p>
+                <p className="text-xs text-white/60 mt-1">This will help improve future responses</p>
+              </div>
+              <button
+                onClick={handleDismissKnowledgePrompt}
+                className="p-1 text-white/40 hover:text-white/60 transition-colors"
+                title="Dismiss"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            
+            {/* Category Selector */}
+            <VoiceCategorySelector
+              onCategorySelect={handleCategorySelect}
+              suggestedCategory={suggestedCategory}
+              voiceContent={lastVoiceMessage}
+            />
+            
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={handleDismissKnowledgePrompt}
+                className="px-3 py-1.5 text-white/60 hover:text-white/80 rounded-md transition-colors text-xs font-medium"
+              >
+                Skip
+              </button>
+              <button
+                onClick={handleStoreInKnowledgeBase}
+                disabled={!selectedCategory}
+                className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-md hover:bg-blue-500/30 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Store in {selectedCategory?.name || 'Category'}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Document Upload Options */}
+      <AnimatePresence>
+        {showDocumentOptions && attachments.length > 0 && (
+          <DocumentUploadOptions
+            files={attachments}
+            onConfirm={handleDocumentUploadDecision}
+            onCancel={handleCancelDocumentUpload}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Processing Indicator */}
+      <AnimatePresence>
+        {isProcessingDocuments && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-sm text-yellow-400"
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            >
+              <FileText size={16} />
+            </motion.div>
+            <span>Processing documents...</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Typing Indicators */}
+      <div className="flex items-center justify-between text-xs text-white/50">
+        <span>
+          {isListening 
+            ? "Voice input active - click microphone to stop"
+            : showKnowledgePrompt
+            ? "Would you like to store your voice input?"
+            : "Press Enter to send, Shift + Enter for new line"
+          }
+        </span>
+        {message.length > 0 && (
+          <span>{message.length} characters</span>
+        )}
+      </div>
+    </div>
+  );
+};

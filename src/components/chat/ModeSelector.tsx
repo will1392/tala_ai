@@ -5,6 +5,7 @@ import { useMode } from '../../hooks/useMode';
 import type { AppMode, CMOSubMode } from '../../hooks/useMode';
 import toast from 'react-hot-toast';
 import { DropdownPortal } from './DropdownPortal';
+import { Button } from '../ui/Button';
 
 interface ModeSelectorProps {
   className?: string;
@@ -114,10 +115,12 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
     // Compact version for mobile or smaller spaces
     return (
       <div className={`flex items-center gap-2 ${className}`}>
-        <button
+        <Button
           onClick={handleModeToggle}
           disabled={isLoading}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+          variant="secondary"
+          size="sm"
+          className="rounded-full text-sm font-medium"
           style={{
             backgroundColor: theme.primary + '20',
             color: theme.primary,
@@ -126,7 +129,7 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
         >
           <span className="text-base">{getModeIcon()}</span>
           <span>{mode === 'travel' ? 'Travel' : 'CMO'}</span>
-        </button>
+        </Button>
       </div>
     );
   }
@@ -142,80 +145,86 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
             layoutId="mode-background"
           />
           
-          <div className="relative flex items-center p-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg w-64 shadow-lg">
+          <div className="relative flex items-center p-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg w-64 shadow-lg" role="radiogroup" aria-label="Chat mode selection">
             {/* Background indicator that moves */}
             <motion.div
               className="absolute rounded-md shadow-lg"
               style={{ 
                 backgroundColor: mode === 'travel' ? '#0fc6c6' : '#ff6b6b',
-                width: 'calc(50% - 4px)',
+                width: '50%',
                 height: 'calc(100% - 8px)',
                 top: '4px',
-                left: '4px'
+                left: '0'
               }}
               animate={{
-                x: mode === 'travel' ? 0 : 'calc(100% + 4px)'
+                x: mode === 'travel' ? 0 : '100%'
               }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
             />
             
             {/* Travel Mode Button */}
-            <motion.button
+            <Button
               onClick={() => {
                 console.log('Travel button clicked, isLoading:', isLoading);
                 handleModeSwitch('travel');
               }}
               disabled={false}  // Never disable for better UX
+              variant="ghost"
+              size="md"
               className={`
-                relative flex items-center justify-center gap-2 
-                px-4 py-2 rounded-md font-medium text-sm 
-                transition-all duration-200 z-10 flex-1
+                relative flex-1 bg-transparent hover:bg-transparent
                 ${mode === 'travel' 
                   ? 'text-white font-semibold drop-shadow-md' 
                   : 'text-white/80 hover:text-white'
                 }
               `}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              aria-label="Switch to Travel mode"
+              aria-pressed={mode === 'travel'}
+              role="radio"
+              aria-checked={mode === 'travel'}
             >
               <motion.span 
                 className="text-base"
                 animate={{ scale: mode === 'travel' ? 1.1 : 1 }}
                 transition={{ type: "spring", stiffness: 300 }}
+                aria-hidden="true"
               >
                 ✈️
               </motion.span>
               <span>Travel</span>
-            </motion.button>
+            </Button>
 
             {/* CMO Mode Button */}
-            <motion.button
+            <Button
               onClick={() => {
                 console.log('Marketing button clicked, isLoading:', isLoading);
                 handleModeSwitch('cmo', 'all');
               }}
               disabled={false}  // Never disable for better UX
+              variant="ghost"
+              size="md"
               className={`
-                relative flex items-center justify-center gap-2
-                px-4 py-2 rounded-md font-medium text-sm
-                transition-all duration-200 z-10 flex-1
+                relative flex-1 bg-transparent hover:bg-transparent
                 ${mode === 'cmo' 
                   ? 'text-white font-semibold drop-shadow-md' 
                   : 'text-white/80 hover:text-white'
                 }
               `}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              aria-label="Switch to Marketing mode"
+              aria-pressed={mode === 'cmo'}
+              role="radio"
+              aria-checked={mode === 'cmo'}
             >
               <motion.span 
                 className="text-base"
                 animate={{ scale: mode === 'cmo' ? 1.1 : 1 }}
                 transition={{ type: "spring", stiffness: 300 }}
+                aria-hidden="true"
               >
                 🎯
               </motion.span>
               <span>Marketing</span>
-            </motion.button>
+            </Button>
           </div>
         </div>
 
@@ -230,14 +239,19 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
               transition={{ duration: 0.2 }}
               className="relative"
             >
-              <button
+              <Button
                 ref={dropdownButtonRef}
                 onClick={() => setShowSubModeDropdown(!showSubModeDropdown)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all hover:shadow-sm bg-white/10 backdrop-blur-sm"
+                variant="secondary"
+                size="md"
+                className="border hover:shadow-sm bg-white/10 backdrop-blur-sm"
                 style={{
                   borderColor: 'rgba(255, 255, 255, 0.2)',
                   backgroundColor: showSubModeDropdown ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.1)'
                 }}
+                aria-label={`Marketing sub-mode: ${getSubModeLabel(subMode || 'all')}. Click to change.`}
+                aria-expanded={showSubModeDropdown}
+                aria-haspopup="menu"
               >
                 <span className="text-sm font-medium text-white">
                   {getSubModeLabel(subMode || 'all')}
@@ -246,8 +260,9 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
                   className={`w-4 h-4 transition-transform text-white ${
                     showSubModeDropdown ? 'rotate-180' : ''
                   }`}
+                  aria-hidden="true"
                 />
-              </button>
+              </Button>
 
               {/* Dropdown Menu using Portal */}
               <DropdownPortal
@@ -263,16 +278,22 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
                     maxHeight: '320px',
                     overflowY: 'auto'
                   }}
+                  role="menu"
+                  aria-orientation="vertical"
                 >
                   {subModes.map((subModeOption) => (
-                    <button
+                    <Button
                       key={subModeOption}
                       onClick={() => handleSubModeSelect(subModeOption)}
-                      className="w-full px-4 py-3 text-left text-sm hover:bg-white/10 transition-colors first:rounded-t-lg last:rounded-b-lg flex items-center justify-between"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-between px-4 py-3 text-sm hover:bg-white/10 first:rounded-t-lg last:rounded-b-lg"
                       style={{
                         color: subMode === subModeOption ? '#ff6b6b' : 'white',
                         backgroundColor: subMode === subModeOption ? 'rgba(255, 107, 107, 0.2)' : 'transparent'
                       }}
+                      role="menuitem"
+                      aria-current={subMode === subModeOption ? "true" : undefined}
                     >
                       <span>{getSubModeLabel(subModeOption)}</span>
                       {subMode === subModeOption && (
@@ -281,9 +302,10 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
                           animate={{ scale: 1 }}
                           className="w-2 h-2 rounded-full"
                           style={{ backgroundColor: '#ff6b6b' }}
+                          aria-hidden="true"
                         />
                       )}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </DropdownPortal>
@@ -303,7 +325,7 @@ export const ModeSelector: React.FC<ModeSelectorProps> = ({
           transition={{ duration: 0.2 }}
           className="mt-2"
         >
-          <p className="text-xs" style={{ color: theme.textSecondary }}>
+          <p className="text-xs" style={{ color: 'white' }}>
             {mode === 'travel' 
               ? 'Plan trips, find flights, and explore destinations'
               : `Marketing tools${subMode && subMode !== 'all' ? ` for ${getSubModeLabel(subMode)}` : ''}`

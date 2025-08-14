@@ -170,7 +170,15 @@ const CMODashboardEnhanced: React.FC = () => {
               {(['week', 'month', 'quarter'] as const).map((timeframe) => (
                 <button
                   key={timeframe}
-                  onClick={() => setSelectedTimeframe(timeframe)}
+                  onClick={() => {
+                    setSelectedTimeframe(timeframe);
+                    addNotification({
+                      type: 'info',
+                      title: 'Timeframe Updated',
+                      message: `Dashboard now showing ${timeframe}ly data`,
+                      duration: 3000
+                    });
+                  }}
                   className={cn(
                     "px-4 py-2 rounded-md text-sm font-medium transition-colors",
                     selectedTimeframe === timeframe

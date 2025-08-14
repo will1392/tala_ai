@@ -1,0 +1,286 @@
+/* Base typography for markdown content */
+.tala-prose {
+  color: rgb(31 41 55);
+  line-height: 1.75;
+  font-size: 0.875rem;
+}
+
+.dark .tala-prose {
+  color: rgb(229 231 235);
+}
+
+/* Inline code */
+.tala-prose :where(code):not(:where(pre code)) {
+  background: rgb(243 244 246);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(229 231 235);
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+.dark .tala-prose :where(code):not(:where(pre code)) {
+  background: rgb(55 65 81);
+  border-color: rgb(75 85 99);
+}
+
+/* Headings */
+.tala-prose h1,
+.tala-prose h2,
+.tala-prose h3,
+.tala-prose h4,
+.tala-prose h5,
+.tala-prose h6 {
+  color: rgb(17 24 39);
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.dark .tala-prose h1,
+.dark .tala-prose h2,
+.dark .tala-prose h3,
+.dark .tala-prose h4,
+.dark .tala-prose h5,
+.dark .tala-prose h6 {
+  color: rgb(243 244 246);
+}
+
+.tala-prose h1 { font-size: 1.5rem; }
+.tala-prose h2 { font-size: 1.25rem; }
+.tala-prose h3 { font-size: 1.125rem; }
+.tala-prose h4 { font-size: 1rem; }
+
+.tala-prose h1:first-child,
+.tala-prose h2:first-child,
+.tala-prose h3:first-child {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.tala-prose p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tala-prose p:first-child {
+  margin-top: 0;
+}
+
+.tala-prose p:last-child {
+  margin-bottom: 0;
+}
+
+/* Lists */
+.tala-prose ul,
+.tala-prose ol {
+  padding-left: 1.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tala-prose ul {
+  list-style-type: disc;
+}
+
+.tala-prose ol {
+  list-style-type: decimal;
+}
+
+.tala-prose li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.tala-prose li > p {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.tala-prose ul ul,
+.tala-prose ul ol,
+.tala-prose ol ul,
+.tala-prose ol ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Blockquotes */
+.tala-prose blockquote {
+  border-left: 3px solid rgb(147 51 234);
+  padding-left: 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  color: rgb(107 114 128);
+  font-style: italic;
+}
+
+.dark .tala-prose blockquote {
+  border-left-color: rgb(168 85 247);
+  color: rgb(156 163 175);
+}
+
+/* Code blocks */
+.tala-prose pre {
+  background: rgb(249 250 251);
+  border: 1px solid rgb(229 231 235);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85em;
+  line-height: 1.5;
+  position: relative;
+}
+
+.dark .tala-prose pre {
+  background: rgb(31 41 55);
+  border-color: rgb(55 65 81);
+}
+
+.tala-prose pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  color: rgb(31 41 55);
+}
+
+.dark .tala-prose pre code {
+  color: rgb(229 231 235);
+}
+
+/* Tables */
+.tala-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.tala-prose th,
+.tala-prose td {
+  border: 1px solid rgb(229 231 235);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.dark .tala-prose th,
+.dark .tala-prose td {
+  border-color: rgb(55 65 81);
+}
+
+.tala-prose thead th {
+  background: rgb(249 250 251);
+  font-weight: 600;
+  color: rgb(55 65 81);
+}
+
+.dark .tala-prose thead th {
+  background: rgb(55 65 81);
+  color: rgb(209 213 219);
+}
+
+.tala-prose tbody tr:hover {
+  background: rgb(249 250 251);
+}
+
+.dark .tala-prose tbody tr:hover {
+  background: rgb(55 65 81);
+}
+
+/* Links */
+.tala-prose a {
+  color: rgb(147 51 234);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+.tala-prose a:hover {
+  color: rgb(126 34 206);
+}
+
+.dark .tala-prose a {
+  color: rgb(168 85 247);
+}
+
+.dark .tala-prose a:hover {
+  color: rgb(196 181 253);
+}
+
+/* Horizontal rules */
+.tala-prose hr {
+  border: none;
+  border-top: 1px solid rgb(229 231 235);
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.dark .tala-prose hr {
+  border-top-color: rgb(55 65 81);
+}
+
+/* Strong and emphasis */
+.tala-prose strong {
+  font-weight: 600;
+  color: rgb(17 24 39);
+}
+
+.dark .tala-prose strong {
+  color: rgb(243 244 246);
+}
+
+.tala-prose em {
+  font-style: italic;
+}
+
+/* Images */
+.tala-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Task lists */
+.tala-prose ul.contains-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.tala-prose li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.tala-prose li.task-list-item input[type="checkbox"] {
+  margin-top: 0.25rem;
+}
+
+/* Strikethrough */
+.tala-prose del {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Definition lists */
+.tala-prose dl {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.tala-prose dt {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.tala-prose dd {
+  margin-left: 1.5rem;
+  margin-top: 0.25rem;
+}

@@ -380,7 +380,7 @@ export class TaskDecomposer {
     };
     
     // Merge similar subtasks that can be handled together
-    optimized.subtasks = this.mergeSimiiarSubtasks(optimized.subtasks);
+    optimized.subtasks = this.mergeSimilarSubtasks(optimized.subtasks);
     
     // Rebalance workload across agents
     this.rebalanceWorkload(optimized);
@@ -569,6 +569,256 @@ export class TaskDecomposer {
     }
     
     return components;
+  }
+
+  /**
+   * Merge similar subtasks that can be handled together
+   */
+  mergeSimilarSubtasks(subtasks) {
+    if (!Array.isArray(subtasks) || subtasks.length <= 1) {
+      return subtasks;
+    }
+    
+    const merged = [];
+    const processed = new Set();
+    
+    for (let i = 0; i < subtasks.length; i++) {
+      if (processed.has(i)) continue;
+      
+      const currentTask = subtasks[i];
+      const similarTasks = [currentTask];
+      processed.add(i);
+      
+      // Find similar tasks
+      for (let j = i + 1; j < subtasks.length; j++) {
+        if (processed.has(j)) continue;
+        
+        const otherTask = subtasks[j];
+        if (this.areTasksSimilar(currentTask, otherTask)) {
+          similarTasks.push(otherTask);
+          processed.add(j);
+        }
+      }
+      
+      // Merge similar tasks or keep single task
+      if (similarTasks.length > 1) {
+        merged.push(this.mergeTaskGroup(similarTasks));
+      } else {
+        merged.push(currentTask);
+      }
+    }
+    
+    return merged;
+  }
+  
+  /**
+   * Check if two tasks are similar enough to merge
+   */
+  areTasksSimilar(task1, task2) {
+    // Check if tasks have the same type
+    if (task1.type !== task2.type) return false;
+    
+    // Check if they target similar agents
+    const agents1 = task1.requiredAgents || [];
+    const agents2 = task2.requiredAgents || [];
+    const commonAgents = agents1.filter(a => agents2.includes(a));
+    
+    if (commonAgents.length === 0) return false;
+    
+    // Check content similarity
+    const desc1 = (task1.description || '').toLowerCase();
+    const desc2 = (task2.description || '').toLowerCase();
+    
+    // Simple similarity check based on keywords
+    const keywords1 = desc1.split(/\s+/);
+    const keywords2 = desc2.split(/\s+/);
+    const commonKeywords = keywords1.filter(k => keywords2.includes(k) && k.length > 3);
+    
+    return commonKeywords.length >= 2;
+  }
+  
+  /**
+   * Merge a group of similar tasks
+   */
+  mergeTaskGroup(tasks) {
+    const baseTask = tasks[0];
+    const merged = {
+      ...baseTask,
+      id: `merged_${Date.now()}`,
+      description: `Combined task: ${tasks.map(t => t.description).join('; ')}`,
+      data: this.mergeTaskData(tasks.map(t => t.data)),
+      subtasks: tasks,
+      merged: true
+    };
+    
+    return merged;
+  }
+  
+  /**
+   * Merge data from multiple tasks
+   */
+  mergeTaskData(dataArray) {
+    const merged = {};
+    
+    dataArray.forEach(data => {
+      if (data && typeof data === 'object') {
+        Object.keys(data).forEach(key => {
+          if (Array.isArray(data[key])) {
+            merged[key] = [...(merged[key] || []), ...data[key]];
+          } else if (typeof data[key] === 'object') {
+            merged[key] = { ...(merged[key] || {}), ...data[key] };
+          } else {
+            merged[key] = data[key];
+          }
+        });
+      }
+    });
+    
+    return merged;
+  }
+  
+  /**
+   * Rebalance workload across agents
+   */
+  rebalanceWorkload(optimized) {
+    if (!optimized.subtasks || optimized.subtasks.length === 0) return;
+    
+    // Group tasks by required agents
+    const agentWorkload = new Map();
+    
+    optimized.subtasks.forEach(task => {
+      const agents = task.requiredAgents || ['general'];
+      agents.forEach(agent => {
+        if (!agentWorkload.has(agent)) {
+          agentWorkload.set(agent, []);
+        }
+        agentWorkload.get(agent).push(task);
+      });
+    });
+    
+    // Redistribute if any agent is overloaded
+    const maxTasksPerAgent = Math.ceil(optimized.subtasks.length / agentWorkload.size);
+    
+    for (const [agent, tasks] of agentWorkload) {
+      if (tasks.length > maxTasksPerAgent) {
+        // Find agents with lighter loads
+        const lighterAgents = Array.from(agentWorkload.entries())
+          .filter(([a, t]) => a !== agent && t.length < maxTasksPerAgent)
+          .sort((a, b) => a[1].length - b[1].length);
+        
+        // Redistribute excess tasks
+        const excessTasks = tasks.splice(maxTasksPerAgent);
+        excessTasks.forEach((task, index) => {
+          if (lighterAgents[index % lighterAgents.length]) {
+            const [targetAgent] = lighterAgents[index % lighterAgents.length];
+            task.requiredAgents = [targetAgent];
+            agentWorkload.get(targetAgent).push(task);
+          }
+        });
+      }
+    }
+  }
+  
+  /**
+   * Optimize parallel execution groups
+   */
+  optimizeParallelGroups(parallelGroups, subtasks) {
+    if (!Array.isArray(parallelGroups)) return [];
+    
+    return parallelGroups.map(group => {
+      // Ensure group has tasks array
+      const tasks = group.tasks || [];
+      if (tasks.length === 0) {
+        return {
+          ...group,
+          tasks: [],
+          estimatedDuration: 0,
+          parallelizable: 1
+        };
+      }
+      
+      // Sort tasks in group by estimated duration (shortest first)
+      const sortedTasks = [...tasks].sort((a, b) => {
+        const durationA = this.estimateTaskDuration(a);
+        const durationB = this.estimateTaskDuration(b);
+        return durationA - durationB;
+      });
+      
+      // Group tasks that can run truly in parallel
+      const optimizedGroup = {
+        ...group,
+        tasks: sortedTasks,
+        estimatedDuration: Math.max(...sortedTasks.map(t => this.estimateTaskDuration(t))),
+        parallelizable: this.assessParallelizability(sortedTasks)
+      };
+      
+      return optimizedGroup;
+    });
+  }
+  
+  /**
+   * Estimate task duration in seconds
+   */
+  estimateTaskDuration(task) {
+    // Simple heuristic based on task type and complexity
+    const baseTime = {
+      'document-processing': 30,
+      'itinerary-planning': 45,
+      'booking-extraction': 20,
+      'task-generation': 15,
+      'email-monitoring': 10
+    };
+    
+    const duration = baseTime[task.type] || 30;
+    
+    // Adjust based on data complexity
+    if (task.data) {
+      const dataSize = JSON.stringify(task.data).length;
+      const complexityMultiplier = Math.min(dataSize / 1000, 3);
+      return duration * (1 + complexityMultiplier);
+    }
+    
+    return duration;
+  }
+  
+  /**
+   * Assess how parallelizable a group of tasks is
+   */
+  assessParallelizability(tasks) {
+    if (tasks.length <= 1) return 1;
+    
+    // Check for dependencies between tasks
+    let dependencies = 0;
+    for (let i = 0; i < tasks.length; i++) {
+      for (let j = i + 1; j < tasks.length; j++) {
+        if (this.hasTaskDependency(tasks[i], tasks[j])) {
+          dependencies++;
+        }
+      }
+    }
+    
+    // Return parallelizability score (0-1)
+    const maxDependencies = (tasks.length * (tasks.length - 1)) / 2;
+    return Math.max(0, 1 - (dependencies / maxDependencies));
+  }
+  
+  /**
+   * Check if one task depends on another
+   */
+  hasTaskDependency(task1, task2) {
+    // Simple dependency detection
+    if (task1.dependencies && task1.dependencies.includes(task2.id)) return true;
+    if (task2.dependencies && task2.dependencies.includes(task1.id)) return true;
+    
+    // Check data dependencies
+    if (task1.data && task2.data) {
+      // If one task produces data that another consumes
+      const task1Outputs = Object.keys(task1.data);
+      const task2Inputs = task2.requiredInputs || [];
+      return task1Outputs.some(output => task2Inputs.includes(output));
+    }
+    
+    return false;
   }
 
   /**
@@ -852,7 +1102,9 @@ export class TaskDecomposer {
       let totalDuration = 0;
       
       optimized.graph.parallelGroups.forEach(group => {
-        const groupDuration = Math.max(...group.map(taskId => {
+        // Handle both array groups and single task groups
+        const tasks = Array.isArray(group) ? group : (group.tasks || [group]);
+        const groupDuration = Math.max(...tasks.map(taskId => {
           const task = optimized.subtasks.find(st => st.id === taskId);
           return task?.estimatedDuration || 0;
         }));

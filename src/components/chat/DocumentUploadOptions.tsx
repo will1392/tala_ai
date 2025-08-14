@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FileText, Database, FolderOpen, Tag, FileSearch, Upload, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../utils/cn';
+import { Button } from '../ui/Button';
 import { VoiceCategorySelector } from './VoiceCategorySelector';
 import { CategoryDetectionService, type Category } from '../../services/categoryDetectionService';
 
@@ -96,28 +97,30 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
         <Upload size={16} className="text-purple-400 flex-shrink-0" />
         <div className="flex-1">
           <p className="text-purple-400 font-medium text-sm">What would you like to do with these documents?</p>
-          <p className="text-xs text-white/60 mt-1">{files.length} file{files.length > 1 ? 's' : ''} selected</p>
+          <p className="text-xs text-gray-600 dark:text-white/60 mt-1">{files.length} file{files.length > 1 ? 's' : ''} selected</p>
         </div>
-        <button
+        <Button
           onClick={onCancel}
-          className="p-1 text-white/40 hover:text-white/60 transition-colors"
+          variant="ghost"
+          size="sm"
+          className="p-1 text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60 min-h-0 min-w-0"
           title="Cancel upload"
         >
           <X size={14} />
-        </button>
+        </Button>
       </div>
 
       {/* File Preview */}
       <div className="space-y-2">
-        <h4 className="text-xs font-medium text-white/80">Files to process:</h4>
+        <h4 className="text-xs font-medium text-gray-700 dark:text-white/80">Files to process:</h4>
         <div className="space-y-1">
           {files.map((file, index) => {
             const preview = getFilePreview(file);
             return (
               <div key={index} className="flex items-center gap-2 p-2 bg-white/5 rounded text-xs">
-                <FileText size={12} className="text-white/50" />
+                <FileText size={12} className="text-gray-500 dark:text-white/50" />
                 <span className="flex-1 truncate">{preview.name}</span>
-                <span className="text-white/50">{preview.size}</span>
+                <span className="text-gray-500 dark:text-white/50">{preview.size}</span>
               </div>
             );
           })}
@@ -126,7 +129,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
 
       {/* Action Selection */}
       <div className="space-y-3">
-        <h4 className="text-sm font-medium text-white">Choose action:</h4>
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white">Choose action:</h4>
         
         <div className="space-y-2">
           {/* Extract Data Option */}
@@ -144,8 +147,8 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
             />
             <FileSearch size={16} className="text-green-400" />
             <div className="flex-1">
-              <div className="text-sm font-medium text-white">Extract Data Only</div>
-              <div className="text-xs text-white/60">Process document content and show key information</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">Extract Data Only</div>
+              <div className="text-xs text-gray-600 dark:text-white/60">Process document content and show key information</div>
             </div>
           </label>
 
@@ -164,8 +167,8 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
             />
             <Database size={16} className="text-blue-400" />
             <div className="flex-1">
-              <div className="text-sm font-medium text-white">Store in Knowledge Base</div>
-              <div className="text-xs text-white/60">Save document for future AI reference</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">Store in Knowledge Base</div>
+              <div className="text-xs text-gray-600 dark:text-white/60">Save document for future AI reference</div>
             </div>
           </label>
 
@@ -187,8 +190,8 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
               <Database size={14} className="text-purple-400" />
             </div>
             <div className="flex-1">
-              <div className="text-sm font-medium text-white">Extract Data & Store</div>
-              <div className="text-xs text-white/60">Process content now and save for future use</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">Extract Data & Store</div>
+              <div className="text-xs text-gray-600 dark:text-white/60">Process content now and save for future use</div>
             </div>
           </label>
         </div>
@@ -208,7 +211,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
                 onChange={(e) => setExtractType(e.target.value as any)}
                 className="text-green-400"
               />
-              <span className="text-sm text-white">Summary - Key points and overview</span>
+              <span className="text-sm text-gray-900 dark:text-white">Summary - Key points and overview</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -219,7 +222,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
                 onChange={(e) => setExtractType(e.target.value as any)}
                 className="text-green-400"
               />
-              <span className="text-sm text-white">Key Data - Important facts and figures</span>
+              <span className="text-sm text-gray-900 dark:text-white">Key Data - Important facts and figures</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -230,7 +233,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
                 onChange={(e) => setExtractType(e.target.value as any)}
                 className="text-green-400"
               />
-              <span className="text-sm text-white">Full Text - Complete document content</span>
+              <span className="text-sm text-gray-900 dark:text-white">Full Text - Complete document content</span>
             </label>
           </div>
         </div>
@@ -250,7 +253,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
 
           {/* Tags Input */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-white/80">Tags (optional):</label>
+            <label className="text-xs font-medium text-gray-700 dark:text-white/80">Tags (optional):</label>
             <input
               type="text"
               value={tags}
@@ -265,20 +268,24 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
 
       {/* Action Buttons */}
       <div className="flex items-center justify-end gap-2 pt-2">
-        <button
+        <Button
           onClick={onCancel}
-          className="px-3 py-1.5 text-white/60 hover:text-white/80 rounded-md transition-colors text-xs font-medium"
+          variant="ghost"
+          size="sm"
+          className="text-white/60 hover:text-white/80 text-xs"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleConfirm}
-          className="px-4 py-1.5 bg-purple-500/20 text-purple-400 rounded-md hover:bg-purple-500/30 transition-colors text-xs font-medium"
+          variant="primary"
+          size="sm"
+          className="bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 text-xs"
         >
           {selectedAction === 'extract' ? 'Extract Data' : 
            selectedAction === 'store' ? 'Store Documents' : 
            'Extract & Store'}
-        </button>
+        </Button>
       </div>
     </motion.div>
   );

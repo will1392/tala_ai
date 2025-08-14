@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tala AI - Frontend Reset Tool</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #fff;
+        }
+        h1 {
+            color: #00b4d8;
+            border-bottom: 2px solid #00b4d8;
+            padding-bottom: 10px;
+        }
+        .section {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #333;
+        }
+        button {
+            background: #00b4d8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0096c7;
+        }
+        button.danger {
+            background: #e63946;
+        }
+        button.danger:hover {
+            background: #d62828;
+        }
+        .log {
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #4ade80;
+        }
+        .error {
+            color: #f87171;
+        }
+        .warning {
+            color: #fbbf24;
+        }
+        .info {
+            color: #60a5fa;
+        }
+        .stat {
+            display: inline-block;
+            margin: 10px 20px 10px 0;
+            padding: 8px 16px;
+            background: #262626;
+            border-radius: 4px;
+        }
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+        .stat-value {
+            color: #fff;
+            font-size: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Tala AI - Frontend Reset Tool</h1>
+    
+    <div class="section">
+        <h2>📊 Current State</h2>
+        <div id="stats">
+            <div class="stat">
+                <div class="stat-label">Conversations</div>
+                <div class="stat-value" id="convCount">-</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Frontend IDs</div>
+                <div class="stat-value" id="frontendCount">-</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Backend IDs</div>
+                <div class="stat-value" id="backendCount">-</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Cached Messages</div>
+                <div class="stat-value" id="messageCount">-</div>
+            </div>
+        </div>
+        <button onclick="analyzeState()">🔍 Analyze Current State</button>
+    </div>
+    
+    <div class="section">
+        <h2>🧹 Cleanup Actions</h2>
+        <button onclick="removeFrontendIds()">Remove Frontend IDs Only</button>
+        <button onclick="clearAllConversations()" class="danger">Clear All Conversations</button>
+        <button onclick="fullReset()" class="danger">Full Reset (Clear Everything)</button>
+    </div>
+    
+    <div class="section">
+        <h2>🧪 Test Backend</h2>
+        <button onclick="testBackendConnection()">Test Backend Connection</button>
+        <button onclick="createTestConversation()">Create Test Conversation</button>
+        <button onclick="loadBackendConversations()">Load Backend Conversations</button>
+    </div>
+    
+    <div class="section">
+        <h2>📝 Activity Log</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001';
+        const USER_ID = 'admin-1';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function analyzeState() {
+            log('Analyzing current state...', 'info');
+            
+            // Get conversation data
+            const currentConv = localStorage.getItem('tala_current_conversation');
+            const convList = localStorage.getItem('tala_conversations_admin-1');
+            const messageKeys = Object.keys(localStorage).filter(k => k.startsWith('tala_messages_'));
+            
+            let frontendCount = 0;
+            let backendCount = 0;
+            
+            if (convList) {
+                const list = JSON.parse(convList);
+                document.getElementById('convCount').textContent = list.length;
+                
+                list.forEach(conv => {
+                    if (conv.id?.startsWith('conv-')) {
+                        frontendCount++;
+                    } else {
+                        backendCount++;
+                    }
+                });
+                
+                document.getElementById('frontendCount').textContent = frontendCount;
+                document.getElementById('backendCount').textContent = backendCount;
+                
+                if (frontendCount > 0) {
+                    log(`Found ${frontendCount} frontend IDs that need cleanup`, 'warning');
+                }
+                if (backendCount > 0) {
+                    log(`Found ${backendCount} proper backend IDs`, 'success');
+                }
+            } else {
+                document.getElementById('convCount').textContent = '0';
+                document.getElementById('frontendCount').textContent = '0';
+                document.getElementById('backendCount').textContent = '0';
+            }
+            
+            document.getElementById('messageCount').textContent = messageKeys.length;
+            
+            if (currentConv) {
+                const parsed = JSON.parse(currentConv);
+                if (parsed.id?.startsWith('conv-')) {
+                    log(`Current conversation has frontend ID: ${parsed.id}`, 'warning');
+                } else {
+                    log(`Current conversation has backend ID: ${parsed.id}`, 'success');
+                }
+            }
+            
+            log('Analysis complete', 'success');
+        }
+        
+        function removeFrontendIds() {
+            log('Removing frontend IDs...', 'info');
+            
+            // Remove conversations with frontend IDs
+            const convList = localStorage.getItem('tala_conversations_admin-1');
+            if (convList) {
+                const list = JSON.parse(convList);
+                const filtered = list.filter(c => !c.id?.startsWith('conv-'));
+                const removed = list.length - filtered.length;
+                localStorage.setItem('tala_conversations_admin-1', JSON.stringify(filtered));
+                log(`Removed ${removed} frontend conversations`, 'success');
+            }
+            
+            // Remove message caches with frontend IDs
+            const messageKeys = Object.keys(localStorage).filter(k => 
+                k.startsWith('tala_messages_conv-')
+            );
+            messageKeys.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            log(`Removed ${messageKeys.length} frontend message caches`, 'success');
+            
+            // Clear current conversation if it's a frontend ID
+            const currentConv = localStorage.getItem('tala_current_conversation');
+            if (currentConv) {
+                const parsed = JSON.parse(currentConv);
+                if (parsed.id?.startsWith('conv-')) {
+                    localStorage.removeItem('tala_current_conversation');
+                    log('Cleared current conversation (was frontend ID)', 'success');
+                }
+            }
+            
+            analyzeState();
+            log('Frontend ID cleanup complete!', 'success');
+        }
+        
+        function clearAllConversations() {
+            if (!confirm('This will clear ALL conversations. Continue?')) return;
+            
+            log('Clearing all conversations...', 'warning');
+            
+            const keys = Object.keys(localStorage).filter(k => 
+                k.includes('tala_conversations') || 
+                k.includes('tala_messages') ||
+                k.includes('tala_current')
+            );
+            
+            keys.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            
+            log(`Cleared ${keys.length} conversation-related items`, 'success');
+            analyzeState();
+        }
+        
+        function fullReset() {
+            if (!confirm('This will clear ALL Tala AI data. Continue?')) return;
+            
+            log('Performing full reset...', 'warning');
+            
+            const keys = Object.keys(localStorage).filter(k => k.includes('tala'));
+            keys.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            
+            log(`Cleared ${keys.length} total items`, 'success');
+            log('Full reset complete!', 'success');
+            analyzeState();
+        }
+        
+        async function testBackendConnection() {
+            log('Testing backend connection...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations`, {
+                    headers: { 'x-user-id': USER_ID }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Backend connected! Found ${data.conversations?.length || 0} conversations`, 'success');
+                } else {
+                    log(`❌ Backend error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function createTestConversation() {
+            log('Creating test conversation...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/chat/v2`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': USER_ID
+                    },
+                    body: JSON.stringify({
+                        message: 'Test message from reset tool',
+                        mode: 'travel',
+                        searchKnowledge: false
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Created conversation: ${data.conversationId}`, 'success');
+                    if (data.conversationId?.startsWith('conv-')) {
+                        log('⚠️ Backend is still creating frontend IDs!', 'warning');
+                    } else {
+                        log('✅ Backend created proper ID format', 'success');
+                    }
+                } else {
+                    log(`❌ Failed to create: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Creation failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadBackendConversations() {
+            log('Loading backend conversations...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations`, {
+                    headers: { 'x-user-id': USER_ID }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.conversations && data.conversations.length > 0) {
+                        log(`Found ${data.conversations.length} backend conversations:`, 'success');
+                        data.conversations.slice(0, 5).forEach(conv => {
+                            const idType = conv.id?.startsWith('conv-') ? '❌ Frontend' : '✅ Backend';
+                            log(`  ${idType}: ${conv.id} - ${conv.title || 'Untitled'}`, 'info');
+                        });
+                    } else {
+                        log('No backend conversations found', 'warning');
+                    }
+                } else {
+                    log(`❌ Failed to load: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Load failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-analyze on load
+        window.onload = () => {
+            log('Frontend Reset Tool loaded', 'info');
+            analyzeState();
+        };
+    </script>
+</body>
+</html>

@@ -155,22 +155,35 @@ export class ServiceIntegration {
     // Extend message addition to use threading
     const originalAddMessage = conversationService.addMessage;
     
-    conversationService.addMessage = async function(conversationId, messageData) {
-      const result = await originalAddMessage.call(this, conversationId, messageData);
+    conversationService.addMessage = async function(messageData) {
+      // Handle both old format (conversationId, messageData) and new format (messageData with conversation_id)
+      let actualMessageData;
+      if (typeof messageData === 'string') {
+        // Old format: conversationId as first param, messageData as second
+        actualMessageData = {
+          conversation_id: arguments[0],
+          ...arguments[1]
+        };
+      } else {
+        // New format: messageData contains conversation_id
+        actualMessageData = messageData;
+      }
+      
+      const result = await originalAddMessage.call(this, actualMessageData);
       
       if (result.success && this.intelligence) {
         try {
           // Get conversation to find thread ID
-          const conv = await conversationService.getConversationById(conversationId);
+          const conv = await conversationService.getConversation(actualMessageData.conversation_id);
           if (conv.data?.thread_id) {
             // Add message to thread
             await this.intelligence.threadingService.addMessage(conv.data.thread_id, {
-              role: messageData.sender === 'user' ? 'user' : 'assistant',
-              content: messageData.content,
+              role: actualMessageData.role || actualMessageData.sender,
+              content: actualMessageData.content,
               metadata: {
                 messageId: result.data.id,
-                entities: messageData.entities,
-                timestamp: messageData.timestamp
+                entities: actualMessageData.entities,
+                timestamp: actualMessageData.timestamp
               }
             });
           }

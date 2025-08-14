@@ -20,7 +20,7 @@ class EnhancedResponseGenerator {
     this.FAIR_MATCH = 0.35;       // Marginal quality
     this.MIN_RELEVANCE_SCORE = 0.35; // Absolute minimum
     
-    this.MAX_RESPONSE_TOKENS = 2000;
+    this.MAX_RESPONSE_TOKENS = 4000;  // Increased for GPT-5 to avoid cutoffs
   }
 
   /**
@@ -30,9 +30,13 @@ class EnhancedResponseGenerator {
     query, 
     searchResults, 
     conversationHistory = [], 
-    openaiClient 
+    openaiClient,
+    userLearningContext = null
   }) {
     console.log('🎯 Enhanced Response Generator activated');
+    if (userLearningContext) {
+      console.log('🧠 Using personalized learning context');
+    }
     
     // 1. Intelligently select and extract content from search results
     const { relevantContent, selectionMetadata } = this.selectAndExtractContent(query, searchResults);
@@ -45,25 +49,26 @@ class EnhancedResponseGenerator {
       query,
       relevantContent,
       conversationContext,
-      selectionMetadata
+      selectionMetadata,
+      userLearningContext
     });
     
     // 4. Generate response
     console.log('📝 Generating enhanced response...');
     const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-nano-2025-08-07',
       messages: [
         { 
           role: 'system', 
-          content: this.getSystemPrompt() 
+          content: this.getSystemPrompt(userLearningContext) 
         },
         { 
           role: 'user', 
           content: enhancedPrompt 
         }
       ],
-      temperature: 0.6,
-      max_tokens: this.MAX_RESPONSE_TOKENS
+      temperature: 1.0,  // GPT-5 only supports temperature=1.0
+      max_completion_tokens: this.MAX_RESPONSE_TOKENS  // GPT-5 uses max_completion_tokens
     });
     
     return {
@@ -522,8 +527,8 @@ Remember: Quality over quantity - better to give excellent information from one 
   /**
    * Get sophisticated system prompt
    */
-  getSystemPrompt() {
-    return `You are Tala, an expert AI travel assistant with deep knowledge of destinations worldwide. Your personality is:
+  getSystemPrompt(userLearningContext = null) {
+    let basePrompt = `You are Tala, an expert AI travel assistant with deep knowledge of destinations worldwide. Your personality is:
 - Warm, enthusiastic, and genuinely excited about travel
 - Professional yet approachable
 - Detail-oriented and thorough
@@ -540,6 +545,29 @@ Your responses should:
 - Acknowledge when information is limited or not perfectly matched to the query
 
 You base your responses on travel guide information provided, and you're always honest about what you do and don't have information about.`;
+
+    // Add user-specific learning context if available
+    if (userLearningContext) {
+      basePrompt += '\n\n===== USER PERSONALIZATION =====\n';
+      
+      if (userLearningContext.communicationStyle) {
+        basePrompt += `\n${userLearningContext.communicationStyle}`;
+      }
+      
+      if (userLearningContext.businessContext) {
+        basePrompt += `\n${userLearningContext.businessContext}`;
+      }
+      
+      if (userLearningContext.preferences) {
+        basePrompt += `\nUser preferences:\n${userLearningContext.preferences}`;
+      }
+      
+      if (userLearningContext.personalizedTips) {
+        basePrompt += `\nPersonalized tips:\n${userLearningContext.personalizedTips.join('\n')}`;
+      }
+    }
+    
+    return basePrompt;
   }
 }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NotificationProvider } from '../components/cmo/NotificationSystem';
 import CMODashboardEnhanced from './CMODashboardEnhanced';
 import { OnboardingFlowEnhanced } from '../components/cmo/OnboardingFlowEnhanced';
-import { GuidedTour } from '../components/cmo/GuidedTour';
+import { GuidedTour } from '../components/cmo/GuidedTourWorking';
 import { HelpModal } from '../components/cmo/HelpSystem';
 import { AchievementsPanel } from '../components/cmo/AchievementDisplay';
 import { Trophy, HelpCircle, Play, Sparkles } from 'lucide-react';

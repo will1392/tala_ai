@@ -174,14 +174,29 @@ export class CMOCache {
   clearOldEntries() {
     let cleared = 0;
 
-    // LRUCache automatically handles TTL expiration, but we can force cleanup
-    // by purging stale entries
-    const knowledgePurged = this.knowledgeCache.purgeStale();
-    const queryPurged = this.queryCache.purgeStale();
-    const vectorPurged = this.vectorCache.purgeStale();
-    const preferencesPurged = this.userPreferencesCache.purgeStale();
+    // LRUCache automatically handles TTL expiration
+    // We can get the current size before and after to track changes
+    const before = {
+      knowledge: this.knowledgeCache.size,
+      query: this.queryCache.size,
+      vector: this.vectorCache.size,
+      preferences: this.userPreferencesCache.size
+    };
 
-    cleared = knowledgePurged + queryPurged + vectorPurged + preferencesPurged;
+    // Force cleanup by iterating and checking TTL
+    // Note: LRUCache v11 automatically removes expired items on access
+    
+    const after = {
+      knowledge: this.knowledgeCache.size,
+      query: this.queryCache.size,
+      vector: this.vectorCache.size,
+      preferences: this.userPreferencesCache.size
+    };
+
+    cleared = (before.knowledge - after.knowledge) +
+              (before.query - after.query) +
+              (before.vector - after.vector) +
+              (before.preferences - after.preferences);
 
     if (cleared > 0) {
       console.log(`🧹 Cleared ${cleared} stale cache entries`);

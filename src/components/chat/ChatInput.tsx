@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import { Send, Paperclip, Mic, MicOff, Sparkles, AlertCircle, Database, X, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '../shared/Button';
+import { Button } from '../ui/Button';
 import { cn } from '../../utils/cn';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { VoiceCategorySelector } from './VoiceCategorySelector';
@@ -238,7 +238,9 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
       {/* Input Area */}
       <div className="flex items-end gap-3">
         <div className="flex-1 relative">
+          <label htmlFor="chat-input" className="sr-only">Message input</label>
           <textarea
+            id="chat-input"
             ref={textareaRef}
             value={isListening ? `${message}${interimTranscript}` : message}
             onChange={(e) => setMessage(e.target.value)}
@@ -246,6 +248,9 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
             placeholder={isListening ? "Listening... Speak now" : placeholder}
             disabled={disabled || isListening}
             rows={1}
+            aria-label="Type your message"
+            aria-describedby="chat-input-help"
+            aria-invalid={false}
             className={cn(
               'w-full resize-none rounded-xl px-4 py-3 pr-12',
               'glass-input min-h-[48px] max-h-[120px]',
@@ -259,9 +264,15 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
           />
           
           {/* AI Enhance Button */}
-          <button className="absolute right-2 bottom-2 p-2 rounded-lg hover:bg-white/10 transition-colors">
-            <Sparkles size={18} className="text-primary" />
-          </button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="absolute right-2 bottom-2 p-2 min-h-0 min-w-0"
+            aria-label="Enhance message with AI"
+            title="Enhance message with AI"
+          >
+            <Sparkles size={18} className="text-primary" aria-hidden="true" />
+          </Button>
         </div>
 
         {/* Action Buttons */}
@@ -272,6 +283,8 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
             multiple
             onChange={handleFileSelect}
             className="hidden"
+            id="file-upload"
+            aria-label="Upload files"
           />
           
           <Button
@@ -280,8 +293,10 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
             onClick={() => fileInputRef.current?.click()}
             className="p-3"
             disabled={disabled}
+            aria-label="Attach files"
+            title="Attach files"
           >
-            <Paperclip size={20} />
+            <Paperclip size={20} aria-hidden="true" />
           </Button>
           
           <Button
@@ -294,19 +309,22 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
               !isSpeechSupported && 'opacity-50 cursor-not-allowed'
             )}
             disabled={disabled || !isSpeechSupported}
+            aria-label={!isSpeechSupported ? 'Speech recognition not supported' : isListening ? 'Stop voice recording' : 'Start voice recording'}
+            aria-pressed={isListening}
             title={!isSpeechSupported ? 'Speech recognition not supported' : isListening ? 'Stop listening' : 'Start voice input'}
           >
             {isListening ? (
               <>
-                <MicOff size={20} />
+                <MicOff size={20} aria-hidden="true" />
                 <motion.div
                   className="absolute inset-0 rounded-lg border-2 border-red-500"
                   animate={{ scale: [1, 1.1, 1] }}
                   transition={{ duration: 1, repeat: Infinity }}
+                  aria-hidden="true"
                 />
               </>
             ) : (
-              <Mic size={20} />
+              <Mic size={20} aria-hidden="true" />
             )}
           </Button>
           
@@ -316,8 +334,10 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
             onClick={handleSend}
             disabled={disabled || (!message.trim() && attachments.length === 0) || isProcessingDocuments}
             className="p-3"
+            aria-label="Send message"
+            title="Send message"
           >
-            <Send size={20} />
+            <Send size={20} aria-hidden="true" />
           </Button>
         </div>
       </div>
@@ -353,12 +373,14 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
               <Mic size={16} />
             </motion.div>
             <span>Listening... Speak clearly</span>
-            <button
+            <Button
               onClick={stopListening}
-              className="ml-auto text-xs text-primary/70 hover:text-primary"
+              variant="ghost"
+              size="sm"
+              className="ml-auto text-xs text-primary/70 hover:text-primary p-1 min-h-0"
             >
               Stop
-            </button>
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -378,13 +400,15 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
                 <p className="text-blue-400 font-medium text-sm">Store voice input in knowledge base?</p>
                 <p className="text-xs text-white/60 mt-1">This will help improve future responses</p>
               </div>
-              <button
+              <Button
                 onClick={handleDismissKnowledgePrompt}
-                className="p-1 text-white/40 hover:text-white/60 transition-colors"
+                variant="ghost"
+                size="sm"
+                className="p-1 text-white/40 hover:text-white/60 min-h-0 min-w-0"
                 title="Dismiss"
               >
                 <X size={14} />
-              </button>
+              </Button>
             </div>
             
             {/* Category Selector */}
@@ -396,19 +420,23 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
             
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-2">
-              <button
+              <Button
                 onClick={handleDismissKnowledgePrompt}
-                className="px-3 py-1.5 text-white/60 hover:text-white/80 rounded-md transition-colors text-xs font-medium"
+                variant="ghost"
+                size="sm"
+                className="text-white/60 hover:text-white/80 text-xs"
               >
                 Skip
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleStoreInKnowledgeBase}
                 disabled={!selectedCategory}
-                className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-md hover:bg-blue-500/30 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                variant="primary"
+                size="sm"
+                className="bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 text-xs"
               >
                 Store in {selectedCategory?.name || 'Category'}
-              </button>
+              </Button>
             </div>
           </motion.div>
         )}
@@ -446,7 +474,7 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
       </AnimatePresence>
 
       {/* Typing Indicators */}
-      <div className="flex items-center justify-between text-xs text-white/50">
+      <div className="flex items-center justify-between text-xs text-white/50" id="chat-input-help">
         <span>
           {isListening 
             ? "Voice input active - click microphone to stop"
@@ -456,7 +484,7 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
           }
         </span>
         {message.length > 0 && (
-          <span>{message.length} characters</span>
+          <span aria-live="polite" aria-atomic="true">{message.length} characters</span>
         )}
       </div>
     </div>

@@ -1,3 +1,5 @@
+import { getMarketingContext, getMarketingStructuredData, getMarketingResponseAdjustment } from './MarketingContextService';
+
 export interface ChatMessage {
   id: string;
   content: string;
@@ -45,6 +47,17 @@ export class ChatService {
     this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     this.userId = userId;
     this.isAdmin = isAdmin;
+    console.log('💬 ChatService initialized:', { baseUrl: this.baseUrl, userId: this.userId });
+    
+    // Check if marketing profile exists
+    const marketingData = getMarketingStructuredData();
+    if (marketingData) {
+      console.log('📊 Marketing profile loaded:', {
+        skillLevel: marketingData.skillLevel,
+        readinessScore: marketingData.readinessScore,
+        activeGoals: marketingData.activeGoals?.length || 0
+      });
+    }
   }
 
   /**
@@ -53,6 +66,8 @@ export class ChatService {
   async sendMessage(
     message: string, 
     conversationId?: string,
+    mode: string = 'travel',
+    subMode?: string,
     maxResults: number = 5
   ): Promise<ChatResponse> {
     try {
@@ -92,6 +107,31 @@ export class ChatService {
       }
       
       // Regular chat request - use v2 endpoint
+      console.log('🚀 ChatService sending request:', {
+        url: `${this.baseUrl}/api/chat/v2`,
+        body: {
+          message,
+          userId: this.userId,
+          isAdmin: this.isAdmin,
+          conversationId,
+          mode,
+          subMode,
+          maxResults,
+          searchKnowledge: mode === 'travel'
+        }
+      });
+      
+      // Get marketing context if available
+      const marketingContext = getMarketingContext();
+      const marketingData = getMarketingStructuredData();
+      const responseAdjustment = getMarketingResponseAdjustment();
+      
+      // Enhance message with marketing context if available
+      let enhancedMessage = message;
+      if (marketingContext && mode === 'marketing') {
+        enhancedMessage = `${message}\n\n[Marketing Context]\n${marketingContext}`;
+      }
+      
       const response = await fetch(`${this.baseUrl}/api/chat/v2`, {
         method: 'POST',
         headers: {
@@ -99,26 +139,46 @@ export class ChatService {
           'x-user-id': this.userId // Use standard user header
         },
         body: JSON.stringify({
-          message,
+          message: enhancedMessage,
           userId: this.userId,
           isAdmin: this.isAdmin,
           conversationId,
-          maxResults
+          mode,
+          subMode,
+          maxResults,
+          // Force knowledge base search for travel mode
+          searchKnowledge: mode === 'travel',
+          // Include marketing context for all modes
+          marketingProfile: marketingData,
+          responseAdjustment: mode === 'marketing' ? responseAdjustment : null
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send message');
+        console.error('❌ Chat API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: `${this.baseUrl}/api/chat/v2`
+        });
+        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+        throw new Error(errorData.error || `Failed to send message: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
       
       // Handle v2 response format
       if (data.success && data.response) {
+        console.log('📊 Response data received:', {
+          hasSources: !!data.sources,
+          sourcesCount: data.sources?.length || 0,
+          sources: data.sources,
+          hasMetadataSources: !!(data.metadata?.sources),
+          metadataSourcesCount: data.metadata?.sources?.length || 0
+        });
+        
         return {
           response: data.response,
-          sources: data.metadata?.sources || [],
+          sources: data.sources || data.metadata?.sources || [],
           contextUsed: data.metadata?.contextUsed || false,
           conversationId: data.conversationId || conversationId || this.generateConversationId(),
           timestamp: new Date().toISOString(),

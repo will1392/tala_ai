@@ -6,7 +6,11 @@
  */
 
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 /**
  * Memory importance thresholds and scoring
@@ -272,7 +276,7 @@ export const EMBEDDING_CONFIG = {
   // Embedding model settings
   MODEL: {
     provider: process.env.EMBEDDING_PROVIDER || 'openai',
-    model_name: process.env.EMBEDDING_MODEL || 'text-embedding-ada-002',
+    model_name: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
     batch_size: parseInt(process.env.EMBEDDING_BATCH_SIZE) || 100,
     retry_attempts: 3,
     timeout_ms: 30000

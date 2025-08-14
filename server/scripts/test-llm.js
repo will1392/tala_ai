@@ -5,10 +5,14 @@
  */
 
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import LLMManager from '../services/llm/LLMManager.js';
 import { LLM_MODELS } from '../services/llm/config.js';
 
-dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const TEST_MESSAGE = [
   { role: 'user', content: 'Hello! Please respond with exactly "LLM Test Successful" to confirm you are working.' }

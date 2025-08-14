@@ -178,9 +178,17 @@ class LLMRouter {
       const response = await this.fallbackManager.executeWithFallback(
         async (modelId) => {
           const service = await this.getServiceInstance(modelId);
-          return await service.chat([
-            { role: 'user', content: query }
-          ], options);
+          const messages = [];
+          
+          // Add system prompt if provided in options
+          if (options.systemPrompt) {
+            messages.push({ role: 'system', content: options.systemPrompt });
+          }
+          
+          // Add user message
+          messages.push({ role: 'user', content: query });
+          
+          return await service.chat(messages, options);
         },
         filteredChain,
         executionContext

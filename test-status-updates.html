@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tala Status Updates Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 {
+            color: #16a085;
+        }
+        .status-box {
+            background: #0f0f1e;
+            border: 1px solid #16a085;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            min-height: 100px;
+        }
+        .status-message {
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+            margin-bottom: 5px;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.85em;
+        }
+        .status {
+            color: #16a085;
+            font-weight: bold;
+        }
+        .stage {
+            color: #e74c3c;
+        }
+        .details {
+            color: #95a5a6;
+            font-size: 0.9em;
+            margin-left: 20px;
+        }
+        button {
+            background: #16a085;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #1abc9c;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        #response {
+            background: #0f0f1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌊 Tala Status Updates Test</h1>
+    
+    <button id="sendQuery" onclick="sendQuery()">Send Test Query</button>
+    
+    <div class="status-box">
+        <h3>Status Updates:</h3>
+        <div id="statusMessages"></div>
+    </div>
+    
+    <div id="response" style="display: none;">
+        <h3>Response:</h3>
+        <div id="responseContent"></div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        
+        async function sendQuery() {
+            const button = document.getElementById('sendQuery');
+            const statusDiv = document.getElementById('statusMessages');
+            const responseDiv = document.getElementById('response');
+            const responseContent = document.getElementById('responseContent');
+            
+            button.disabled = true;
+            statusDiv.innerHTML = '';
+            responseDiv.style.display = 'none';
+            
+            // Generate request ID
+            const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Start SSE connection
+            eventSource = new EventSource(`http://localhost:3001/api/chat/status/stream/${requestId}`);
+            
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'status-message';
+                    
+                    const time = new Date(data.timestamp || Date.now()).toLocaleTimeString();
+                    
+                    if (data.type === 'status') {
+                        messageDiv.innerHTML = `
+                            <span class="timestamp">[${time}]</span>
+                            <span class="status">STATUS:</span> ${data.status}
+                        `;
+                    } else if (data.type === 'progress') {
+                        let detailsHtml = '';
+                        if (data.details) {
+                            detailsHtml = '<div class="details">' + 
+                                Object.entries(data.details).map(([key, value]) => 
+                                    `${key}: ${value}`
+                                ).join(' • ') + 
+                                '</div>';
+                        }
+                        messageDiv.innerHTML = `
+                            <span class="timestamp">[${time}]</span>
+                            <span class="stage">STAGE:</span> ${data.stage}
+                            ${detailsHtml}
+                        `;
+                    } else if (data.type === 'complete') {
+                        messageDiv.innerHTML = `
+                            <span class="timestamp">[${time}]</span>
+                            <span class="status">✅ COMPLETE</span>
+                        `;
+                        eventSource.close();
+                    }
+                    
+                    statusDiv.appendChild(messageDiv);
+                } catch (error) {
+                    console.error('Failed to parse SSE data:', error);
+                }
+            };
+            
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                eventSource.close();
+            };
+            
+            // Send the actual query
+            try {
+                const response = await fetch('http://localhost:3001/api/chat/v2', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': 'admin-1'
+                    },
+                    body: JSON.stringify({
+                        message: 'Tell me about the best beaches in Portugal',
+                        mode: 'travel',
+                        searchKnowledge: true,
+                        requestId: requestId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                responseDiv.style.display = 'block';
+                responseContent.textContent = data.response || 'No response received';
+                
+                // Add sources if available
+                if (data.sources && data.sources.length > 0) {
+                    responseContent.textContent += '\n\nSources:\n' + 
+                        data.sources.map(s => `• ${s.title} (${Math.round(s.score * 100)}%)`).join('\n');
+                }
+                
+            } catch (error) {
+                responseContent.textContent = 'Error: ' + error.message;
+                responseDiv.style.display = 'block';
+            } finally {
+                button.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

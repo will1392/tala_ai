@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NotificationProvider } from '../components/cmo/NotificationSystem';
 import CMODashboardEnhanced from './CMODashboardEnhanced';
 import { OnboardingFlowEnhanced } from '../components/cmo/OnboardingFlowEnhanced';
-import { GuidedTour } from '../components/cmo/GuidedTour';
+import { GuidedTour, CMO_TOURS } from '../components/cmo/GuidedTour';
 import { HelpModal } from '../components/cmo/HelpSystem';
 import { AchievementsPanel } from '../components/cmo/AchievementDisplay';
 import { Trophy, HelpCircle, Play, Sparkles, Flag } from 'lucide-react';
@@ -207,6 +207,7 @@ const CMOWithFeatureFlags: React.FC = () => {
         {showTour && (
           <ErrorBoundary name="GuidedTour">
             <GuidedTour
+              tour={CMO_TOURS.dashboard}
               onComplete={() => setShowTour(false)}
               onSkip={() => setShowTour(false)}
             />

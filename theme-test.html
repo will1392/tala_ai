@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tala Theme System Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#0fc6c6',
+                            light: '#3dd9d9',
+                            dark: '#0aa3a3',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .dark body {
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white min-h-screen">
+    <div class="max-w-6xl mx-auto p-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
+                Tala Theme System
+            </h1>
+            
+            <!-- Theme Toggle -->
+            <button onclick="toggleTheme()" class="relative w-16 h-8 rounded-full bg-gray-300 dark:bg-primary/20 border-2 border-gray-400 dark:border-primary/50 transition-colors">
+                <div id="toggle-knob" class="absolute top-0.5 left-1 w-6 h-6 rounded-full bg-white dark:bg-primary shadow-lg transition-all dark:translate-x-7">
+                    <span id="theme-icon" class="flex items-center justify-center h-full text-xs">
+                        ☀️
+                    </span>
+                </div>
+            </button>
+        </div>
+
+        <!-- Demo Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Basic Card -->
+            <div class="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg transition-shadow">
+                <h3 class="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Basic Card</h3>
+                <p class="text-gray-600 dark:text-gray-300">
+                    This card adapts to both light and dark themes seamlessly.
+                </p>
+            </div>
+
+            <!-- Glass Card -->
+            <div class="p-6 rounded-lg backdrop-blur-md bg-white/80 dark:bg-white/10 border border-gray-200/50 dark:border-white/20">
+                <h3 class="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Glass Card</h3>
+                <p class="text-gray-600 dark:text-gray-300">
+                    Glassmorphic design that works in both themes.
+                </p>
+            </div>
+
+            <!-- Primary Card -->
+            <div class="p-6 rounded-lg bg-primary/10 dark:bg-primary/20 border border-primary/30 dark:border-primary/50">
+                <h3 class="text-xl font-semibold mb-2 text-primary">Primary Card</h3>
+                <p class="text-gray-700 dark:text-gray-200">
+                    Uses primary color with different opacity in each theme.
+                </p>
+            </div>
+
+            <!-- Input Example -->
+            <div class="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Input Field</h3>
+                <input 
+                    type="text" 
+                    placeholder="Type something..."
+                    class="w-full px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+            </div>
+
+            <!-- Button Examples -->
+            <div class="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Buttons</h3>
+                <div class="space-y-2">
+                    <button class="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary-dark transition-colors">
+                        Primary Button
+                    </button>
+                    <button class="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                        Secondary Button
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Indicators -->
+            <div class="p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Status</h3>
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="text-gray-700 dark:text-gray-300">Online</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <span class="text-gray-700 dark:text-gray-300">Processing</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span class="text-gray-700 dark:text-gray-300">Error</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Color Palette -->
+        <div class="mt-12">
+            <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Color Palette</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <div class="h-20 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700"></div>
+                    <p class="text-sm mt-2 text-gray-600 dark:text-gray-400">Background</p>
+                </div>
+                <div>
+                    <div class="h-20 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700"></div>
+                    <p class="text-sm mt-2 text-gray-600 dark:text-gray-400">Card</p>
+                </div>
+                <div>
+                    <div class="h-20 rounded-lg bg-primary"></div>
+                    <p class="text-sm mt-2 text-gray-600 dark:text-gray-400">Primary</p>
+                </div>
+                <div>
+                    <div class="h-20 rounded-lg bg-gray-900 dark:bg-white"></div>
+                    <p class="text-sm mt-2 text-gray-600 dark:text-gray-400">Text</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Example -->
+        <div class="mt-12">
+            <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Chat Messages</h2>
+            <div class="space-y-4 p-6 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <!-- User Message -->
+                <div class="flex justify-end">
+                    <div class="max-w-xs p-3 rounded-lg bg-primary text-white">
+                        Tell me about beaches in Portugal
+                    </div>
+                </div>
+                <!-- Assistant Message -->
+                <div class="flex justify-start">
+                    <div class="max-w-md p-3 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white">
+                        Portugal has some of the most beautiful beaches in Europe, from the dramatic cliffs of the Algarve to the surfing paradises of the west coast.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check for saved theme preference or default to 'light'
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        if (currentTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').textContent = '🌙';
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.textContent = '☀️';
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                icon.textContent = '🌙';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+    </script>
+</body>
+</html>

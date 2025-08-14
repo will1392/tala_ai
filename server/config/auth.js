@@ -6,9 +6,14 @@
  */
 
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Load environment variables
-dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Config is in /server/config, so go up two levels to reach root
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 /**
  * Get authentication configuration based on environment variables

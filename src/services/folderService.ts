@@ -20,23 +20,31 @@ class FolderService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
   }
 
-  async createFolder(request: CreateFolderRequest): Promise<Folder> {
-    console.log('📁 Creating folder:', request.name);
+  async createFolder(userId: string, request: CreateFolderRequest): Promise<Folder> {
+    console.log('📁 Creating folder:', request.name, 'for user:', userId);
     
-    const response = await fetch(`${this.baseUrl}/api/folders`, {
+    const response = await fetch(`${this.baseUrl}/folders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-user-id': userId
       },
       body: JSON.stringify(request),
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to create folder' }));
-      throw new Error(error.error || 'Failed to create folder');
+      let errorMessage = 'Failed to create folder';
+      try {
+        const errorData = await response.json();
+        console.error('Server error response:', errorData);
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        console.error('Failed to parse error response:', e);
+      }
+      throw new Error(`${errorMessage} (Status: ${response.status})`);
     }
 
     const folder = await response.json();
@@ -52,7 +60,7 @@ class FolderService {
       isAdmin: isAdmin.toString(),
     });
 
-    const response = await fetch(`${this.baseUrl}/api/folders?${params}`);
+    const response = await fetch(`${this.baseUrl}/folders?${params}`);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to fetch folders' }));
@@ -67,7 +75,7 @@ class FolderService {
   async deleteFolder(folderId: string, userId: string): Promise<void> {
     console.log('🗑️ Deleting folder:', folderId);
     
-    const response = await fetch(`${this.baseUrl}/api/folders/${folderId}`, {
+    const response = await fetch(`${this.baseUrl}/folders/${folderId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -86,7 +94,7 @@ class FolderService {
   async updateFolder(folderId: string, updates: Partial<Pick<Folder, 'name' | 'description'>>, userId: string): Promise<Folder> {
     console.log('📝 Updating folder:', folderId);
     
-    const response = await fetch(`${this.baseUrl}/api/folders/${folderId}`, {
+    const response = await fetch(`${this.baseUrl}/folders/${folderId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

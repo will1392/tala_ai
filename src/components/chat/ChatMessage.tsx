@@ -4,7 +4,7 @@ import { User, Bot, Copy, ThumbsUp, ThumbsDown, FileText, ExternalLink } from 'l
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { cn } from '../../utils/cn';
-import ReactMarkdown from 'react-markdown';
+import Markdown from '../shared/Markdown';
 import { ReferenceDocumentModal } from './ReferenceDocumentModal';
 
 interface Message {
@@ -60,16 +60,8 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
             variant="light"
             className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-purple-500/20"
           >
-            <div className="prose prose-invert max-w-none text-center">
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0 text-white/90">{children}</p>,
-                  ul: ({ children }) => <ul className="list-none space-y-1 text-left inline-block">{children}</ul>,
-                  li: ({ children }) => <li className="text-white/80">{children}</li>,
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
+            <div className="text-center">
+              <Markdown content={message.content} />
             </div>
           </GlassCard>
         </div>
@@ -107,7 +99,7 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
       )}>
         {/* Name and Time */}
         <div className={cn(
-          'flex items-center gap-2 text-sm text-white/60',
+          'flex items-center gap-2 text-sm text-gray-600 dark:text-white/60',
           isUser && 'flex-row-reverse'
         )}>
           <span className="font-medium">{isUser ? 'You' : 'Tala'}</span>
@@ -127,21 +119,11 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
               isUser ? 'bg-primary/20' : ''
             )}
           >
-            <div className="prose prose-invert max-w-none">
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                  li: ({ children }) => <li className="mb-1">{children}</li>,
-                  code: ({ children }) => (
-                    <code className="bg-white/10 px-1 py-0.5 rounded text-sm">{children}</code>
-                  ),
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </div>
+            {isUser ? (
+              <p className="whitespace-pre-wrap leading-relaxed text-gray-900 dark:text-gray-100">{message.content}</p>
+            ) : (
+              <Markdown content={message.content} />
+            )}
 
             {/* Attachments */}
             {message.attachments && message.attachments.length > 0 && (
@@ -154,7 +136,7 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
                     <FileText size={20} className="text-primary" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">{attachment.name}</p>
-                      <p className="text-xs text-white/60">{attachment.size}</p>
+                      <p className="text-xs text-gray-600 dark:text-white/60">{attachment.size}</p>
                     </div>
                   </div>
                 ))}
@@ -164,7 +146,7 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
             {/* Sources */}
             {message.sources && message.sources.length > 0 && (
               <div className="mt-3 pt-3 border-t border-white/10">
-                <p className="text-xs text-white/60 mb-2">Sources:</p>
+                <p className="text-xs text-gray-600 dark:text-white/60 mb-2">Sources:</p>
                 <div className="space-y-1">
                   {message.sources.map((source, index) => (
                     <button
@@ -179,7 +161,7 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
                       )}
                       <span className="truncate flex-1 text-left">{source.title}</span>
                       {source.score && (
-                        <span className="text-xs text-white/40 ml-auto" title="Relevance score">
+                        <span className="text-xs text-gray-500 dark:text-white/40 ml-auto" title="Relevance score">
                           {Math.round(source.score * 100)}%
                         </span>
                       )}

@@ -4,9 +4,13 @@
  */
 
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { getSupabaseService } from './db/supabaseClient.js';
 
-dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 async function runIntegrationMigration() {
     console.log('🚀 Running integration tables migration...\n');

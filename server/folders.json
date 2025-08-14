@@ -3,7 +3,7 @@
     "id": "76cb0d0a-adac-46da-8eda-4b679726f101",
     "name": "Destinations",
     "createdAt": "2025-06-30T13:38:07.247Z",
-    "documentCount": 1,
+    "documentCount": 2,
     "userId": "admin-1",
     "isAdmin": true
   },
@@ -11,17 +11,138 @@
     "id": "4e2732a2-adda-4799-afaf-24cd6aa22fc9",
     "name": "Test",
     "createdAt": "2025-06-30T15:26:29.231Z",
-    "documentCount": 0,
+    "documentCount": 1,
     "userId": "admin-1",
     "isAdmin": true
   },
   {
     "id": "dffeff1b-dbac-40c0-9eaa-a31f535447c0",
     "name": "France",
+    "description": "Travel guides and information about France",
     "createdAt": "2025-07-03T01:23:22.765Z",
+    "documentCount": 1,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "italy-001",
+    "name": "Italy",
+    "description": "Travel guides and information about Italy",
+    "createdAt": "2025-08-04T16:25:00.000Z",
     "documentCount": 0,
     "userId": "admin-1",
     "isAdmin": true,
-    "primaryFolderId": "e3647818-52ac-4d93-ba7d-333ece6a5021"
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "spain-001",
+    "name": "Spain",
+    "description": "Travel guides and information about Spain",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "japan-001",
+    "name": "Japan",
+    "description": "Travel guides and information about Japan",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "australia-001",
+    "name": "Australia",
+    "description": "Travel guides and information about Australia",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "greece-001",
+    "name": "Greece",
+    "description": "Travel guides and information about Greece",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "portugal-001",
+    "name": "Portugal",
+    "description": "Travel guides and information about Portugal",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 2,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "england-001",
+    "name": "England",
+    "description": "Travel guides and information about England",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 2,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "airlines-001",
+    "name": "Airlines",
+    "description": "Airline information and policies",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "bf380526-3fd8-41b0-bd63-a85a60ccc2ad"
+  },
+  {
+    "id": "hotels-001",
+    "name": "Hotels",
+    "description": "Hotel chains and accommodations",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "bf380526-3fd8-41b0-bd63-a85a60ccc2ad"
+  },
+  {
+    "id": "car-rentals-001",
+    "name": "Car Rentals",
+    "description": "Car rental companies and policies",
+    "createdAt": "2025-08-04T16:25:00.000Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "bf380526-3fd8-41b0-bd63-a85a60ccc2ad"
+  },
+  {
+    "id": "11cd5be6-cb24-49df-95d5-551330e3b7db",
+    "name": "Iceland",
+    "description": "Iceland subfolder",
+    "createdAt": "2025-08-04T21:08:54.868Z",
+    "documentCount": 1,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "37b2dff2-fa91-46c7-bd30-c28715178bf0"
+  },
+  {
+    "id": "1b52e63a-d729-4e12-a85c-6cee121c948b",
+    "name": "New Zealand",
+    "description": "",
+    "createdAt": "2025-08-11T15:13:27.714Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8"
   }
 ]

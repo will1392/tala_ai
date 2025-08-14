@@ -26,12 +26,14 @@ export const Sidebar = () => {
       initial={{ x: -100, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       className="fixed left-0 top-0 h-full w-64 glass-dark border-r border-white/10"
+      role="complementary"
+      aria-label="Main sidebar"
     >
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center glow">
-            <Sparkles className="text-secondary-900" size={20} />
+          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center glow" aria-hidden="true">
+            <Sparkles className="text-secondary-900" size={20} aria-hidden="true" />
           </div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
             Tala AI
@@ -40,7 +42,7 @@ export const Sidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="p-4 space-y-2">
+      <nav className="p-4 space-y-2" role="navigation" aria-label="Main navigation">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
@@ -61,6 +63,7 @@ export const Sidebar = () => {
                     'transition-colors',
                     isActive ? 'text-primary' : 'text-white/70 group-hover:text-white'
                   )} 
+                  aria-hidden="true"
                 />
                 <span className={cn(
                   'font-medium',
@@ -76,9 +79,9 @@ export const Sidebar = () => {
 
       {/* User Profile */}
       <div className="absolute bottom-0 left-0 right-0 p-4">
-        <div className="glass rounded-xl p-4">
+        <div className="glass rounded-xl p-4" role="region" aria-label="User profile">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full" />
+            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full" aria-hidden="true" />
             <div>
               <p className="font-medium">Agency Name</p>
               <p className="text-sm text-white/60">Pro Plan</p>

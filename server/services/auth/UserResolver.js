@@ -12,11 +12,13 @@ class UserResolver {
   constructor() {
     this.userCache = new Map();
     this.initialized = false;
-    // Default UUIDs for system users
+    // Default UUIDs for system users - FIXED mappings to ensure consistency
     this.systemUsers = {
       'default': '00000000-0000-0000-0000-000000000001',
       'test_user': '00000000-0000-0000-0000-000000000002',
-      'demo_user': '00000000-0000-0000-0000-000000000003'
+      'demo_user': '00000000-0000-0000-0000-000000000003',
+      'admin-1': '11111111-1111-1111-1111-111111111111', // Fixed UUID for admin-1
+      'admin': '11111111-1111-1111-1111-111111111111'    // Same UUID for admin
     };
     this.defaultOrgId = '00000000-0000-0000-0000-000000000001';
   }
@@ -66,6 +68,20 @@ class UserResolver {
           organization_id: this.defaultOrgId,
           role: 'member',
           status: 'active'
+        },
+        {
+          id: this.systemUsers['admin-1'],
+          email: 'admin@tala.ai',
+          first_name: 'Admin',
+          last_name: 'User',
+          display_name: 'Will',
+          organization_id: this.defaultOrgId,
+          role: 'admin',
+          status: 'active',
+          metadata: {
+            originalId: 'admin-1',
+            isAdmin: true
+          }
         }
       ];
       

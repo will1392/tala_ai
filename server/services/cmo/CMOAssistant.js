@@ -16,6 +16,13 @@ import { getSocialPlatformGuide } from '../../templates/cmo/social-responses.js'
 import { getMailPieceSpecs } from '../../templates/cmo/directmail-responses.js';
 import { getAdsPlatformGuide } from '../../templates/cmo/ads-responses.js';
 
+// Import expertise services
+import ExpertiseAssessment from '../expertise/ExpertiseAssessment.js';
+import CommunicationAdapter from '../expertise/CommunicationAdapter.js';
+import ExpertiseLearning from '../expertise/ExpertiseLearning.js';
+import ExpertiseProfiles from '../expertise/ExpertiseProfiles.js';
+import { ResponseTemplates, generateAdaptiveResponse } from '../../templates/cmo/expertise-responses.js';
+
 class CMOAssistant {
   constructor() {
     this.knowledgeBase = cmoKnowledgeBase;
@@ -23,6 +30,13 @@ class CMOAssistant {
     this.responseEnhancer = cmoResponseEnhancer;
     this.conversationFlow = conversationFlow;
     this.marketingIntelligence = marketingIntelligence;
+    
+    // Initialize expertise services
+    this.expertiseAssessment = new ExpertiseAssessment();
+    this.communicationAdapter = new CommunicationAdapter();
+    this.expertiseLearning = new ExpertiseLearning();
+    this.expertiseProfiles = new ExpertiseProfiles();
+    
     this.initialized = false;
   }
 
@@ -40,6 +54,472 @@ class CMOAssistant {
       console.error('Failed to initialize CMO Assistant:', error);
       throw error;
     }
+  }
+
+  /**
+   * Process a message with expertise-aware adaptations
+   */
+  async processMessage(message, userId, options = {}) {
+    const startTime = Date.now();
+    
+    try {
+      // Get user expertise profile
+      const expertise = await this.getUserExpertise(userId);
+      
+      // Detect marketing context and topic
+      const contextAnalysis = await this.contextDetector.detectMarketingContext(message);
+      const topic = contextAnalysis.primaryContext || options.topic || 'general';
+      const channel = this.expertiseProfiles.mapTopicToChannel(topic);
+      
+      // Get topic-specific expertise
+      const topicExpertise = await this.expertiseProfiles.getTopicExpertise(userId, topic);
+      
+      // Build enhanced context
+      const enhancedContext = {
+        ...options,
+        topic,
+        channel,
+        expertise: expertise?.level || 'beginner',
+        channelExpertise: topicExpertise,
+        intent: contextAnalysis.intent,
+        confidence: contextAnalysis.confidence
+      };
+      
+      // Generate base response
+      const baseResponse = await this.generateResponse(message, enhancedContext);
+      
+      // Adapt response based on expertise
+      const adaptedResponse = await this.adaptResponseForExpertise(
+        baseResponse,
+        expertise,
+        enhancedContext
+      );
+      
+      // Track interaction for learning
+      const duration = Date.now() - startTime;
+      await this.trackInteractionLearning(userId, {
+        message,
+        response: adaptedResponse,
+        context: enhancedContext,
+        duration,
+        topic,
+        channel
+      });
+      
+      return adaptedResponse;
+      
+    } catch (error) {
+      console.error('Error processing message with expertise:', error);
+      
+      // Fallback to basic processing
+      return this.processQuery(message, { userId, ...options });
+    }
+  }
+
+  /**
+   * Get user expertise profile
+   */
+  async getUserExpertise(userId) {
+    try {
+      // Try to get detailed profile first
+      const profile = await this.expertiseProfiles.getUserProfile(userId);
+      if (profile) {
+        return {
+          level: profile.overall_level,
+          confidence: profile.overall_confidence,
+          channel_expertise: profile.channel_expertise,
+          learning_style: profile.preferred_learning_style,
+          technical_comfort: profile.technical_comfort,
+          industry_experience: profile.industry_experience,
+          tools_familiar: profile.tools_familiar
+        };
+      }
+      
+      // Fallback to basic assessment data
+      const basicExpertise = await this.expertiseAssessment.getUserExpertise(userId);
+      return basicExpertise || {
+        level: 'beginner',
+        confidence: 0.5,
+        channel_expertise: {},
+        learning_style: 'visual',
+        technical_comfort: 0.5
+      };
+    } catch (error) {
+      console.error('Error getting user expertise:', error);
+      return {
+        level: 'beginner',
+        confidence: 0.5,
+        channel_expertise: {},
+        learning_style: 'visual',
+        technical_comfort: 0.5
+      };
+    }
+  }
+
+  /**
+   * Generate base response - First check for specific template responses
+   */
+  async generateResponse(message, context) {
+    // Check if we have a specific template response for this topic/level combination
+    const templateResponse = await this.tryGenerateTemplateResponse(message, context);
+    if (templateResponse) {
+      return templateResponse;
+    }
+    
+    // Use existing processQuery method for base response generation
+    const queryResult = await this.processQuery(message, context);
+    
+    return {
+      content: queryResult.content || this.buildResponseContent(queryResult),
+      context: queryResult.context,
+      intent: queryResult.intent,
+      results: queryResult.results,
+      suggestions: queryResult.suggestions,
+      quickActions: queryResult.quickActions,
+      template: queryResult.template
+    };
+  }
+
+  /**
+   * Try to generate response using specific expertise templates
+   */
+  async tryGenerateTemplateResponse(message, context) {
+    const { topic, channel, expertise } = context;
+    
+    // Map common questions to subtopics
+    const questionMapping = {
+      'improve email open rates': { topic: 'email', subtopic: 'open_rates' },
+      'email open rate': { topic: 'email', subtopic: 'open_rates' },
+      'open rates': { topic: 'email', subtopic: 'open_rates' },
+      'subject line': { topic: 'email', subtopic: 'subject_lines' },
+      'email subject': { topic: 'email', subtopic: 'subject_lines' },
+      'title tag': { topic: 'seo', subtopic: 'title_tags' },
+      'meta description': { topic: 'seo', subtopic: 'meta_descriptions' },
+      'keyword research': { topic: 'seo', subtopic: 'keyword_research' },
+      'social media content': { topic: 'social', subtopic: 'content_strategy' },
+      'ppc campaign': { topic: 'ppc', subtopic: 'campaign_structure' },
+      'blog strategy': { topic: 'content', subtopic: 'blog_strategy' },
+      'conversion tracking': { topic: 'analytics', subtopic: 'conversion_tracking' }
+    };
+
+    // Find matching topic and subtopic
+    let matchedTopic = null, matchedSubtopic = null;
+    
+    const messageLower = message.toLowerCase();
+    Object.keys(questionMapping).forEach(question => {
+      if (messageLower.includes(question)) {
+        matchedTopic = questionMapping[question].topic;
+        matchedSubtopic = questionMapping[question].subtopic;
+      }
+    });
+
+    // Use detected context if no direct match
+    if (!matchedTopic) {
+      matchedTopic = channel || topic;
+      // Default subtopics based on context
+      const defaultSubtopics = {
+        'email': 'open_rates',
+        'seo': 'title_tags',
+        'social': 'content_strategy',
+        'ppc': 'campaign_structure',
+        'content': 'blog_strategy',
+        'analytics': 'conversion_tracking'
+      };
+      matchedSubtopic = defaultSubtopics[matchedTopic];
+    }
+
+    // Generate adaptive response if we have a match
+    if (matchedTopic && matchedSubtopic) {
+      const adaptiveContent = generateAdaptiveResponse(
+        matchedTopic, 
+        matchedSubtopic, 
+        expertise, 
+        {
+          includeMetrics: context.technical_comfort > 0.6,
+          includeTools: context.tools_familiar?.length > 0
+        }
+      );
+
+      if (adaptiveContent) {
+        return {
+          content: adaptiveContent,
+          context: { ...context, source: 'expertise_template', topic: matchedTopic, subtopic: matchedSubtopic },
+          intent: 'marketing_guidance',
+          template: `${matchedTopic}_${matchedSubtopic}_${expertise}`,
+          isAdaptive: true
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Build response content from query results
+   */
+  buildResponseContent(queryResult) {
+    let content = '';
+    
+    if (queryResult.results && queryResult.results.length > 0) {
+      content += '## Marketing Insights\n\n';
+      
+      queryResult.results.forEach((result, index) => {
+        content += `### ${result.title}\n`;
+        if (result.description) {
+          content += `${result.description}\n\n`;
+        }
+        if (result.content) {
+          content += `${result.content}\n\n`;
+        }
+      });
+    }
+    
+    // Add template content if available
+    if (queryResult.template && queryResult.template.content) {
+      content += queryResult.template.content + '\n\n';
+    }
+    
+    // Add suggestions
+    if (queryResult.suggestions && queryResult.suggestions.length > 0) {
+      content += '## Recommendations\n\n';
+      queryResult.suggestions.forEach(suggestion => {
+        content += `- ${suggestion.message}\n`;
+      });
+    }
+    
+    // Don't return a generic question if we have no content - let the system handle it
+    return content;
+  }
+
+  /**
+   * Adapt response based on user expertise
+   */
+  async adaptResponseForExpertise(baseResponse, expertise, context) {
+    try {
+      // Get adaptive response template if available
+      const adaptiveTemplate = this.getAdaptiveTemplate(
+        context.topic,
+        context.subtopic || context.intent,
+        expertise.level
+      );
+      
+      if (adaptiveTemplate) {
+        // Use expertise-specific template
+        const adaptedContent = generateAdaptiveResponse(
+          context.topic,
+          context.subtopic || context.intent,
+          expertise.level,
+          {
+            includeMetrics: expertise.technical_comfort > 0.6,
+            includeTools: expertise.tools_familiar?.length > 0,
+            hasData: context.hasData || false
+          }
+        );
+        
+        if (adaptedContent) {
+          baseResponse.content = adaptedContent;
+          baseResponse.adaptationSource = 'template';
+        }
+      }
+      
+      // Apply communication style adaptation
+      if (baseResponse.content) {
+        const communicationPrefs = await this.expertiseProfiles.getCommunicationPreferences(context.userId);
+        
+        baseResponse.content = this.communicationAdapter.adaptResponse(
+          baseResponse.content,
+          expertise.level,
+          {
+            topic: context.topic,
+            channelExpertise: context.channelExpertise,
+            learningStyle: expertise.learning_style,
+            technicalComfort: expertise.technical_comfort,
+            industryContext: expertise.industry_experience,
+            communicationPrefs
+          }
+        );
+        
+        baseResponse.adaptationSource = baseResponse.adaptationSource === 'template' ? 'both' : 'communication';
+      }
+      
+      // Add expertise-specific quick actions
+      baseResponse.quickActions = this.enhanceQuickActionsForExpertise(
+        baseResponse.quickActions || [],
+        expertise,
+        context
+      );
+      
+      // Add learning recommendations
+      if (context.channelExpertise && context.channelExpertise.confidence < 0.7) {
+        baseResponse.learningRecommendations = await this.generateLearningRecommendations(
+          context.userId,
+          context.topic,
+          expertise
+        );
+      }
+      
+      return baseResponse;
+      
+    } catch (error) {
+      console.error('Error adapting response for expertise:', error);
+      return baseResponse; // Return original response on error
+    }
+  }
+
+  /**
+   * Get adaptive response template
+   */
+  getAdaptiveTemplate(topic, subtopic, level) {
+    try {
+      const topicKey = topic.toUpperCase();
+      if (ResponseTemplates[topicKey] && ResponseTemplates[topicKey][subtopic]) {
+        return ResponseTemplates[topicKey][subtopic][level];
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting adaptive template:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Enhance quick actions based on expertise
+   */
+  enhanceQuickActionsForExpertise(quickActions, expertise, context) {
+    const enhanced = [...quickActions];
+    
+    // Add level-appropriate actions
+    if (expertise.level === 'beginner') {
+      enhanced.unshift({
+        id: 'explain-basics',
+        label: 'Explain Basics',
+        icon: '📚',
+        priority: 'high'
+      });
+    } else if (expertise.level === 'expert') {
+      enhanced.push({
+        id: 'advanced-strategies',
+        label: 'Advanced Strategies',
+        icon: '🚀',
+        priority: 'medium'
+      });
+    }
+    
+    // Add channel-specific actions based on expertise
+    if (context.channelExpertise && context.channelExpertise.level > 2) {
+      enhanced.push({
+        id: 'deep-dive',
+        label: `Advanced ${context.channel.toUpperCase()}`,
+        icon: '🔍',
+        priority: 'medium'
+      });
+    }
+    
+    return enhanced;
+  }
+
+  /**
+   * Generate learning recommendations
+   */
+  async generateLearningRecommendations(userId, topic, expertise) {
+    try {
+      const recommendations = await this.expertiseProfiles.getChannelRecommendations(userId);
+      
+      // Filter for current topic/channel
+      const channel = this.expertiseProfiles.mapTopicToChannel(topic);
+      const channelRecs = recommendations.filter(rec => rec.channel === channel);
+      
+      if (channelRecs.length > 0) {
+        return channelRecs.map(rec => ({
+          type: rec.type,
+          message: rec.recommendation,
+          priority: rec.priority,
+          action: rec.type === 'improvement' ? 'Learn Fundamentals' : 'Explore Advanced Topics'
+        }));
+      }
+      
+      // Generate default recommendations
+      return [{
+        type: 'improvement',
+        message: `Build stronger foundation in ${topic} fundamentals`,
+        priority: 'medium',
+        action: 'View Learning Resources'
+      }];
+    } catch (error) {
+      console.error('Error generating learning recommendations:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Track interaction for learning
+   */
+  async trackInteractionLearning(userId, interactionData) {
+    try {
+      // Track with expertise learning system
+      await this.expertiseLearning.trackInteraction(userId, {
+        message: interactionData.message,
+        response: interactionData.response.content,
+        duration: interactionData.duration,
+        topic: interactionData.topic,
+        type: 'message',
+        success: !this.hasConfusionSignals(interactionData.message),
+        metadata: {
+          channel: interactionData.channel,
+          intent: interactionData.context.intent,
+          adaptationSource: interactionData.response.adaptationSource,
+          quickActionsUsed: interactionData.response.quickActions?.length || 0
+        }
+      });
+      
+      // Update channel expertise based on interaction
+      await this.expertiseProfiles.updateChannelExpertise(userId, interactionData.topic, {
+        success: !this.hasConfusionSignals(interactionData.message),
+        confusion: this.hasConfusionSignals(interactionData.message),
+        timeToComplete: interactionData.duration,
+        difficulty: this.assessMessageDifficulty(interactionData.message)
+      });
+      
+    } catch (error) {
+      console.error('Error tracking interaction learning:', error);
+      // Don't throw error to avoid breaking main flow
+    }
+  }
+
+  /**
+   * Check for confusion signals in message
+   */
+  hasConfusionSignals(message) {
+    const confusionPhrases = [
+      "i don't understand",
+      "can you explain",
+      "what does that mean",
+      "i'm confused",
+      "too complicated",
+      "can you simplify"
+    ];
+    
+    const lowerMessage = message.toLowerCase();
+    return confusionPhrases.some(phrase => lowerMessage.includes(phrase));
+  }
+
+  /**
+   * Assess message difficulty level
+   */
+  assessMessageDifficulty(message) {
+    const advancedTerms = [
+      'attribution', 'programmatic', 'remarketing', 'cohort',
+      'funnel optimization', 'multivariate', 'segmentation',
+      'automation', 'integration', 'analytics'
+    ];
+    
+    const lowerMessage = message.toLowerCase();
+    const advancedCount = advancedTerms.filter(term => lowerMessage.includes(term)).length;
+    
+    if (advancedCount >= 3) return 'expert';
+    if (advancedCount >= 2) return 'advanced';
+    if (advancedCount >= 1) return 'intermediate';
+    return 'beginner';
   }
 
   /**
@@ -645,6 +1125,81 @@ class CMOAssistant {
     }
     
     return content;
+  }
+
+  /**
+   * Get expertise-based response (main entry point for chat integration)
+   */
+  async getExpertiseResponse(message, userId, options = {}) {
+    // Use the new processMessage method with expertise integration
+    return this.processMessage(message, userId, options);
+  }
+
+  /**
+   * Update user expertise profile
+   */
+  async updateUserExpertise(userId, assessment) {
+    try {
+      // Create detailed profile
+      await this.expertiseProfiles.createDetailedProfile(userId, assessment);
+      
+      // Save basic assessment
+      await this.expertiseAssessment.saveAssessment(userId, assessment, {});
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user expertise:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get user's expertise summary
+   */
+  async getUserExpertiseSummary(userId) {
+    try {
+      return await this.expertiseProfiles.getExpertiseSummary(userId);
+    } catch (error) {
+      console.error('Error getting expertise summary:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get personalized learning recommendations
+   */
+  async getPersonalizedRecommendations(userId) {
+    try {
+      return await this.expertiseProfiles.getChannelRecommendations(userId);
+    } catch (error) {
+      console.error('Error getting personalized recommendations:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if user needs expertise assessment
+   */
+  async needsExpertiseAssessment(userId) {
+    try {
+      const profile = await this.expertiseProfiles.getUserProfile(userId);
+      return !profile; // Needs assessment if no profile exists
+    } catch (error) {
+      console.error('Error checking expertise assessment need:', error);
+      return true; // Assume needs assessment on error
+    }
+  }
+
+  /**
+   * Get expertise learning insights
+   */
+  async getLearningInsights(userId) {
+    try {
+      return await this.expertiseLearning.getLearningInsights(userId);
+    } catch (error) {
+      console.error('Error getting learning insights:', error);
+      return { hasData: false };
+    }
   }
 }
 

@@ -49,6 +49,7 @@ export class ConversationService extends BaseService {
 
       // Prepare conversation data with defaults
       const conversationData = {
+        id: data.id || uuidv4(), // Accept provided ID or generate new one
         organization_id: data.organization_id,
         user_id: data.user_id,
         title: data.title || 'New Conversation',
@@ -478,8 +479,13 @@ export class ConversationService extends BaseService {
     }
 
     if (includeMessages) {
-      // Would query message service - placeholder for now
-      additionalData.messages = [];
+      // Fetch actual messages from the database
+      const messagesResult = await this.getMessages(id, options);
+      if (messagesResult.success) {
+        additionalData.messages = messagesResult.data;
+      } else {
+        additionalData.messages = [];
+      }
     }
 
     if (includeTags) {
@@ -499,11 +505,30 @@ export class ConversationService extends BaseService {
    * @returns {Object} Message count
    */
   async getMessageCount(conversationId) {
-    // This would typically query the messages table
-    return {
-      success: true,
-      data: { count: 0 }
-    };
+    try {
+      const { count, error } = await this.getClient()
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      return {
+        success: true,
+        data: { count: count || 0 }
+      };
+    } catch (error) {
+      this.log(`Failed to get message count: ${error.message}`, 'error');
+      return {
+        success: false,
+        error: {
+          code: 'COUNT_ERROR',
+          message: error.message
+        }
+      };
+    }
   }
 
   /**
@@ -647,37 +672,163 @@ export class ConversationService extends BaseService {
         conversation_id,
         role,
         content,
-        metadata = {}
+        metadata = {},
+        model_used = null,
+        provider = null,
+        prompt_tokens = null,
+        completion_tokens = null,
+        total_tokens = null,
+        cost = null,
+        response_time_ms = null,
+        context_used = [],
+        entities_extracted = []
       } = messageData;
+
+      // Get the conversation to ensure it exists and get the next message index
+      const conversation = await this.getConversation(conversation_id);
+      if (!conversation.success) {
+        throw new Error('Conversation not found');
+      }
+
+      // Get the current message count to determine the index
+      const messageCountResult = await this.executeQuery(async () => {
+        return await this.getClient()
+          .from('messages')
+          .select('message_index', { count: 'exact', head: true })
+          .eq('conversation_id', conversation_id)
+          .order('message_index', { ascending: false })
+          .limit(1);
+      }, 'GET_MAX_MESSAGE_INDEX');
+
+      let nextIndex = 0;
+      if (messageCountResult.success && messageCountResult.count > 0) {
+        const { data: [latestMessage] } = await this.getClient()
+          .from('messages')
+          .select('message_index')
+          .eq('conversation_id', conversation_id)
+          .order('message_index', { ascending: false })
+          .limit(1);
+        
+        nextIndex = latestMessage ? latestMessage.message_index + 1 : 0;
+      }
 
       // Create message in messages table
       const message = {
         id: uuidv4(),
         conversation_id,
-        role,
         content,
+        sender: role, // Map 'role' to 'sender' as per schema
+        message_index: nextIndex,
+        model_used,
+        provider,
+        prompt_tokens,
+        completion_tokens,
+        total_tokens,
+        cost,
+        response_time_ms,
+        context_used,
+        entities_extracted,
         metadata,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      // In a real implementation, this would insert into a messages table
-      // For now, we'll return a success response
+      // Insert the message into the database
+      const insertResult = await this.executeQuery(async () => {
+        return await this.getClient()
+          .from('messages')
+          .insert([message])
+          .select()
+          .single();
+      }, 'INSERT_MESSAGE');
+
+      if (!insertResult.success) {
+        throw new Error(insertResult.error.message);
+      }
+
       this.log(`Added message to conversation ${conversation_id}`);
       
-      // Update conversation's updated_at timestamp
-      await this.updateConversation(conversation_id, {
-        updated_at: new Date().toISOString()
-      });
+      // Update conversation's updated_at timestamp and message count
+      const updateData = {
+        updated_at: new Date().toISOString(),
+        last_message_at: new Date().toISOString(),
+        message_count: conversation.data.message_count + 1
+      };
+
+      // Update token usage if this is an assistant message
+      if (role === 'assistant' && total_tokens) {
+        updateData.total_tokens_used = (conversation.data.total_tokens_used || 0) + total_tokens;
+        if (cost) {
+          updateData.total_cost = (conversation.data.total_cost || 0) + cost;
+        }
+      }
+
+      await this.updateConversation(conversation_id, updateData);
 
       return {
         success: true,
-        data: message
+        data: insertResult.data
       };
     } catch (error) {
       return {
         success: false,
         error: {
           code: 'ADD_MESSAGE_ERROR',
+          message: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * Get messages for a conversation
+   * @param {string} conversationId - Conversation ID
+   * @param {Object} options - Query options
+   * @returns {Object} Messages array
+   */
+  async getMessages(conversationId, options = {}) {
+    const {
+      pagination = { page: 1, pageSize: 100 },
+      includeDeleted = false
+    } = options;
+
+    try {
+      const query = this.getClient()
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('message_index', { ascending: true });
+
+      // Apply pagination
+      const { page, pageSize } = pagination;
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize - 1;
+      query.range(start, end);
+
+      const result = await this.executeQuery(async () => {
+        return await query;
+      }, 'GET_MESSAGES');
+
+      if (!result.success) {
+        throw new Error(result.error.message);
+      }
+
+      this.log(`Retrieved ${result.data.length} messages for conversation ${conversationId}`);
+
+      return {
+        success: true,
+        data: result.data,
+        pagination: {
+          page,
+          pageSize,
+          total: result.count
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'GET_MESSAGES_ERROR',
           message: error.message
         }
       };

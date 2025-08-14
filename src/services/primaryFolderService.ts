@@ -18,7 +18,7 @@ class PrimaryFolderService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
   }
 
   /**
@@ -32,10 +32,21 @@ class PrimaryFolderService {
       isAdmin: isAdmin.toString(),
     });
 
-    const response = await fetch(`${this.baseUrl}/primary-folders?${params}`);
+    const url = `${this.baseUrl}/primary-folders?${params}`;
+    console.log('📡 Fetching from URL:', url);
+
+    const response = await fetch(url);
+    console.log('📡 Response status:', response.status, response.statusText);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to fetch primary folders' }));
+      const errorText = await response.text();
+      console.error('❌ Error response:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { error: errorText || 'Failed to fetch primary folders' };
+      }
       throw new Error(error.error || 'Failed to fetch primary folders');
     }
 

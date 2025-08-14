@@ -254,11 +254,11 @@ The Team`
 
     case 'social':
       return {
-        content: '🚀 Big news! We just launched our most requested feature.
+        content: `🚀 Big news! We just launched our most requested feature.
 
 Swipe to see how it can transform your workflow →
 
-What feature would you like to see next? Let us know in the comments! 👇'
+What feature would you like to see next? Let us know in the comments! 👇`
       };
 
     case 'blog-outline':

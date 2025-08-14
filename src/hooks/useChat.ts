@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ChatService, type ChatMessage, type Conversation } from '../services/chatService';
+import { useInteractionTracking } from './useExpertiseLearning';
 
 interface UseChatOptions {
   userId?: string;
@@ -24,6 +25,7 @@ export const useChat = (options: UseChatOptions = {}) => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   const chatServiceRef = useRef(new ChatService(userId, isAdmin));
+  const { trackMessage } = useInteractionTracking();
 
   // Initialize chat
   useEffect(() => {
@@ -86,7 +88,9 @@ export const useChat = (options: UseChatOptions = {}) => {
       }
 
       // Send message to API
+      const startTime = Date.now();
       const response = await chatServiceRef.current.sendMessage(content, conversationId);
+      const duration = Date.now() - startTime;
       
       // Remove typing indicator and add actual response
       setMessages(prev => {
@@ -94,6 +98,17 @@ export const useChat = (options: UseChatOptions = {}) => {
         const talaMessage = chatServiceRef.current.createTalaMessage(response);
         return [...withoutTyping, talaMessage];
       });
+
+      // Track interaction for learning
+      try {
+        await trackMessage(content, response.response, {
+          duration,
+          topic: response.topic || 'general',
+          conversationId
+        });
+      } catch (trackingError) {
+        console.warn('Failed to track interaction:', trackingError);
+      }
 
       // Update conversations list if this was a new conversation
       if (!currentConversationId) {

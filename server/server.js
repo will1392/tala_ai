@@ -7,8 +7,9 @@ import { QdrantClient } from '@qdrant/qdrant-js';
 import OpenAI from 'openai';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { dirname } from 'path';
 import path from 'path';
+import fs from 'fs';
 const require = createRequire(import.meta.url);
 const PDFParse = require('pdf-parse');
 import mammoth from 'mammoth';
@@ -38,9 +39,14 @@ import { getAuthConfig } from './config/auth.js';
 import { ConversationService } from './services/db/conversationService.js';
 import { DocumentService } from './services/db/documentService.js';
 import { FolderService } from './services/db/folderService.js';
+import QdrantOptimizer from './services/QdrantOptimizer.js';
 
-// Load environment variables
-dotenv.config();
+// Import credits middleware
+import creditsMiddleware from './middleware/creditsMiddleware.js';
+const { requireCredits, getCreditsStatus, purchaseCredits, getCreditPackages, upgradeTier, getTransactionHistory } = creditsMiddleware;
+
+// Load environment variables from parent directory
+dotenv.config({ path: path.join(dirname(fileURLToPath(import.meta.url)), '../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -55,8 +61,16 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Initialize cloud storage service
+// Initialize cloud storage service - REQUIRE S3
 const cloudStorage = new CloudStorageService();
+
+// Validate storage configuration on startup
+if (process.env.STORAGE_TYPE !== 's3') {
+  console.error('⚠️ WARNING: Storage type is not S3');
+  console.error(`   Current: STORAGE_TYPE=${process.env.STORAGE_TYPE || 'not set'}`);
+  console.error('   Required: STORAGE_TYPE=s3');
+  console.error('   Documents will fail to upload without S3 configuration');
+}
 
 // Initialize LLM Router with feature flag
 let llmRouter = null;
@@ -126,29 +140,68 @@ const folderService = new FolderService();
       console.log('⚠️  Database not ready - using JSON fallback mode');
       console.log('💡 Run: node test-database-setup.js to configure database');
     }
+    
+    // Optimize Qdrant collections for better performance
+    console.log('🚀 Optimizing Qdrant collections...');
+    try {
+      const qdrantOptimizer = new QdrantOptimizer(qdrant);
+      
+      // Optimize the main knowledge collection
+      const optimizationResult = await qdrantOptimizer.optimizeCollection('tala_admin_knowledge');
+      if (optimizationResult.success) {
+        console.log('✅ Qdrant collection optimized:', optimizationResult);
+      } else {
+        console.log('⚠️ Qdrant optimization skipped:', optimizationResult.error);
+      }
+      
+      // Also optimize user knowledge collection if it exists
+      try {
+        await qdrantOptimizer.optimizeCollection('tala_knowledge');
+      } catch (err) {
+        // Collection might not exist yet
+        console.log('ℹ️ User knowledge collection not found - will optimize when created');
+      }
+    } catch (error) {
+      console.error('⚠️ Qdrant optimization failed:', error.message);
+      // Non-fatal - continue server startup
+    }
   } catch (error) {
     console.log('⚠️  Database health check failed - using JSON fallback mode');
     console.error('Details:', error.message);
   }
 })();
 
-// Test cloud storage connection on startup
+// Test S3 connection on startup - CRITICAL for document storage
 (async () => {
-  if (process.env.STORAGE_TYPE && process.env.STORAGE_TYPE !== 'local') {
+  if (process.env.STORAGE_TYPE === 's3') {
     try {
       await cloudStorage.testConnection();
-      console.log(`✅ Cloud storage (${process.env.STORAGE_TYPE}) connection verified`);
+      console.log(`✅ S3 storage connection verified`);
+      console.log(`   Bucket: ${process.env.AWS_S3_BUCKET}`);
+      console.log(`   Region: ${process.env.AWS_REGION}`);
     } catch (error) {
-      console.error(`❌ Cloud storage connection failed:`, error.message);
-      console.error(`⚠️  Falling back to local storage`);
+      console.error(`❌ CRITICAL: S3 connection failed:`, error.message);
+      console.error(`   Documents will NOT be able to upload`);
+      console.error(`   Check your AWS credentials and bucket configuration`);
+      // Log specific error details
+      if (error.code === 'NoSuchBucket') {
+        console.error(`   → Bucket '${process.env.AWS_S3_BUCKET}' does not exist`);
+      } else if (error.code === 'InvalidAccessKeyId') {
+        console.error(`   → Invalid AWS_ACCESS_KEY_ID`);
+      } else if (error.code === 'SignatureDoesNotMatch') {
+        console.error(`   → Invalid AWS_SECRET_ACCESS_KEY`);
+      } else if (error.code === 'AccessDenied') {
+        console.error(`   → Access denied - check IAM permissions`);
+      }
     }
   } else {
-    console.log(`📁 Using local storage (uploads directory)`);
+    console.error(`❌ CRITICAL: S3 storage not configured`);
+    console.error(`   Set STORAGE_TYPE=s3 in .env file`);
+    console.error(`   Documents cannot be uploaded without S3`);
   }
 })();
 
 // Create uploads directory if it doesn't exist
-import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -192,8 +245,9 @@ app.use(session({
   }
 }));
 
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
+// Request body parsing with reasonable limits
+app.use(express.json({ limit: '10mb' })); // 10MB for regular JSON requests
+app.use(express.urlencoded({ limit: '10mb', extended: true })); // 10MB for form data
 
 // Serve uploaded files with proper headers
 app.use('/api/files', (req, res, next) => {
@@ -222,7 +276,7 @@ app.use(rateLimiter.middleware('api'));
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 500 * 1024 * 1024, // 500MB limit (increased from 10MB)
+    fileSize: 50 * 1024 * 1024, // 50MB limit for document uploads
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
@@ -285,9 +339,18 @@ loadConversations();
 
 // Utility functions
 function getCollectionName(userId, isAdmin = false) {
-  if (isAdmin) {
+  // FIXED: Admin users should always use admin collection
+  // Check if user ID indicates admin (admin-1, admin, etc)
+  const isAdminUser = userId && (
+    userId.toString().toLowerCase().includes('admin') ||
+    userId === '1' ||
+    userId === 'admin-1'
+  );
+  
+  if (isAdmin || isAdminUser) {
     return 'tala_admin_knowledge';
   }
+  
   return userId ? `tala_user_${userId}_knowledge` : 'tala_admin_knowledge';
 }
 
@@ -458,6 +521,21 @@ app.use('/api/email', emailRoutes);
 // CMO Context routes
 import cmoContextRoutes from './routes/cmo-context.js';
 app.use('/api/cmo/context', cmoContextRoutes);
+
+// Expertise Assessment routes
+import expertiseRoutes from './routes/expertise-es.js';
+import userProfileRoutes from './routes/user-profile.js';
+import usersRoutes from './routes/users.js';
+app.use('/api/expertise', expertiseRoutes);
+app.use('/api/user-profile', userProfileRoutes);
+app.use('/api/users', usersRoutes);
+
+// Credits API Routes
+app.get('/api/credits/status', getCreditsStatus);
+app.post('/api/credits/purchase', purchaseCredits);
+app.get('/api/credits/packages', getCreditPackages);
+app.post('/api/credits/upgrade-tier', upgradeTier);
+app.get('/api/credits/history', getTransactionHistory);
 
 // Comprehensive health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -732,6 +810,12 @@ app.use('/api/chat-tasks', chatTaskRoutes);
 // Intelligent Chat Routes
 import intelligentChatRoutes from './routes/intelligentChat.js';
 app.use('/api/chat', intelligentChatRoutes);
+console.log('✅ Intelligent chat routes mounted at /api/chat (includes /api/chat/v2)');
+
+// Chat status routes for real-time updates
+import chatStatusRoutes from './routes/chatStatus.js';
+app.use('/api/chat/status', chatStatusRoutes);
+console.log('✅ Chat status routes mounted at /api/chat/status');
 
 // CMO Performance Monitoring Routes
 import cmoMonitoringRoutes from './routes/cmo-monitoring.js';
@@ -765,13 +849,13 @@ app.use('/api/cmo/feedback', cmoFeedbackRoutes);
 import cmoAnalysisRoutes from './routes/api/cmo-analysis.js';
 app.use('/api/cmo/analysis', cmoAnalysisRoutes);
 
-// Database-backed Chat Routes (v2)
-import chatV2Routes from './routes/api/chat-v2.js';
-app.use('/api/chat/v2', chatV2Routes);
+// Database-backed Chat Routes (v2) - DISABLED: Using intelligent chat v2 instead
+// import chatV2Routes from './routes/api/chat-v2.js';
+// app.use('/api/chat/v2', chatV2Routes);
 
 // Documents Routes
-import documentsRouter from './routes/documents.js';
-app.use('/api/documents', documentsRouter);
+// import documentsRouter from './routes/documents.js';
+// app.use('/api/documents', documentsRouter); // Temporarily disabled due to database policy issues
 
 // Email Connection Routes
 // import emailConnectRoutes from './routes/email-connect.js';
@@ -781,56 +865,147 @@ app.use('/api/documents', documentsRouter);
 
 // Create folder
 app.post('/api/folders', authenticate, asyncHandler(async (req, res) => {
-  const { name, description, parent_folder_id = null } = req.body;
+  const { name, description, userId, isAdmin, primaryFolderId } = req.body;
   
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Folder name is required' });
   }
-
-  const folderData = {
-    organization_id: req.organizationId,
-    user_id: req.userId,
-    name: name.trim(),
-    description: description?.trim() || null,
-    parent_folder_id: parent_folder_id || null,
-    folder_type: 'user'
-  };
-
-  const result = await folderService.createFolder(folderData);
   
-  if (!result.success) {
-    return res.status(500).json({ error: result.error || 'Failed to create folder' });
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
   }
   
-  console.log(`📁 Created folder: ${name} (ID: ${result.data.id})`);
-  res.json(result.data);
+  // Create new folder with file-based structure
+  const folderId = uuidv4();
+  const folder = {
+    id: folderId,
+    name: name.trim(),
+    description: description || '',
+    createdAt: new Date().toISOString(),
+    documentCount: 0,
+    userId: userId,
+    isAdmin: isAdmin === true || isAdmin === 'true',
+    primaryFolderId: primaryFolderId || null
+  };
+  
+  // Save to Map
+  folders.set(folderId, folder);
+  saveFolders(folders);
+  
+  // Update primary folder counts if applicable
+  if (primaryFolderId) {
+    updatePrimaryFolderCounts();
+  }
+  
+  console.log(`📁 Created folder: ${name} (ID: ${folderId})`);
+  res.json(folder);
 }));
 
 // Get folders
 app.get('/api/folders', authenticate, asyncHandler(async (req, res) => {
-  const { parent_folder_id = null, include_admin = false } = req.query;
+  const { userId, isAdmin, primaryFolderId } = req.query;
   
-  const filters = {
-    organization_id: req.organizationId,
-    user_id: req.userId
-  };
+  console.log(`📁 Getting folders for user: ${userId || req.userId}, isAdmin: ${isAdmin}, primaryFolderId: ${primaryFolderId}`);
   
-  if (parent_folder_id !== null) {
-    filters.parent_folder_id = parent_folder_id || null;
+  // Get all folders from the file-based Map
+  let userFolders = Array.from(folders.values());
+  
+  // Filter by user unless admin
+  if (isAdmin !== 'true') {
+    const targetUserId = userId || req.userId;
+    userFolders = userFolders.filter(f => f.userId === targetUserId || f.isAdmin === true);
   }
   
-  // If include_admin is true and user has admin role, also get admin folders
-  if (include_admin === 'true' && req.user.role === 'admin') {
-    delete filters.user_id; // Remove user filter to get admin folders too
-    filters.folder_type = ['user', 'admin'];
+  // Filter by primaryFolderId if provided
+  if (primaryFolderId && primaryFolderId !== 'all') {
+    userFolders = userFolders.filter(f => f.primaryFolderId === primaryFolderId);
   }
   
-  const result = await folderService.getFolders(filters, {
-    organizationId: req.organizationId,
-    orderBy: 'name'
-  });
+  // Dynamically calculate document counts for each folder
+  try {
+    // Get collections to search
+    const collectionsToSearch = [];
+    if (isAdmin === 'true') {
+      collectionsToSearch.push('tala_admin_knowledge');
+      const collections = await qdrant.getCollections();
+      collections.collections.forEach(c => {
+        if (c.name.startsWith('tala_user_') && c.name.endsWith('_knowledge')) {
+          collectionsToSearch.push(c.name);
+        }
+      });
+    } else {
+      collectionsToSearch.push('tala_admin_knowledge');
+      collectionsToSearch.push(getCollectionName(userId || req.userId, false));
+    }
+    
+    // Count documents for each folder
+    const folderDocCounts = {};
+    const seenDocs = new Set(); // Track unique documents by title
+    
+    for (const collectionName of collectionsToSearch) {
+      try {
+        const collectionInfo = await qdrant.getCollection(collectionName);
+        if (!collectionInfo) continue;
+        
+        let nextPageOffset = null;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const scrollResult = await qdrant.scroll(collectionName, {
+            limit: 100,
+            offset: nextPageOffset,
+            with_payload: true,
+            with_vector: false
+          });
+          
+          scrollResult.points.forEach(point => {
+            const docTitle = (point.payload.metadata?.title || point.payload.document?.originalName || '');
+            const docTitleLower = docTitle.toLowerCase();
+            const pointFolderId = point.payload.metadata?.folderId;
+            
+            // Create unique key using documentId to handle documents with same title
+            const docKey = `${point.payload.documentId}_${docTitle}`;
+            
+            // Only count each unique document once
+            if (!seenDocs.has(docKey)) {
+              seenDocs.add(docKey);
+              
+              // Try to match document to folders
+              for (const folder of userFolders) {
+                // Check if document has explicit folder ID match
+                if (pointFolderId === folder.id) {
+                  folderDocCounts[folder.id] = (folderDocCounts[folder.id] || 0) + 1;
+                  break;
+                }
+                // Check if document title contains folder name (case-insensitive)
+                else if (docTitleLower.includes(folder.name.toLowerCase())) {
+                  folderDocCounts[folder.id] = (folderDocCounts[folder.id] || 0) + 1;
+                  break;
+                }
+              }
+            }
+          });
+          
+          nextPageOffset = scrollResult.next_page_offset;
+          hasMore = nextPageOffset !== null && nextPageOffset !== undefined;
+        }
+      } catch (error) {
+        console.warn(`Failed to count documents in collection ${collectionName}:`, error.message);
+      }
+    }
+    
+    // Update folder document counts
+    userFolders = userFolders.map(folder => ({
+      ...folder,
+      documentCount: folderDocCounts[folder.id] || 0
+    }));
+    
+  } catch (error) {
+    console.error('Failed to calculate document counts:', error);
+    // Continue with static counts from file
+  }
   
-  const userFolders = result.success ? result.data : [];
+  console.log(`📁 Returning ${userFolders.length} folders`);
   res.json(userFolders);
 }));
 
@@ -1134,6 +1309,7 @@ updatePrimaryFolderCounts();
 
 // Get all primary folders
 app.get('/api/primary-folders', async (req, res) => {
+  console.log('📁 Primary folders endpoint hit - query:', req.query);
   try {
     const { userId, isAdmin = 'false' } = req.query;
     
@@ -1687,7 +1863,7 @@ app.post('/api/documents/detect-language', upload.single('document'), async (req
 });
 
 // Upload document
-app.post('/api/documents/upload', upload.single('document'), async (req, res) => {
+app.post('/api/documents/upload', upload.single('document'), requireCredits('document_upload'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -1753,77 +1929,106 @@ app.post('/api/documents/upload', upload.single('document'), async (req, res) =>
       const filename = `${documentId}-${file.originalname}`;
       console.log(`📁 File buffer size: ${file.buffer.length} bytes`);
       
+      // ALWAYS use S3 - NO LOCAL FALLBACK
+      if (storageProvider !== 's3') {
+        console.error(`❌ Invalid storage configuration: ${storageProvider}. S3 is required.`);
+        return res.status(500).json({ 
+          error: 'Storage configuration error',
+          details: 'System must be configured for S3 storage. Local storage is not supported.',
+          storageType: storageProvider
+        });
+      }
+      
       try {
-        // Use cloud storage service
-        if (storageProvider !== 'local') {
-          const uploadResult = await cloudStorage.uploadFile(
-            file.buffer,
-            file.originalname,
-            file.mimetype,
-            documentId
-          );
-          console.log(`✅ PDF uploaded to ${storageProvider}: ${uploadResult.url}`);
-          fileUrl = uploadResult.url;
-          storageKey = uploadResult.key; // Use the full S3 key including documents/ prefix
-        } else {
-          // Fallback to local storage
-          const filepath = path.join(uploadsDir, filename);
-          console.log(`📁 Saving PDF locally to: ${filepath}`);
-          fs.writeFileSync(filepath, file.buffer);
-          console.log(`✅ PDF saved locally: ${filename}`);
-          fileUrl = `/api/files/${filename}`;
-          storageKey = null; // No storage key for local files
-          
-          // Verify file was saved
-          if (fs.existsSync(filepath)) {
-            const stats = fs.statSync(filepath);
-            console.log(`✅ File verified - size: ${stats.size} bytes`);
-          } else {
-            console.error(`❌ File not found after save: ${filepath}`);
-          }
+        // Upload to S3 - NO FALLBACK
+        const uploadResult = await cloudStorage.uploadFile(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+          documentId
+        );
+        
+        console.log(`✅ PDF uploaded to S3: ${uploadResult.url}`);
+        fileUrl = uploadResult.url;
+        storageKey = uploadResult.key; // Use the full S3 key including documents/ prefix
+        
+        // Verify upload by checking if we can generate a signed URL
+        try {
+          const testUrl = await cloudStorage.getSignedUrl(uploadResult.key, 60); // 1 minute test URL
+          console.log(`✅ S3 upload verified - can generate signed URLs`);
+        } catch (verifyError) {
+          console.error(`⚠️ S3 upload verification warning:`, verifyError.message);
+          // Continue - upload succeeded even if signed URL test failed
         }
+        
       } catch (saveError) {
-        console.error(`❌ Failed to save PDF:`, saveError);
-        // Fallback to local storage if cloud fails
-        if (storageProvider !== 'local') {
-          try {
-            const filepath = path.join(uploadsDir, filename);
-            fs.writeFileSync(filepath, file.buffer);
-            fileUrl = `/api/files/${filename}`;
-            storageProvider = 'local';
-            storageKey = null; // No storage key for local fallback
-            console.log(`⚠️ Fell back to local storage due to cloud error`);
-          } catch (localError) {
-            console.error(`❌ Failed to save to local storage as well:`, localError);
+        // NO FALLBACK - FAIL LOUDLY
+        console.error(`❌ S3 upload failed:`, saveError);
+        console.error(`📊 S3 Error Details:`, {
+          bucket: process.env.AWS_S3_BUCKET,
+          region: process.env.AWS_REGION,
+          error: saveError.message,
+          code: saveError.code,
+          statusCode: saveError.statusCode
+        });
+        
+        // Return detailed error to frontend
+        return res.status(500).json({ 
+          error: 'Failed to upload document to cloud storage',
+          details: saveError.message,
+          code: saveError.code || 'S3_UPLOAD_FAILED',
+          troubleshooting: {
+            checkCredentials: 'Verify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in .env',
+            checkBucket: `Ensure bucket '${process.env.AWS_S3_BUCKET}' exists and is accessible`,
+            checkRegion: `Verify region '${process.env.AWS_REGION}' is correct`,
+            checkPermissions: 'Ensure IAM user has s3:PutObject permission'
           }
-        }
+        });
       }
     } else {
       console.log(`⚠️ File is not a PDF, mimetype: ${file.mimetype}`);
     }
 
     // Process document with visual analysis support
+    console.log('📄 About to process document:', {
+      hasBuffer: !!file.buffer,
+      bufferLength: file.buffer?.length,
+      isBuffer: Buffer.isBuffer(file.buffer),
+      mimetype: file.mimetype,
+      filename: file.originalname
+    });
+    
     const processedDoc = await documentProcessor.processDocument({
       buffer: file.buffer,
       mimetype: file.mimetype,
-      originalname: file.originalname
+      filename: file.originalname // Fixed: use 'filename' instead of 'originalname'
     }, {
       chunkSize: 1000,
       extractImages: true,
       documentType: category // Use category as hint for document type
     });
     
-    const text = processedDoc.content;
+    console.log('🔍 Processed document result:', {
+      hasText: !!processedDoc.text,
+      textLength: processedDoc.text?.length || 0,
+      hasContent: !!processedDoc.content,
+      contentLength: processedDoc.content?.length || 0,
+      success: processedDoc.success,
+      metadata: processedDoc.metadata
+    });
+    
+    const text = processedDoc.text || processedDoc.content; // Support both property names
     
     if (!text || text.trim().length === 0) {
       // For visual documents, we might still want to store them even without text
       if (processedDoc.type !== 'visual') {
+        console.error('❌ No content found in file, returning error');
         return res.status(400).json({ error: 'No content found in file' });
       }
     }
 
     // Use processed chunks or create new ones
-    const chunks = processedDoc.chunks.length > 0 ? 
+    const chunks = (processedDoc.chunks && processedDoc.chunks.length > 0) ? 
       processedDoc.chunks : createChunks(text);
     
     if (chunks.length === 0) {
@@ -2592,7 +2797,7 @@ app.get('/api/chat/history/:conversationId', authenticate, asyncHandler(async (r
   
   try {
     // Try to get conversation from database first
-    const conversationResult = await conversationService.getConversationById(conversationId, {
+    const conversationResult = await conversationService.getConversation(conversationId, {
       organizationId: req.organizationId
     });
     
@@ -2604,9 +2809,26 @@ app.get('/api/chat/history/:conversationId', authenticate, asyncHandler(async (r
         return res.status(403).json({ error: 'Access denied to this conversation' });
       }
       
-      // TODO: Get messages from database when MessageService is implemented
-      messages = [];
-      console.log(`📜 Retrieved ${messages.length} messages from database for conversation ${conversationId}`);
+      // Get messages from database
+      const messagesResult = await conversationService.getMessages(conversationId);
+      
+      if (messagesResult.success) {
+        // Transform messages to match expected format
+        messages = messagesResult.data.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.sender === 'assistant' ? 'tala' : msg.sender,
+          timestamp: new Date(msg.created_at),
+          sources: msg.context_used || [],
+          tokensUsed: msg.total_tokens,
+          model: msg.model_used,
+          entities: msg.entities_extracted
+        }));
+        console.log(`📜 Retrieved ${messages.length} messages from database for conversation ${conversationId}`);
+      } else {
+        console.error('Failed to get messages:', messagesResult.error);
+        messages = [];
+      }
     } else {
       throw new Error('Conversation not found in database');
     }
@@ -2632,7 +2854,7 @@ app.get('/api/chat/history/:conversationId', authenticate, asyncHandler(async (r
     conversationId,
     conversation,
     messages,
-    lastActivity: conversation.updated_at
+    lastActivity: conversation.updated_at || conversation.lastActivity
   });
 }));
 
@@ -3112,6 +3334,7 @@ app.post('/api/voice/store', async (req, res) => {
 
 // Search documents
 app.post('/api/documents/search', async (req, res) => {
+  req.startTime = Date.now();
   try {
     const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.2, folderId, primaryFolderId, category, fileType } = req.body;
     
@@ -3158,6 +3381,11 @@ app.post('/api/documents/search', async (req, res) => {
         // Build search filters
         const searchFilter = { must: [] };
         
+        // IMPORTANT: When folder filtering is active, we need to ensure
+        // we ONLY get documents from the specified folders
+        const hasFolderFilter = (folderId && folderId !== 'all') || 
+                               (primaryFolderId && primaryFolderId !== 'all');
+        
         // Filter by primary folder
         if (primaryFolderId && primaryFolderId !== 'all') {
           searchFilter.must.push({
@@ -3168,10 +3396,16 @@ app.post('/api/documents/search', async (req, res) => {
         
         // Filter by sub-folder
         if (folderId && folderId !== 'all') {
+          // When a specific folder is selected, ONLY show documents from that folder
+          // This excludes documents with no folder or different folders
           searchFilter.must.push({
             key: 'metadata.folderId',
             match: { value: folderId }
           });
+        } else if (folderId === 'all' || !folderId) {
+          // When 'all' is selected or no folder specified, 
+          // we should still respect the primary folder if one is selected
+          // This prevents showing documents from unrelated primary folders
         }
         
         // Filter by category
@@ -3190,6 +3424,11 @@ app.post('/api/documents/search', async (req, res) => {
           });
         }
 
+        // Log the search filters being applied
+        if (searchFilter.must.length > 0) {
+          console.log(`🔍 Applying search filters for collection ${collectionName}:`, JSON.stringify(searchFilter, null, 2));
+        }
+        
         const searchResult = await qdrant.search(collectionName, {
           vector: queryVector,
           limit: Math.ceil(limit / collectionsToSearch.length) + 5,
@@ -3198,7 +3437,7 @@ app.post('/api/documents/search', async (req, res) => {
           filter: searchFilter.must.length > 0 ? searchFilter : undefined
         });
         
-        const collectionResults = searchResult
+        let collectionResults = searchResult
           .filter(result => result.score >= scoreThreshold)
           .map(result => ({
             id: result.id,
@@ -3210,6 +3449,36 @@ app.post('/api/documents/search', async (req, res) => {
             },
             document: result.payload?.document
           }));
+        
+        // Additional post-processing filter to ensure folder matching
+        // This is a safety net in case Qdrant filtering isn't working as expected
+        if (folderId && folderId !== 'all') {
+          const beforeCount = collectionResults.length;
+          collectionResults = collectionResults.filter(result => 
+            result.metadata?.folderId === folderId
+          );
+          if (beforeCount !== collectionResults.length) {
+            console.log(`⚠️  Filtered out ${beforeCount - collectionResults.length} results that didn't match folder ${folderId}`);
+          }
+        }
+        
+        if (primaryFolderId && primaryFolderId !== 'all') {
+          const beforeCount = collectionResults.length;
+          collectionResults = collectionResults.filter(result => 
+            result.metadata?.primaryFolderId === primaryFolderId
+          );
+          if (beforeCount !== collectionResults.length) {
+            console.log(`⚠️  Filtered out ${beforeCount - collectionResults.length} results that didn't match primary folder ${primaryFolderId}`);
+          }
+        }
+        
+        // Log document folder information for debugging
+        if (collectionResults.length > 0 && (folderId || primaryFolderId)) {
+          console.log(`📄 Found ${collectionResults.length} results from ${collectionName}:`);
+          collectionResults.forEach((result, idx) => {
+            console.log(`  - Result ${idx + 1}: folder=${result.metadata?.folderId || 'none'}, primaryFolder=${result.metadata?.primaryFolderId || 'none'}, title=${result.metadata?.title || 'untitled'}`);
+          });
+        }
           
         allResults.push(...collectionResults);
         
@@ -3219,15 +3488,38 @@ app.post('/api/documents/search', async (req, res) => {
     }
     
     // Sort by relevance and limit results
-    const results = allResults
+    const sortedResults = allResults
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
     
+    // Transform results to match frontend expectations
+    const transformedResults = (sortedResults || []).map(result => ({
+      id: result.id,
+      score: result.score,
+      documentId: result.metadata?.documentId || result.id,
+      documentTitle: result.metadata?.title || 'Untitled',
+      contentPreview: result.content?.substring(0, 200) + '...' || '',
+      fileType: result.document?.fileType || 'unknown',
+      category: result.metadata?.category || 'general',
+      uploadDate: result.document?.uploadedAt || new Date().toISOString(),
+      folderId: result.metadata?.folderId || null,
+      primaryFolderId: result.metadata?.primaryFolderId || null,
+      metadata: {
+        fileName: result.document?.originalName || result.metadata?.title,
+        fileSize: result.document?.fileSize,
+        mimeType: result.document?.fileType,
+        wordCount: result.metadata?.wordCount,
+        folderName: result.metadata?.folderName,
+        primaryFolderName: result.metadata?.primaryFolderName,
+        ...result.metadata
+      }
+    }));
+    
     res.json({
-      results,
-      totalResults: results.length,
+      success: true,
+      results: transformedResults,
+      totalResults: transformedResults.length,
       query,
-      collectionsSearched: collectionsToSearch,
       processingTime: Date.now() - req.startTime
     });
     
@@ -3347,16 +3639,31 @@ app.get('/api/documents', async (req, res) => {
               title: point.payload.metadata?.title || point.payload.document?.originalName
             });
             
-            // Filter out documents that don't match the folder when folder is specified
-            if (folderId && folderId !== 'all' && pointFolderId !== folderId) {
-              console.log(`📄 Skipping document - folder mismatch`);
-              return;
+            // Filter documents based on folder IDs
+            // For now, let's be more lenient with filtering to handle legacy documents
+            let shouldInclude = true;
+            
+            // Check if this document belongs to the requested folder
+            if (folderId && folderId !== 'all') {
+              // Check if document title matches folder name (for legacy documents)
+              const docTitle = (point.payload.metadata?.title || point.payload.document?.originalName || '').toLowerCase();
+              const folderInfo = folders.get(folderId);
+              const folderName = folderInfo?.name || '';
+              
+              // Include if folder ID matches OR if document title contains folder name (case-insensitive)
+              shouldInclude = pointFolderId === folderId || 
+                            (folderName && docTitle.toLowerCase().includes(folderName.toLowerCase()));
+              
+              if (!shouldInclude) {
+                console.log(`📄 Skipping document - folder mismatch (${pointFolderId} !== ${folderId}, title: ${docTitle})`);
+                return;
+              }
             }
             
-            // Filter out documents that don't match the primary folder when primary folder is specified
+            // For primary folder filtering, be lenient as well
             if (primaryFolderId && primaryFolderId !== 'all' && pointPrimaryFolderId !== primaryFolderId) {
-              console.log(`📄 Skipping document - primary folder mismatch`);
-              return;
+              // For now, don't skip based on primary folder since legacy documents don't have this
+              console.log(`📄 Note: Document missing primaryFolderId (has: ${pointPrimaryFolderId}, wants: ${primaryFolderId})`);
             }
             
             if (!allDocuments.has(docId)) {

@@ -354,7 +354,7 @@ class ToolDiscoveryService {
 
     // Suggest tools in categories with high engagement
     const topCategories = Object.entries(userPattern.skillProgress)
-      .sort(([, a], [, b]) => b - a)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
       .slice(0, 3)
       .map(([category]) => category);
 

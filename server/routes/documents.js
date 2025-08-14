@@ -111,8 +111,6 @@ router.get('/',
 
       // Apply organization isolation
       const filters = {
-        organization_id: req.organizationId,
-        ...(sanitizedQuery.search && { search: sanitizedQuery.search }),
         ...(sanitizedQuery.folder_id && { folder_id: sanitizedQuery.folder_id }),
         ...(sanitizedQuery.is_encrypted && { is_encrypted: sanitizedQuery.is_encrypted === 'true' })
       };
@@ -122,7 +120,30 @@ router.get('/',
         pageSize: Math.min(parseInt(sanitizedQuery.limit) || 20, 100)
       };
 
-      const result = await documentService.getMany(filters, { pagination });
+      let result;
+      
+      // If search term is provided, use searchDocuments method which handles text search properly
+      if (sanitizedQuery.search) {
+        result = await documentService.searchDocuments(
+          req.organizationId, 
+          sanitizedQuery.search, 
+          {
+            userId: req.userId,
+            pagination,
+            filters, // This will include folder_id if provided
+            includeContent: false
+          }
+        );
+      } else {
+        // Otherwise use regular getMany for listing
+        result = await documentService.getMany(
+          {
+            organization_id: req.organizationId,
+            ...filters
+          }, 
+          { pagination }
+        );
+      }
 
       if (!result.success) {
         throw new Error(result.message);
@@ -1032,6 +1053,119 @@ router.get('/pipeline/stats',
         success: false,
         error: 'STATS_ERROR',
         message: 'Failed to get pipeline statistics'
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/documents/search
+ * Search documents with full-text search
+ */
+router.post('/search',
+  authenticate,
+  requirePermission('documents:read'),
+  async (req, res) => {
+    try {
+      // Validate request body
+      const schema = {
+        query: { required: true, type: 'string', maxLength: 200 },
+        userId: { type: 'string', maxLength: 36 },
+        isAdmin: { type: 'boolean' },
+        limit: { type: 'number', min: 1, max: 100 },
+        folderId: { type: 'string', maxLength: 36 },
+        primaryFolderId: { type: 'string', maxLength: 36 },
+        category: { type: 'string', maxLength: 50 },
+        fileType: { type: 'string', maxLength: 50 },
+        scoreThreshold: { type: 'number', min: 0, max: 1 }
+      };
+
+      validateRequestStructure(req.body, schema);
+
+      const searchQuery = sanitizeString(req.body.query, { maxLength: 200 });
+      const limit = Math.min(parseInt(req.body.limit) || 10, 100);
+      
+      // Build filters
+      const filters = {};
+      if (req.body.folderId && req.body.folderId !== 'all') {
+        filters.folder_id = req.body.folderId;
+      }
+      if (req.body.primaryFolderId) {
+        // Would need to implement primary folder filtering in the document service
+        // For now, we'll just note it for future implementation
+      }
+      if (req.body.category) {
+        filters.content_type = req.body.category;
+      }
+      if (req.body.fileType) {
+        filters.file_type = req.body.fileType;
+      }
+
+      // Perform search
+      const startTime = Date.now();
+      const result = await documentService.searchDocuments(
+        req.organizationId,
+        searchQuery,
+        {
+          userId: req.userId,
+          pagination: { page: 1, pageSize: limit },
+          filters,
+          includeContent: false
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      const processingTime = Date.now() - startTime;
+
+      // Log search
+      await auditLog('documents_searched', 'document', req.userId, req.ip, {
+        query: searchQuery,
+        resultsCount: result.data.length,
+        filters,
+        processingTime
+      });
+
+      // Transform results to match frontend expectations
+      const transformedResults = result.data.map(doc => ({
+        id: doc.id,
+        score: 1.0, // TODO: Implement actual relevance scoring
+        documentId: doc.id,
+        documentTitle: doc.title,
+        contentPreview: doc.content_preview || '',
+        fileType: doc.file_type || 'unknown',
+        category: doc.content_type || 'general',
+        uploadDate: doc.created_at,
+        folderId: doc.folder_id,
+        metadata: {
+          fileName: doc.file_name,
+          fileSize: doc.file_size,
+          mimeType: doc.mime_type,
+          wordCount: doc.word_count,
+          ...doc.metadata
+        }
+      }));
+
+      res.json({
+        success: true,
+        results: transformedResults,
+        totalResults: result.count || result.data.length,
+        processingTime,
+        query: searchQuery
+      });
+
+    } catch (error) {
+      await auditLog('document_search_error', 'document', req.userId, req.ip, {
+        query: req.body.query,
+        error: error.message
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'SEARCH_ERROR',
+        message: 'Failed to search documents'
       });
     }
   }

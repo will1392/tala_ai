@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const qdrant = new QdrantClient({
   url: process.env.QDRANT_URL,

@@ -8,9 +8,13 @@
 import { cmoKnowledgeBase } from '../services/cmo/CMOKnowledgeBase.js';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Load environment variables
-dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 async function initializeCMOKnowledge() {
   console.log('🚀 Initializing CMO Knowledge Base...\n');

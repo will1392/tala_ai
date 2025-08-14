@@ -17,7 +17,71 @@ const LLM_PROVIDERS = {
 
 // Model Configurations
 const LLM_MODELS = {
-  // OpenAI Models
+  // OpenAI GPT-5 Models (Released 2025-08-07)
+  'gpt-5-nano-2025-08-07': {
+    provider: LLM_PROVIDERS.OPENAI,
+    name: 'GPT-5 Nano',
+    maxTokens: 16384,
+    contextWindow: 128000,
+    pricing: {
+      input: 0.00010,  // per 1K tokens (estimated)
+      output: 0.0004   // per 1K tokens (estimated)
+    },
+    capabilities: {
+      chat: true,
+      embedding: false,
+      vision: true,
+      functionCalling: true
+    },
+    defaultParams: {
+      temperature: 0.7,
+      maxTokens: 4096,
+      topP: 1.0
+    }
+  },
+  'gpt-5-mini-2025-08-07': {
+    provider: LLM_PROVIDERS.OPENAI,
+    name: 'GPT-5 Mini',
+    maxTokens: 32768,
+    contextWindow: 256000,
+    pricing: {
+      input: 0.0005,   // per 1K tokens (estimated)
+      output: 0.002    // per 1K tokens (estimated)
+    },
+    capabilities: {
+      chat: true,
+      embedding: false,
+      vision: true,
+      functionCalling: true
+    },
+    defaultParams: {
+      temperature: 0.7,
+      maxTokens: 8192,
+      topP: 1.0
+    }
+  },
+  'gpt-5-2025-08-07': {
+    provider: LLM_PROVIDERS.OPENAI,
+    name: 'GPT-5',
+    maxTokens: 65536,
+    contextWindow: 512000,
+    pricing: {
+      input: 0.015,    // per 1K tokens (estimated)
+      output: 0.06     // per 1K tokens (estimated)
+    },
+    capabilities: {
+      chat: true,
+      embedding: false,
+      vision: true,
+      functionCalling: true
+    },
+    defaultParams: {
+      temperature: 0.7,
+      maxTokens: 16384,
+      topP: 1.0
+    }
+  },
+  // Legacy OpenAI Models
   'gpt-4': {
     provider: LLM_PROVIDERS.OPENAI,
     name: 'GPT-4',
@@ -631,17 +695,17 @@ const LLM_MODELS = {
   }
 };
 
-// Default model for each use case
+// Default model for each use case (Updated with GPT-5 models)
 const DEFAULT_MODELS = {
-  chat: 'gemini-2.5-flash',     // Fast, cost-effective with latest capabilities
+  chat: 'gpt-5-nano-2025-08-07',     // GPT-5 Nano for common tasks
   embedding: 'text-embedding-3-small',  // Standard embedding model
-  analysis: 'claude-sonnet-4-20250514',    // Claude 4 for best analysis
-  creative: 'claude-opus-4-20250514',       // Claude 4 Opus for creative tasks
-  vision: 'gemini-2.5-pro',     // Gemini 2.5 Pro for advanced multimodal
-  reasoning: 'gemini-2.5-pro',  // Gemini 2.5 Pro with thinking capabilities
-  fast: 'gemini-2.5-flash',     // Upgraded to Gemini 2.5 Flash
+  analysis: 'gpt-5-2025-08-07',    // GPT-5 for heavy analysis work
+  creative: 'claude-opus-4-20250514',       // Keep Claude 4 Opus for creative (pending GPT-5 testing)
+  vision: 'gpt-5-mini-2025-08-07',     // GPT-5 Mini for vision tasks
+  reasoning: 'gpt-5-2025-08-07',  // GPT-5 for complex reasoning
+  fast: 'gpt-5-nano-2025-08-07',     // GPT-5 Nano for fast responses
   local: 'llama-3.1-8b',        // Local deployment
-  multimodal: 'gemini-2.5-pro'  // Best for complex multimodal tasks
+  multimodal: 'gpt-5-mini-2025-08-07'  // GPT-5 Mini for multimodal tasks
 };
 
 // Provider-specific configurations
@@ -649,7 +713,7 @@ const PROVIDER_CONFIGS = {
   [LLM_PROVIDERS.OPENAI]: {
     baseURL: 'https://api.openai.com/v1',
     apiKeyEnv: 'OPENAI_API_KEY',
-    defaultModel: 'gpt-4o-mini',
+    defaultModel: 'gpt-5-nano-2025-08-07',  // Updated to GPT-5 Nano
     rateLimits: {
       requestsPerMinute: 500,
       tokensPerMinute: 150000

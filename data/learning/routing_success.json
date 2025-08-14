@@ -1,1 +1,7 @@
-{}
+{}  "general:": {
+    "attempts": 1,
+    "successes": 1,
+    "averageTime": 0,
+    "satisfactionScores": []
+  }
+}

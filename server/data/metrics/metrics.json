@@ -1,94 +1,39 @@
 {
   "metadata": {
     "version": "1.0.0",
-    "createdAt": "2025-07-13T15:23:18.423Z",
-    "lastUpdated": "2025-07-13T15:23:27.145Z"
+    "createdAt": "2025-08-13T01:46:47.426Z",
+    "lastUpdated": "2025-08-13T01:47:08.860Z"
   },
   "metrics": [
     {
-      "requestId": "req_1752420198459_ws10iwvzz",
+      "requestId": "req_1755049607427_dw4w7w0tt",
       "modelId": "gpt-4o-mini-2024-07-18",
-      "queryType": "factual",
-      "userId": "user_123",
-      "sessionId": "session_456",
-      "responseTime": 1016,
-      "tokensUsed": 21,
-      "cost": 0.000006299999999999999,
-      "inputCost": 0,
-      "outputCost": 0,
-      "success": true,
-      "fallbacksUsed": 0,
-      "modelsAttempted": 1,
-      "contentLength": 31,
-      "timestamp": 1752420199475,
-      "id": "1752420199476-hriiwgj7m"
-    },
-    {
-      "requestId": "req_1752420199977_wmzvz7be3",
-      "modelId": "gpt-4o-mini-2024-07-18",
-      "queryType": "complexPlanning",
-      "userId": "user_123",
-      "sessionId": "session_456",
-      "responseTime": 3863,
-      "tokensUsed": 325,
-      "cost": 0.00018375,
-      "inputCost": 0,
-      "outputCost": 0,
-      "success": true,
-      "fallbacksUsed": 0,
-      "modelsAttempted": 1,
-      "contentLength": 1199,
-      "timestamp": 1752420203840,
-      "id": "1752420203841-9lqcmdu42"
-    },
-    {
-      "requestId": "req_1752420204340_r7uzqg08e",
-      "modelId": "grok-3",
       "queryType": "realTime",
-      "userId": "user_789",
-      "sessionId": "session_101",
-      "responseTime": 1720,
-      "tokensUsed": 117,
-      "cost": 0.000585,
+      "userId": "admin-1",
+      "responseTime": 21431,
+      "tokensUsed": 1241,
+      "cost": 0.0006006,
       "inputCost": 0,
       "outputCost": 0,
       "success": true,
       "fallbacksUsed": 0,
       "modelsAttempted": 1,
-      "contentLength": 459,
-      "timestamp": 1752420206060,
-      "id": "1752420206060-k54ej0yis"
-    },
-    {
-      "requestId": "req_1752420206562_kchgtsogo",
-      "modelId": "gpt-4o-mini-2024-07-18",
-      "queryType": "factual",
-      "userId": "user_456",
-      "sessionId": "session_789",
-      "responseTime": 583,
-      "tokensUsed": 27,
-      "cost": 0.00000855,
-      "inputCost": 0,
-      "outputCost": 0,
-      "success": true,
-      "fallbacksUsed": 0,
-      "modelsAttempted": 1,
-      "contentLength": 44,
-      "timestamp": 1752420207145,
-      "id": "1752420207145-u70rpuoo7"
+      "contentLength": 4226,
+      "timestamp": 1755049628858,
+      "id": "1755049628860-lkfzlyhjt"
     }
   ],
   "aggregations": {
     "hourly": {
-      "486783": {
+      "487513": {
         "period": "hour",
-        "key": 486783,
-        "timestamp": 1752420199475,
-        "requests": 4,
-        "successfulRequests": 4,
-        "totalResponseTime": 7182,
-        "totalCost": 0.0007836,
-        "totalTokens": 490,
+        "key": 487513,
+        "timestamp": 1755049628858,
+        "requests": 1,
+        "successfulRequests": 1,
+        "totalResponseTime": 21431,
+        "totalCost": 0.0006006,
+        "totalTokens": 1241,
         "models": {},
         "queryTypes": {},
         "users": {},
@@ -96,15 +41,15 @@
       }
     },
     "daily": {
-      "20282": {
+      "20313": {
         "period": "day",
-        "key": 20282,
-        "timestamp": 1752420199475,
-        "requests": 4,
-        "successfulRequests": 4,
-        "totalResponseTime": 7182,
-        "totalCost": 0.0007836,
-        "totalTokens": 490,
+        "key": 20313,
+        "timestamp": 1755049628858,
+        "requests": 1,
+        "successfulRequests": 1,
+        "totalResponseTime": 21431,
+        "totalCost": 0.0006006,
+        "totalTokens": 1241,
         "models": {},
         "queryTypes": {},
         "users": {},
@@ -112,15 +57,15 @@
       }
     },
     "weekly": {
-      "2896": {
+      "2901": {
         "period": "week",
-        "key": 2896,
-        "timestamp": 1752420199475,
-        "requests": 4,
-        "successfulRequests": 4,
-        "totalResponseTime": 7182,
-        "totalCost": 0.0007836,
-        "totalTokens": 490,
+        "key": 2901,
+        "timestamp": 1755049628858,
+        "requests": 1,
+        "successfulRequests": 1,
+        "totalResponseTime": 21431,
+        "totalCost": 0.0006006,
+        "totalTokens": 1241,
         "models": {},
         "queryTypes": {},
         "users": {},
@@ -128,15 +73,15 @@
       }
     },
     "monthly": {
-      "2025-07": {
+      "2025-08": {
         "period": "month",
-        "key": "2025-07",
-        "timestamp": 1752420199475,
-        "requests": 4,
-        "successfulRequests": 4,
-        "totalResponseTime": 7182,
-        "totalCost": 0.0007836,
-        "totalTokens": 490,
+        "key": "2025-08",
+        "timestamp": 1755049628858,
+        "requests": 1,
+        "successfulRequests": 1,
+        "totalResponseTime": 21431,
+        "totalCost": 0.0006006,
+        "totalTokens": 1241,
         "models": {},
         "queryTypes": {},
         "users": {},
@@ -146,58 +91,12 @@
   },
   "patterns": {
     "queryTypes": {
-      "factual": {
-        "queryType": "factual",
-        "totalQueries": 2,
-        "avgResponseTime": 799.5,
-        "avgCost": 0.000007424999999999999,
-        "avgTokens": 24,
-        "preferredModels": {
-          "gpt-4o-mini-2024-07-18": 2
-        },
-        "timeOfDayDistribution": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          2,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ],
-        "dayOfWeekDistribution": [
-          2,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ],
-        "successRate": 250
-      },
-      "complexPlanning": {
-        "queryType": "complexPlanning",
+      "realTime": {
+        "queryType": "realTime",
         "totalQueries": 1,
-        "avgResponseTime": 3863,
-        "avgCost": 0.00018375,
-        "avgTokens": 325,
+        "avgResponseTime": 21431,
+        "avgCost": 0.0006006,
+        "avgTokens": 1241,
         "preferredModels": {
           "gpt-4o-mini-2024-07-18": 1
         },
@@ -213,70 +112,24 @@
           0,
           0,
           0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
           1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
           0,
           0
         ],
         "dayOfWeekDistribution": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ],
-        "successRate": 200
-      },
-      "realTime": {
-        "queryType": "realTime",
-        "totalQueries": 1,
-        "avgResponseTime": 1720,
-        "avgCost": 0.000585,
-        "avgTokens": 117,
-        "preferredModels": {
-          "grok-3": 1
-        },
-        "timeOfDayDistribution": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
           0,
           0,
           1,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ],
-        "dayOfWeekDistribution": [
-          1,
-          0,
-          0,
           0,
           0,
           0,
@@ -286,116 +139,54 @@
       }
     },
     "userBehavior": {
-      "user_123": {
-        "userId": "user_123",
-        "totalQueries": 2,
-        "avgSessionLength": 0,
-        "preferredQueryTypes": {
-          "factual": 1,
-          "complexPlanning": 1
-        },
-        "preferredModels": {
-          "gpt-4o-mini-2024-07-18": 2
-        },
-        "totalCost": 0.00019004999999999998,
-        "avgCostPerQuery": 0.00009502499999999999,
-        "lastActive": 1752420203840,
-        "firstSeen": 1752420199475,
-        "sessionsCount": 0
-      },
-      "user_789": {
-        "userId": "user_789",
+      "admin-1": {
+        "userId": "admin-1",
         "totalQueries": 1,
         "avgSessionLength": 0,
         "preferredQueryTypes": {
           "realTime": 1
         },
         "preferredModels": {
-          "grok-3": 1
-        },
-        "totalCost": 0.000585,
-        "avgCostPerQuery": 0.000585,
-        "lastActive": 1752420206060,
-        "firstSeen": 1752420206060,
-        "sessionsCount": 0
-      },
-      "user_456": {
-        "userId": "user_456",
-        "totalQueries": 1,
-        "avgSessionLength": 0,
-        "preferredQueryTypes": {
-          "factual": 1
-        },
-        "preferredModels": {
           "gpt-4o-mini-2024-07-18": 1
         },
-        "totalCost": 0.00000855,
-        "avgCostPerQuery": 0.00000855,
-        "lastActive": 1752420207145,
-        "firstSeen": 1752420207145,
+        "totalCost": 0.0006006,
+        "avgCostPerQuery": 0.0006006,
+        "lastActive": 1755049628858,
+        "firstSeen": 1755049628858,
         "sessionsCount": 0
       }
     },
     "modelPerformance": {
       "gpt-4o-mini-2024-07-18": {
         "modelId": "gpt-4o-mini-2024-07-18",
-        "totalQueries": 3,
-        "avgResponseTime": 1820.6666666666667,
-        "avgCost": 0.00006620000000000001,
-        "successRate": 283.33333333333337,
-        "performanceTrend": [
-          {
-            "timestamp": 1752420199475,
-            "responseTime": 1016,
-            "success": true
-          },
-          {
-            "timestamp": 1752420203840,
-            "responseTime": 3863,
-            "success": true
-          },
-          {
-            "timestamp": 1752420207145,
-            "responseTime": 583,
-            "success": true
-          }
-        ],
-        "costEfficiency": 0.00002336470588235294,
-        "reliabilityScore": 100
-      },
-      "grok-3": {
-        "modelId": "grok-3",
         "totalQueries": 1,
-        "avgResponseTime": 1720,
-        "avgCost": 0.000585,
+        "avgResponseTime": 21431,
+        "avgCost": 0.0006006,
         "successRate": 200,
         "performanceTrend": [
           {
-            "timestamp": 1752420206060,
-            "responseTime": 1720,
+            "timestamp": 1755049628858,
+            "responseTime": 21431,
             "success": true
           }
         ],
-        "costEfficiency": 0.0002925,
+        "costEfficiency": 0.0003003,
         "reliabilityScore": 100
       }
     },
     "costTrends": {
-      "2025-07": {
-        "month": "2025-07",
-        "totalCost": 0.0007836,
-        "queriesCount": 4,
-        "avgCostPerQuery": 0.0001959,
+      "2025-08": {
+        "month": "2025-08",
+        "totalCost": 0.0006006,
+        "queriesCount": 1,
+        "avgCostPerQuery": 0.0006006,
         "costByModel": {
-          "gpt-4o-mini-2024-07-18": 0.00019859999999999998,
-          "grok-3": 0.000585
+          "gpt-4o-mini-2024-07-18": 0.0006006
         },
         "costByQueryType": {
-          "factual": 0.000014849999999999998,
-          "complexPlanning": 0.00018375,
-          "realTime": 0.000585
+          "realTime": 0.0006006
         },
-        "projectedMonthlyCost": 0.0018685846153846154
+        "projectedMonthlyCost": 0.0015515499999999998
       }
     }
   }

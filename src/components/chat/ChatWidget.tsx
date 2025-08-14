@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '../layout/GlassCard';
-import { Button } from '../shared/Button';
+import { Button } from '../ui/Button';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 
@@ -55,11 +55,11 @@ export const ChatWidget = () => {
               <div className="bg-gradient-to-r from-primary to-primary-dark p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <MessageCircle size={20} className="text-white" />
+                    <MessageCircle size={20} className="text-gray-900 dark:text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white">Tala Assistant</h3>
-                    <p className="text-xs text-white/80">Always here to help</p>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Tala Assistant</h3>
+                    <p className="text-xs text-gray-700 dark:text-white/80">Always here to help</p>
                   </div>
                 </div>
                 <Button

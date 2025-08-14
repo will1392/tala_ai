@@ -390,11 +390,17 @@ export class MemoryIndexer {
         await this.qdrant.getCollection(collectionName);
         console.log(`✅ Collection ${collectionName} exists`);
       } catch (error) {
-        if (error.message.includes('Not found')) {
+        if (error.message?.includes('Not found') || error.message?.includes("doesn't exist") || error.status === 404) {
           console.log(`🔨 Creating collection ${collectionName}...`);
-          await this.createCollection(collectionName);
+          try {
+            await this.createCollection(collectionName);
+          } catch (createError) {
+            console.warn(`⚠️ Could not create collection ${collectionName}:`, createError.message);
+            // Continue without this collection
+          }
         } else {
-          throw error;
+          console.warn(`⚠️ Collection check failed for ${collectionName}:`, error.message);
+          // Continue without throwing
         }
       }
     }

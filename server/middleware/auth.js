@@ -13,6 +13,13 @@ export const authenticate = (req, res, next) => {
                    req.headers.authorization?.replace('Bearer ', '') || 
                    'test_user_123';
     
+    console.log('🔐 Auth middleware:', {
+        'x-user-id': req.headers['x-user-id'],
+        'x-mock-user-id': req.headers['x-mock-user-id'],
+        'authorization': req.headers.authorization,
+        'final userId': userId
+    });
+    
     if (!userId) {
         return res.status(401).json({ error: 'Authentication required' });
     }
@@ -20,7 +27,7 @@ export const authenticate = (req, res, next) => {
     // In production, you would verify the token/session here
     // For now, we'll accept any user ID
     req.userId = userId;
-    req.organizationId = req.headers['x-organization-id'] || 'test_org_123';
+    req.organizationId = req.headers['x-organization-id'] || '00000000-0000-0000-0000-000000000001';
     
     next();
 };
@@ -33,7 +40,7 @@ export const optionalAuth = (req, res, next) => {
     
     if (userId) {
         req.userId = userId;
-        req.organizationId = req.headers['x-organization-id'] || 'test_org_123';
+        req.organizationId = req.headers['x-organization-id'] || '00000000-0000-0000-0000-000000000001';
     }
     
     next();
@@ -54,7 +61,7 @@ export const requireRole = (role) => {
 export const requireTestAuth = (req, res, next) => {
     // For test mode, always authenticate
     req.userId = 'test_user_123';
-    req.organizationId = 'test_org_123';
+    req.organizationId = '00000000-0000-0000-0000-000000000001';
     next();
 };
 

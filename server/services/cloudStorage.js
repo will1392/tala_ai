@@ -15,11 +15,13 @@ const __dirname = dirname(__filename);
 class CloudStorageService {
   constructor() {
     this.storageType = process.env.STORAGE_TYPE || 'local';
-    this.localUploadsDir = path.join(dirname(__dirname), 'uploads');
-    
-    // Ensure local uploads directory exists
-    if (!fs.existsSync(this.localUploadsDir)) {
-      fs.mkdirSync(this.localUploadsDir, { recursive: true });
+    if (this.storageType === 's3') {
+      console.log(`📦 CloudStorageService initialized with S3`);
+      console.log(`  - Bucket: ${process.env.AWS_S3_BUCKET}`);
+      console.log(`  - Region: ${process.env.AWS_REGION || 'us-east-1'}`);
+    } else {
+      console.error(`❌ CloudStorageService: Invalid storage type '${this.storageType}'`);
+      console.error(`   Only 'S3' storage is supported`);
     }
     
     // Initialize storage providers
@@ -43,59 +45,55 @@ class CloudStorageService {
   }
 
   /**
-   * Upload a file to the configured storage provider
+   * Upload a file to S3 storage (only supported method)
    * @param {Buffer} fileBuffer - File buffer
    * @param {string} originalName - Original filename
    * @param {string} mimeType - File MIME type
    * @param {string} documentId - Unique document ID
    * @returns {Promise<{url: string, key: string}>} Storage result
+   * @throws {Error} If upload fails or S3 not configured
    */
   async uploadFile(fileBuffer, originalName, mimeType, documentId) {
     const filename = this.generateFilename(documentId, originalName);
     
-    switch (this.storageType) {
-      case 's3':
-        return await this.uploadToS3(fileBuffer, filename, mimeType);
-      case 'cloudinary':
-        return await this.uploadToCloudinary(fileBuffer, filename, mimeType);
-      case 'local':
-      default:
-        return await this.uploadToLocal(fileBuffer, filename);
+    if (this.storageType !== 's3') {
+      throw new Error(`Storage type '${this.storageType}' is not supported. Only S3 storage is allowed.`);
     }
+    
+    if (!this.isConfigured()) {
+      throw new Error('S3 storage is not properly configured. Check AWS credentials and bucket settings.');
+    }
+    
+    return await this.uploadToS3(fileBuffer, filename, mimeType);
   }
 
   /**
-   * Delete a file from storage
+   * Delete a file from S3 storage
    * @param {string} fileKey - File key/path to delete
    * @returns {Promise<boolean>} Success status
+   * @throws {Error} If S3 not configured
    */
   async deleteFile(fileKey) {
-    switch (this.storageType) {
-      case 's3':
-        return await this.deleteFromS3(fileKey);
-      case 'cloudinary':
-        return await this.deleteFromCloudinary(fileKey);
-      case 'local':
-      default:
-        return await this.deleteFromLocal(fileKey);
+    if (this.storageType !== 's3') {
+      throw new Error(`Storage type '${this.storageType}' is not supported. Only S3 storage is allowed.`);
     }
+    
+    return await this.deleteFromS3(fileKey);
   }
 
   /**
-   * Get a signed URL for accessing a file (useful for private S3 buckets)
+   * Get a signed URL for accessing a file from S3
    * @param {string} fileKey - File key
    * @param {number} expiresIn - URL expiration time in seconds (default: 1 hour)
    * @returns {Promise<string>} Signed URL
+   * @throws {Error} If S3 not configured
    */
   async getSignedUrl(fileKey, expiresIn = 3600) {
-    switch (this.storageType) {
-      case 's3':
-        return await this.getS3SignedUrl(fileKey, expiresIn);
-      case 'local':
-      default:
-        // For local storage, return the direct URL
-        return `/api/files/${path.basename(fileKey)}`;
+    if (this.storageType !== 's3') {
+      throw new Error(`Storage type '${this.storageType}' is not supported. Only S3 storage is allowed.`);
     }
+    
+    return await this.getS3SignedUrl(fileKey, expiresIn);
   }
 
   // === AWS S3 Implementation ===
@@ -161,48 +159,9 @@ class CloudStorageService {
     }
   }
 
-  // === Local Storage Implementation ===
-  async uploadToLocal(fileBuffer, filename) {
-    try {
-      const filepath = path.join(this.localUploadsDir, filename);
-      
-      fs.writeFileSync(filepath, fileBuffer);
-      console.log(`✅ File saved locally: ${filename}`);
-      
-      // Verify file was saved
-      if (!fs.existsSync(filepath)) {
-        throw new Error('File verification failed after save');
-      }
-
-      return {
-        url: `/api/files/${filename}`,
-        key: filename,
-        provider: 'local',
-        path: filepath
-      };
-    } catch (error) {
-      console.error('❌ Local upload failed:', error);
-      throw new Error(`Local storage failed: ${error.message}`);
-    }
-  }
-
-  async deleteFromLocal(fileKey) {
-    try {
-      const filepath = path.join(this.localUploadsDir, path.basename(fileKey));
-      
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-        console.log(`🗑️ File deleted locally: ${fileKey}`);
-        return true;
-      } else {
-        console.warn(`⚠️ File not found for deletion: ${fileKey}`);
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Local deletion failed:', error);
-      return false;
-    }
-  }
+  // === Local Storage Implementation - REMOVED ===
+  // Local storage is not supported. All files must be stored in S3.
+  // This ensures consistency, scalability, and proper access control.
 
   // === Cloudinary Implementation (Placeholder) ===
   async uploadToCloudinary(fileBuffer, filename, mimeType) {
@@ -266,26 +225,37 @@ class CloudStorageService {
   /**
    * Test the storage connection
    * @returns {Promise<boolean>} Connection test result
+   * @throws {Error} If connection test fails
    */
   async testConnection() {
-    try {
-      switch (this.storageType) {
-        case 's3':
-          // Test S3 connection by listing buckets
+    switch (this.storageType) {
+      case 's3':
+        // Test S3 connection by checking bucket access
+        try {
           await this.s3.headBucket({ Bucket: this.s3Bucket }).promise();
+          
+          // Also test if we can list objects (more comprehensive test)
+          const listResult = await this.s3.listObjectsV2({
+            Bucket: this.s3Bucket,
+            MaxKeys: 1,
+            Prefix: 'documents/'
+          }).promise();
+          
           console.log('✅ S3 connection test successful');
           return true;
-          
-        case 'local':
-        default:
-          // Test local storage by checking directory access
-          fs.accessSync(this.localUploadsDir, fs.constants.W_OK);
-          console.log('✅ Local storage test successful');
-          return true;
-      }
-    } catch (error) {
-      console.error(`❌ Storage connection test failed:`, error.message);
-      return false;
+        } catch (error) {
+          // Re-throw with error details for better debugging
+          error.code = error.code || error.Code;
+          error.statusCode = error.statusCode || error.$metadata?.httpStatusCode;
+          throw error;
+        }
+        
+      case 'local':
+        // Should not be used
+        throw new Error('Local storage is not supported. Configure S3 storage.');
+        
+      default:
+        throw new Error(`Unknown storage type: ${this.storageType}. Configure S3 storage.`);
     }
   }
 }

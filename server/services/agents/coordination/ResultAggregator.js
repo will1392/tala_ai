@@ -646,6 +646,110 @@ export class ResultAggregator {
   }
 
   /**
+   * Normalize formats in results
+   */
+  normalizeFormats(results) {
+    if (!results || typeof results !== 'object') return results;
+    
+    const normalized = {};
+    for (const [key, value] of Object.entries(results)) {
+      if (Array.isArray(value)) {
+        // Normalize array formats
+        normalized[key] = value.map(item => {
+          if (typeof item === 'string') {
+            // Trim whitespace and normalize case for strings
+            return item.trim();
+          }
+          return item;
+        });
+      } else if (value && typeof value === 'object') {
+        // Recursively normalize objects
+        normalized[key] = this.normalizeFormats(value);
+      } else if (typeof value === 'string') {
+        // Normalize string values
+        normalized[key] = value.trim();
+      } else {
+        normalized[key] = value;
+      }
+    }
+    
+    return normalized;
+  }
+
+  /**
+   * Filter results by confidence threshold
+   */
+  filterByConfidence(results) {
+    if (!results || typeof results !== 'object') return results;
+    
+    const threshold = this.options.confidenceThreshold || 0.5;
+    const filtered = {};
+    
+    for (const [key, value] of Object.entries(results)) {
+      if (Array.isArray(value)) {
+        // Filter array items by confidence
+        filtered[key] = value.filter(item => {
+          if (item && typeof item === 'object' && 'confidence' in item) {
+            return item.confidence >= threshold;
+          }
+          return true; // Keep items without confidence scores
+        });
+      } else if (value && typeof value === 'object' && 'confidence' in value) {
+        // Filter object by confidence
+        if (value.confidence >= threshold) {
+          filtered[key] = value;
+        }
+      } else {
+        // Keep items without confidence scores
+        filtered[key] = value;
+      }
+    }
+    
+    return filtered;
+  }
+
+  /**
+   * Add computed fields to results
+   */
+  addComputedFields(results, context) {
+    if (!results || typeof results !== 'object') return results;
+    
+    const enhanced = { ...results };
+    
+    // Add metadata if not present
+    if (!enhanced.metadata) {
+      enhanced.metadata = {
+        processedAt: new Date().toISOString(),
+        processingContext: context?.type || 'unknown',
+        resultCount: this.countResults(results)
+      };
+    }
+    
+    // Add summary statistics
+    if (Array.isArray(enhanced.data)) {
+      enhanced.summary = {
+        totalItems: enhanced.data.length,
+        averageConfidence: this.calculateAverageConfidence(enhanced.data)
+      };
+    }
+    
+    return enhanced;
+  }
+
+  /**
+   * Count results in a data structure
+   */
+  countResults(data) {
+    if (Array.isArray(data)) {
+      return data.length;
+    }
+    if (data && typeof data === 'object') {
+      return Object.keys(data).length;
+    }
+    return 1;
+  }
+
+  /**
    * Calculate overall confidence
    */
   calculateOverallConfidence(results) {
@@ -667,6 +771,46 @@ export class ResultAggregator {
     // Simple consensus: how similar are the results?
     // This is a simplified implementation
     return 0.8; // Placeholder - implement actual consensus calculation
+  }
+
+  /**
+   * Calculate average confidence from an array of items
+   */
+  calculateAverageConfidence(items) {
+    if (!Array.isArray(items) || items.length === 0) return 0.5;
+    
+    const confidences = items
+      .map(item => item.confidence || item.score || 0.5)
+      .filter(conf => typeof conf === 'number');
+    
+    if (confidences.length === 0) return 0.5;
+    
+    return confidences.reduce((sum, conf) => sum + conf, 0) / confidences.length;
+  }
+
+  /**
+   * Assess data completeness
+   */
+  assessDataCompleteness(data) {
+    if (!data || typeof data !== 'object') return 0;
+    
+    const requiredFields = ['content', 'data', 'results', 'response'];
+    let score = 0;
+    let totalFields = 0;
+    
+    for (const field of requiredFields) {
+      if (field in data) {
+        totalFields++;
+        if (data[field] && 
+            (Array.isArray(data[field]) ? data[field].length > 0 : 
+             typeof data[field] === 'object' ? Object.keys(data[field]).length > 0 : 
+             true)) {
+          score++;
+        }
+      }
+    }
+    
+    return totalFields > 0 ? score / totalFields : 0;
   }
 
   /**

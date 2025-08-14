@@ -106,11 +106,11 @@ const NotificationItem: React.FC<{
   };
 
   const colors = {
-    success: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
-    error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-    warning: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800',
-    info: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-    achievement: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
+    success: 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800',
+    error: 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800',
+    warning: 'bg-orange-50 dark:bg-orange-900 border-orange-200 dark:border-orange-800',
+    info: 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800',
+    achievement: 'bg-purple-50 dark:bg-purple-900 border-purple-200 dark:border-purple-800'
   };
 
   const iconColors = {
@@ -151,7 +151,7 @@ const NotificationItem: React.FC<{
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 50, scale: 0.9 }}
       className={cn(
-        "relative p-4 rounded-lg border shadow-lg backdrop-blur-sm",
+        "relative p-4 rounded-lg border shadow-lg",
         colors[notification.type]
       )}
     >

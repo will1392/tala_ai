@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { MessageSquare, Plus, AlertCircle, Loader2, Settings, Mic, ChevronDown, BarChart3 } from 'lucide-react';
-import { GlassCard } from '../components/layout/GlassCard';
-import { Button } from '../components/shared/Button';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MessageSquare, Plus, AlertCircle, Loader2, Mic, ChevronDown, BarChart3, Sparkles, X, Bot, User, Clock, Zap } from 'lucide-react';
 import { ChatMessage } from '../components/chat/ChatMessage';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ConversationContextIndicator } from '../components/chat/ConversationContextIndicator';
@@ -19,6 +17,86 @@ import { useContextAwareMode } from '../hooks/useContextAwareMode';
 import { useConversationFlow } from '../hooks/useConversationFlow';
 import { cn } from '../utils/cn';
 import { speechService } from '../services/speechService';
+import type { UserProfile } from '../components/onboarding/UserProfileOnboarding';
+
+// Premium UI Components (matching PremiumDashboard)
+const Button = ({ 
+  children, 
+  variant = "default",
+  size = "default",
+  className = "",
+  ...props
+}: { 
+  children: React.ReactNode;
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  size?: "default" | "sm" | "lg" | "icon";
+  className?: string;
+  [key: string]: any;
+}) => {
+  const variants = {
+    default: "bg-primary text-primary-foreground hover:bg-primary/90",
+    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+    outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    ghost: "hover:bg-accent hover:text-accent-foreground",
+    link: "text-primary underline-offset-4 hover:underline"
+  }
+
+  const sizes = {
+    default: "h-10 px-4 py-2",
+    sm: "h-9 rounded-2xl px-3",
+    lg: "h-11 rounded-2xl px-8",
+    icon: "h-10 w-10"
+  }
+
+  return (
+    <button
+      className={cn(
+        "inline-flex items-center justify-center rounded-2xl text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        variants[variant],
+        sizes[size],
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+}
+
+const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div className={cn("rounded-3xl border bg-card text-card-foreground shadow-sm backdrop-blur-sm", className)}>
+    {children}
+  </div>
+)
+
+const Badge = ({ 
+  children, 
+  variant = "default",
+  className = "" 
+}: { 
+  children: React.ReactNode;
+  variant?: "default" | "outline" | "secondary" | "destructive" | "success";
+  className?: string;
+}) => {
+  const variants = {
+    default: "bg-primary text-primary-foreground hover:bg-primary/80",
+    outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/80",
+    success: "bg-green-500 text-white hover:bg-green-600"
+  }
+
+  return (
+    <div className={cn(
+      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors",
+      variants[variant],
+      className
+    )}>
+      {children}
+    </div>
+  )
+}
 
 interface Conversation {
   id: string;
@@ -66,16 +144,8 @@ export const Chat = () => {
   const { mode, subMode } = useMode();
   const { getAnnouncement, formatAnnouncementMessage } = useModeAnnouncements();
   const { processMessageContext } = useContextAwareMode();
-  const [messages, setMessages] = useState<any[]>([
-    {
-      id: 'welcome',
-      content: mode === 'cmo' 
-        ? "Hello! I'm Tala, your AI marketing assistant. I can help you with SEO, email marketing, social media, paid ads, and direct mail campaigns. How can I assist you today?"
-        : "Hello! I'm Tala, your AI travel assistant. I can help you with visa requirements, travel documents, airline policies, and destination information from your knowledge base. How can I assist you today?",
-      sender: 'tala' as const,
-      timestamp: new Date(),
-    }
-  ]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
@@ -114,10 +184,88 @@ export const Chat = () => {
     clearConversation
   } = useConversationFlow();
 
-  // Load conversations on component mount
+  // Load conversations and user profile on component mount
   useEffect(() => {
     loadConversations();
+    loadUserProfile();
   }, []);
+
+  // Load user profile
+  const loadUserProfile = async () => {
+    try {
+      // In development, check localStorage
+      if (process.env.NODE_ENV === 'development') {
+        const storedProfile = localStorage.getItem('tala_user_profile');
+        if (storedProfile) {
+          const profile = JSON.parse(storedProfile);
+          setUserProfile(profile);
+          
+          // Set personalized welcome message if no messages yet
+          if (messages.length === 0) {
+            setMessages([{
+              id: 'welcome',
+              content: getPersonalizedWelcome(profile),
+              sender: 'tala' as const,
+              timestamp: new Date(),
+            }]);
+          }
+        } else {
+          // No profile, use default welcome
+          setDefaultWelcomeMessage();
+        }
+        return;
+      }
+
+      // Production: load from API
+      const userId = 'admin-1'; // This would come from auth context
+      const response = await fetch(`/api/user-profile/${userId}`);
+      if (response.ok) {
+        const profile = await response.json();
+        setUserProfile(profile);
+        
+        // Set personalized welcome message if no messages yet
+        if (messages.length === 0) {
+          setMessages([{
+            id: 'welcome',
+            content: getPersonalizedWelcome(profile),
+            sender: 'tala' as const,
+            timestamp: new Date(),
+          }]);
+        }
+      } else {
+        // No profile, use default welcome
+        setDefaultWelcomeMessage();
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      setDefaultWelcomeMessage();
+    }
+  };
+
+  // Get personalized welcome message based on profile
+  const getPersonalizedWelcome = (profile: UserProfile) => {
+    const name = profile.name || 'there';
+    
+    if (mode === 'cmo') {
+      return `Hello ${name}! I'm Tala, your AI marketing assistant. I can help you with SEO, email marketing, social media, paid ads, and direct mail campaigns. How can I assist you today?`;
+    } else {
+      return `Hello ${name}! I'm Tala, your AI travel assistant. I can help you with visa requirements, travel documents, airline policies, and destination information from your knowledge base. How can I assist you today?`;
+    }
+  };
+
+  // Set default welcome message
+  const setDefaultWelcomeMessage = () => {
+    if (messages.length === 0) {
+      setMessages([{
+        id: 'welcome',
+        content: mode === 'cmo' 
+          ? "Hello! I'm Tala, your AI marketing assistant. I can help you with SEO, email marketing, social media, paid ads, and direct mail campaigns. How can I assist you today?"
+          : "Hello! I'm Tala, your AI travel assistant. I can help you with visa requirements, travel documents, airline policies, and destination information from your knowledge base. How can I assist you today?",
+        sender: 'tala' as const,
+        timestamp: new Date(),
+      }]);
+    }
+  };
 
   // Function to load marketing health
   const loadMarketingHealth = async () => {
@@ -250,12 +398,16 @@ export const Chat = () => {
 
   const startNewConversation = () => {
     setCurrentConversationId(null);
+    const welcomeContent = userProfile 
+      ? getPersonalizedWelcome(userProfile)
+      : mode === 'cmo' 
+        ? "Hello! I'm Tala, your AI marketing assistant. How can I help you with your marketing today?"
+        : "Hello! I'm Tala, your AI travel assistant. How can I help you today?";
+    
     setMessages([
       {
         id: 'welcome_new',
-        content: mode === 'cmo' 
-          ? "Hello! I'm Tala, your AI marketing assistant. How can I help you with your marketing today?"
-          : "Hello! I'm Tala, your AI travel assistant. How can I help you today?",
+        content: welcomeContent,
         sender: 'tala' as const,
         timestamp: new Date(),
       }
@@ -331,7 +483,9 @@ export const Chat = () => {
       setIsLoading(true);
 
       // Call the real Tala AI API with mode information
+      console.log('📤 Sending to chat service:', { content, mode, subMode });
       const response = await chatService.sendMessage(content, currentConversationId, mode, subMode);
+      console.log('📥 Response from chat service:', response);
       
       // Update current conversation ID if this was a new conversation
       if (!currentConversationId && response.conversationId) {
@@ -373,6 +527,12 @@ export const Chat = () => {
         }
       }
       
+      console.log('📤 Creating AI message with sources:', {
+        hasSources: !!response.sources,
+        sourcesCount: response.sources?.length || 0,
+        sources: response.sources
+      });
+      
       const aiMessage = {
         id: `ai_${Date.now()}`,
         content: responseContent,
@@ -386,6 +546,8 @@ export const Chat = () => {
         tokensUsed: response.tokensUsed || 0,
         taskCreated: response.taskCreated
       };
+      
+      console.log('📝 Final AI message sources:', aiMessage.sources);
       
       setMessages(prev => [...prev, aiMessage]);
       
@@ -501,83 +663,130 @@ export const Chat = () => {
   };
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-6rem)]">
-      {/* Main Chat Area - Full Screen */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Chat Header - With Mode Selector */}
-        <div className="glass-dark p-4 border-b border-white/10 rounded-t-xl relative">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
-                <h2 className="text-xl font-semibold">Chat with Tala</h2>
-                <p className="text-sm text-white/60">
-                  {mode === 'cmo' ? 'AI Marketing Assistant' : 'AI Travel Assistant'}
-                </p>
-              </div>
-              <ModeSelector />
-              {mode === 'cmo' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowMarketingHealth(!showMarketingHealth);
-                    if (!marketingHealthData) {
-                      loadMarketingHealth();
-                    }
-                  }}
-                  className="gap-2"
-                >
-                  <BarChart3 size={16} />
-                  Marketing Health
-                </Button>
-              )}
-            </div>
-            {error && (
-              <div className="flex items-center gap-2 text-red-400 text-sm">
-                <AlertCircle size={16} />
-                <span>Connection Error</span>
-                <Button variant="ghost" size="sm" onClick={clearError} className="p-1">
-                  ×
-                </Button>
-              </div>
-            )}
-          </div>
-          
-          {/* Conversation Breadcrumbs for CMO mode */}
-          {mode === 'cmo' && conversationState.breadcrumbs.length > 0 && (
-            <ConversationBreadcrumbs
-              breadcrumbs={conversationState.breadcrumbs}
-              onNavigate={navigateToBreadcrumb}
-              onGoBack={goBack}
-              className="mt-3 pb-2"
-            />
-          )}
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-background">
+      {/* Animated gradient background */}
+      <motion.div
+        className="absolute inset-0 -z-10 opacity-20"
+        animate={{
+          background: [
+            "radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.5) 0%, rgba(59, 130, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
+            "radial-gradient(circle at 30% 70%, rgba(236, 72, 153, 0.5) 0%, rgba(139, 92, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
+            "radial-gradient(circle at 70% 30%, rgba(34, 197, 94, 0.5) 0%, rgba(59, 130, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
+            "radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.5) 0%, rgba(59, 130, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
+          ],
+        }}
+        transition={{ duration: 30, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+      />
 
-        {/* Messages Area - Full Height */}
-        <div 
-          ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-6 space-y-4 relative glass min-h-0"
-          onScroll={handleScroll}
-        >
-          {messages.map((message, index) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <ChatMessage message={message} />
-            </motion.div>
-          ))}
-          
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="flex items-center gap-2 text-white/50 text-sm">
-              <Loader2 size={16} className="animate-spin" />
-              <span>Tala is searching knowledge base...</span>
+      <div className="flex gap-6 h-screen p-6">
+        {/* Main Chat Area - Full Screen */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Chat Header - Premium Style */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 p-6 text-white mb-6"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center gap-3">
+                    <Sparkles className="text-yellow-300" size={28} />
+                    Chat with Tala
+                  </h1>
+                  <p className="text-white/80 mt-1">
+                    {mode === 'cmo' ? 'AI Marketing Assistant' : 'AI Travel Assistant'}
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <ModeSelector />
+                  {mode === 'cmo' && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setShowMarketingHealth(!showMarketingHealth);
+                        if (!marketingHealthData) {
+                          loadMarketingHealth();
+                        }
+                      }}
+                      className="gap-2 bg-white/20 hover:bg-white/30 border-white/30 text-white"
+                    >
+                      <BarChart3 size={16} />
+                      Marketing Health
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {error && (
+                  <div className="flex items-center gap-2 bg-red-500/20 border border-red-400/30 rounded-2xl px-3 py-2">
+                    <AlertCircle size={16} />
+                    <span className="text-sm">Connection Error</span>
+                    <Button variant="ghost" size="icon" onClick={clearError} className="h-6 w-6 hover:bg-white/20">
+                      <X size={12} />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+            
+            {/* Conversation Breadcrumbs for CMO mode */}
+            {mode === 'cmo' && conversationState.breadcrumbs.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 pt-4 border-t border-white/20"
+              >
+                <ConversationBreadcrumbs
+                  breadcrumbs={conversationState.breadcrumbs}
+                  onNavigate={navigateToBreadcrumb}
+                  onGoBack={goBack}
+                  className=""
+                />
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Messages Area - Premium Style */}
+          <Card className="flex-1 flex flex-col backdrop-blur-md bg-background/30 border-border/50 overflow-hidden">
+            <div 
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto p-6 space-y-6 relative"
+              onScroll={handleScroll}
+            >
+              <AnimatePresence>
+                {messages.map((message, index) => (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                    transition={{ duration: 0.3, ease: "easeOut", delay: index * 0.1 }}
+                  >
+                    <ChatMessage message={message} />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              
+              {/* Premium Loading indicator */}
+              {isLoading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-4 p-4 rounded-3xl bg-gradient-to-r from-violet-600/10 to-indigo-600/10 border border-violet-200/20 backdrop-blur-sm"
+                >
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
+                    <Bot size={18} className="text-white" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin text-violet-600" />
+                    <span className="text-sm font-medium">Tala is searching knowledge base...</span>
+                  </div>
+                </motion.div>
+              )}
           
           {/* Marketing Health Dashboard for CMO mode */}
           {mode === 'cmo' && showMarketingHealth && (
@@ -616,104 +825,131 @@ export const Chat = () => {
               />
             </div>
           )}
-          
-          {/* Invisible element to scroll to */}
-          <div ref={messagesEndRef} />
-          
-          {/* Scroll to bottom button */}
-          {showScrollButton && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              onClick={scrollToBottom}
-              className="absolute bottom-4 right-4 p-3 bg-primary rounded-full shadow-lg hover:bg-primary/80 transition-colors z-10"
-              title="Scroll to bottom"
-            >
-              <ChevronDown size={20} className="text-white" />
-            </motion.button>
-          )}
+              
+              {/* Scroll to bottom button */}
+              {showScrollButton && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={scrollToBottom}
+                  className="absolute bottom-4 right-4 p-3 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg hover:shadow-xl transition-all z-10"
+                  title="Scroll to bottom"
+                >
+                  <ChevronDown size={20} className="text-white" />
+                </motion.button>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+            
+            {/* Premium Input Area */}
+            <div className="border-t border-border">
+              <ChatInput 
+                onSend={handleSendMessage}
+                disabled={isLoading}
+                placeholder="Ask me about travel, visas, documents, or destinations..."
+              />
+            </div>
+          </Card>
         </div>
 
-        {/* Input Area - Fixed at bottom */}
-        <div className="border-t border-white/10 rounded-b-xl glass-dark">
-          <ChatInput 
-            onSend={handleSendMessage}
-            disabled={isLoading}
-            placeholder="Ask me about travel, visas, documents, or destinations..."
-          />
+        {/* Premium Conversations Sidebar */}
+        <div className="w-80">
+          <Card className="h-full flex flex-col backdrop-blur-md bg-background/50">
+            {/* Header */}
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <MessageSquare size={20} className="text-primary" />
+                  Conversations
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={startNewConversation}
+                  className="rounded-2xl hover:bg-primary/10"
+                  title="Start new conversation"
+                >
+                  <Plus size={18} />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Conversation List */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingConversations ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 size={24} className="animate-spin text-muted-foreground" />
+                </div>
+              ) : conversations.length > 0 ? (
+                <div className="space-y-3">
+                  <AnimatePresence>
+                    {conversations.map((conversation) => (
+                      <motion.div
+                        key={conversation.id}
+                        layout
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className={cn(
+                          "group relative p-4 rounded-2xl border cursor-pointer transition-all duration-200",
+                          "hover:bg-accent hover:shadow-md",
+                          currentConversationId === conversation.id 
+                            ? "bg-primary/10 border-primary/30 shadow-sm" 
+                            : "bg-background/30 border-border hover:border-border/80"
+                        )}
+                        onClick={() => loadConversation(conversation.id)}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium text-sm truncate pr-8">
+                              {conversation.title}
+                            </h4>
+                            {conversation.mode && (
+                              <Badge variant="outline" className="text-xs">
+                                {conversation.mode === 'cmo' ? '📊' : '✈️'}
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <p className="text-xs text-muted-foreground truncate">
+                            {conversation.lastMessage}
+                          </p>
+                          
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Clock size={10} />
+                              <span>{new Date(conversation.lastActivity).toLocaleDateString()}</span>
+                            </div>
+                            <span>{conversation.messageCount} messages</span>
+                          </div>
+                        </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => deleteConversation(conversation.id, e)}
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 w-6 h-6 rounded-lg hover:bg-destructive/20 hover:text-destructive"
+                        >
+                          <X size={12} />
+                        </Button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <MessageSquare size={48} className="mx-auto text-muted-foreground/30 mb-4" />
+                  <p className="text-sm text-muted-foreground">No conversations yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Start chatting to see your history</p>
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
-      </div>
-
-      {/* Minimal Sidebar - Conversation History Only */}
-      <div className="w-72">
-        <GlassCard className="h-full flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b border-white/10">
-            <h3 className="font-semibold">Conversations</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={startNewConversation}
-              className="p-2"
-              title="Start new conversation"
-            >
-              <Plus size={16} />
-            </Button>
-          </div>
-          
-          {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {loadingConversations ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 size={20} className="animate-spin" />
-              </div>
-            ) : conversations.length > 0 ? (
-              <div className="space-y-3">
-                {conversations.map((conversation) => (
-                  <div
-                    key={conversation.id}
-                    className={`group relative glass-button rounded-lg p-3 text-sm hover:bg-white/20 transition-all cursor-pointer ${
-                      currentConversationId === conversation.id ? 'bg-primary/20 border border-primary/30' : ''
-                    }`}
-                    onClick={() => loadConversation(conversation.id)}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="font-medium truncate flex-1 pr-6">{conversation.title}</div>
-                      {conversation.mode && (
-                        <ConversationModeIndicator 
-                          mode={conversation.mode} 
-                          subMode={conversation.subMode}
-                          size="sm"
-                        />
-                      )}
-                    </div>
-                    <div className="text-xs text-white/50 mt-1 truncate">
-                      {conversation.lastMessage}
-                    </div>
-                    <div className="text-xs text-white/40 mt-1">
-                      {new Date(conversation.lastActivity).toLocaleDateString()} • {conversation.messageCount} messages
-                    </div>
-                    
-                    {/* Delete button */}
-                    <button
-                      onClick={(e) => deleteConversation(conversation.id, e)}
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all"
-                      title="Delete conversation"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-sm text-white/50">
-                <MessageSquare size={32} className="mx-auto mb-3 opacity-30" />
-                <p>No conversations yet</p>
-                <p className="text-xs mt-1">Start chatting to see your history</p>
-              </div>
-            )}
-          </div>
-        </GlassCard>
       </div>
       
       {/* Voice Settings Modal */}

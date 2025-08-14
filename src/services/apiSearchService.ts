@@ -23,28 +23,22 @@ export class ApiSearchService implements ISearchService {
       console.log('📍 API Base URL:', this.baseUrl);
       
       // Try to check if the backend is accessible
-      // First try the documents endpoint which should exist
-      const response = await fetch(`${this.baseUrl}/documents`, {
+      // Use the health endpoint instead of documents to avoid auth issues
+      const healthUrl = this.baseUrl.replace('/api', '/health');
+      const response = await fetch(healthUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
       
-      // Even if it returns 401 (unauthorized), it means the server is running
-      if (response.status === 401 || response.status === 403) {
-        console.log('✅ Backend server is running (auth required)');
+      if (response.ok || response.status === 503) {
+        console.log('✅ Backend server is running');
         this.initialized = true;
         return;
       }
       
-      if (response.ok) {
-        console.log('✅ Backend server is accessible');
-        this.initialized = true;
-        return;
-      }
-      
-      // If not 401/403 and not ok, it might still be running
+      // If not ok, it might still be running
       console.warn(`⚠️ Backend returned status ${response.status}, assuming it's running`);
       this.initialized = true;
     } catch (error) {
@@ -138,10 +132,10 @@ export class ApiSearchService implements ISearchService {
       console.log(`✅ Search completed: ${result.totalResults} results in ${result.processingTime}ms`);
       
       return {
-        results: result.results,
-        totalResults: result.totalResults,
-        processingTime: result.processingTime,
-        query: result.query,
+        results: result.results || [], // Ensure results is always an array
+        totalResults: result.totalResults || 0,
+        processingTime: result.processingTime || 0,
+        query: result.query || query,
         suggestions: [] // Could be enhanced
       };
     } catch (error) {

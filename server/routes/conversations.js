@@ -68,6 +68,80 @@ function handleValidationErrors(req, res, next) {
 // Apply middleware
 router.use(initializeServices);
 
+// GET /api/conversations - Get user's conversations list
+router.get('/',
+  async (req, res) => {
+    try {
+      const rawUserId = req.headers['x-user-id'] || req.query.userId;
+      
+      console.log(`📋 Getting conversations for user ${rawUserId}`);
+      
+      // Resolve user ID to proper UUID
+      let userId = rawUserId;
+      try {
+        const { default: userResolver } = await import('../services/auth/UserResolver.js');
+        await userResolver.initialize();
+        userId = await userResolver.resolveUserId(rawUserId);
+        console.log(`   Resolved to UUID: ${userId}`);
+      } catch (resolveError) {
+        console.log('   ⚠️ Could not resolve user ID:', resolveError.message);
+      }
+      
+      // Try to get from ConversationService
+      try {
+        const { ConversationService } = await import('../services/db/conversationService.js');
+        const conversationService = new ConversationService();
+        
+        const result = await conversationService.getMany(
+          { user_id: userId }, // filters
+          {
+            sort: { field: 'updated_at', direction: 'desc' },
+            pagination: { pageSize: 50 }
+          }
+        );
+        
+        if (result.success && result.data && result.data.length > 0) {
+          // Format conversations for frontend
+          const formatted = result.data.map(conv => ({
+            id: conv.id,
+            title: conv.title || `Conversation ${conv.created_at}`,
+            createdAt: conv.created_at,
+            updatedAt: conv.updated_at,
+            messageCount: conv.messages?.length || 0,
+            mode: conv.metadata?.mode || 'travel'
+          }));
+          
+          console.log(`   ✅ Found ${formatted.length} conversations`);
+          
+          return res.json({
+            success: true,
+            conversations: formatted,
+            count: formatted.length
+          });
+        } else {
+          console.log(`   ℹ️ No conversations found for user ${userId}`);
+        }
+      } catch (error) {
+        console.log('   ❌ ConversationService failed:', error.message);
+      }
+      
+      // No conversations found or service failed
+      res.json({
+        success: true,
+        conversations: [],
+        count: 0
+      });
+      
+    } catch (error) {
+      console.error('Error getting conversations:', error);
+      res.status(500).json({
+        error: 'Failed to get conversations',
+        message: error.message
+      });
+    }
+  }
+);
+
 // POST /api/conversations/:id/branch - Create a new branch
 router.post('/:id/branch',
   param('id').isString().isLength({ min: 1 }),
@@ -102,6 +176,105 @@ router.post('/:id/branch',
       console.error('Error creating branch:', error);
       res.status(500).json({
         error: 'Failed to create branch',
+        message: error.message
+      });
+    }
+  }
+);
+
+// GET /api/conversations/:id/messages - Get messages for a conversation
+router.get('/:id/messages',
+  param('id').isString().isLength({ min: 1 }),
+  handleValidationErrors,
+  initializeServices,
+  async (req, res) => {
+    try {
+      const { id: conversationId } = req.params;
+      
+      console.log(`📬 Getting messages for conversation ${conversationId}`);
+      
+      // Try to get messages from ThreadingService
+      try {
+        // Try multiple ways to get the threading service
+        let threadingService = req.app.locals?.intelligence?.threadingService;
+        
+        // If not in app.locals, try to import and use the shared intelligence instance
+        if (!threadingService) {
+          try {
+            const { default: TalaIntelligence } = await import('../services/intelligence/TalaIntelligence.js');
+            // Get or create a singleton instance
+            if (!global._talaIntelligence) {
+              global._talaIntelligence = new TalaIntelligence({
+                maxContextSize: 8000,
+                compressionThreshold: 0.8,
+                memoryRetrievalLimit: 10,
+                learningEnabled: true,
+                mockMode: false
+              });
+              await global._talaIntelligence.initialize();
+            }
+            threadingService = global._talaIntelligence.threadingService;
+          } catch (importError) {
+            console.log('Could not import TalaIntelligence:', importError.message);
+          }
+        }
+        
+        if (threadingService) {
+          console.log('📦 ThreadingService available, getting messages for:', conversationId);
+          const messages = await threadingService.getThreadMessages(conversationId, {
+            limit: 100
+          });
+          
+          console.log(`📦 ThreadingService returned ${messages?.length || 0} messages`);
+          
+          if (messages && messages.length > 0) {
+            return res.json({
+              success: true,
+              conversationId,
+              messages,
+              count: messages.length
+            });
+          }
+        } else {
+          console.log('⚠️ ThreadingService not available');
+        }
+      } catch (error) {
+        console.log('❌ ThreadingService error:', error.message);
+      }
+      
+      // Fallback: Try to get from conversationService
+      try {
+        const { ConversationService } = await import('../services/db/conversationService.js');
+        const conversationService = new ConversationService();
+        
+        const conversation = await conversationService.getById(conversationId, {
+          includeDeleted: false
+        });
+        
+        if (conversation && conversation.messages) {
+          return res.json({
+            success: true,
+            conversationId,
+            messages: conversation.messages,
+            count: conversation.messages.length
+          });
+        }
+      } catch (error) {
+        console.log('ConversationService fallback failed:', error.message);
+      }
+      
+      // No messages found
+      res.json({
+        success: true,
+        conversationId,
+        messages: [],
+        count: 0
+      });
+      
+    } catch (error) {
+      console.error('Error getting messages:', error);
+      res.status(500).json({
+        error: 'Failed to get messages',
         message: error.message
       });
     }

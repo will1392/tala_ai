@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Enable class-based dark mode (allows toggling via a CSS class)
+  darkMode: 'class',
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -45,6 +47,11 @@ export default {
       },
       backdropBlur: {
         xs: '2px',
+      },
+      boxShadow: {
+        'glow': '0 0 20px rgba(15, 198, 198, 0.5)',
+        'glow-sm': '0 0 10px rgba(15, 198, 198, 0.5)',
+        'glow-lg': '0 0 30px rgba(15, 198, 198, 0.5)',
       },
       animation: {
         'glass-shine': 'glass-shine 3s ease-in-out infinite',

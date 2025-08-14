@@ -13,6 +13,7 @@ import AgentOrchestrator from '../agents/AgentOrchestrator.js';
 import ThreadingServiceHybrid from '../conversations/ThreadingServiceHybrid.js';
 import { LearningEngine } from './LearningEngine.js';
 import { CompressionService } from '../compression/CompressionService.js';
+import UserLearningHub from '../learning/UserLearningHub.js';
 
 // Mock Context Manager for testing
 class MockContextManager {
@@ -83,6 +84,18 @@ export class TalaIntelligence {
     this.threadingService = new ThreadingServiceHybrid(); // Use hybrid for database/memory fallback
     this.learningEngine = new LearningEngine();
     this.compressionService = new CompressionService();
+    
+    // Initialize UserLearningHub - optional enhancement
+    try {
+      this.userLearningHub = new UserLearningHub({
+        enableLearning: options.enableUserLearning !== false,
+        learningRate: 0.1
+      });
+      console.log('✅ User Learning Hub initialized');
+    } catch (error) {
+      console.warn('⚠️ User Learning Hub not available:', error.message);
+      this.userLearningHub = null; // Graceful degradation
+    }
     
     // Intelligence state
     this.activeConversations = new Map();
@@ -165,6 +178,20 @@ export class TalaIntelligence {
       // 3. Build context with memories
       const context = await this.buildIntelligentContext(request, userProfile, thread);
       
+      // 3.5. Enhance context with user learning (optional, non-breaking)
+      if (this.userLearningHub) {
+        try {
+          const enhancedContext = await this.userLearningHub.getEnhancedContext(request.userId);
+          if (enhancedContext) {
+            context.userLearning = enhancedContext;
+            console.log('🎯 Applied user learning enhancements');
+          }
+        } catch (error) {
+          console.warn('⚠️ User learning enhancement skipped:', error.message);
+          // Continue without enhancement - doesn't break anything
+        }
+      }
+      
       // 4. Determine routing strategy
       const routingDecision = await this.makeRoutingDecision(request, context, userProfile);
       console.log(`🎯 Routing strategy: ${routingDecision.strategy}`);
@@ -193,6 +220,25 @@ export class TalaIntelligence {
         routingDecision,
         executionTime: Date.now() - startTime
       });
+      
+      // 7.5. Learn from this interaction (optional, non-breaking)
+      if (this.userLearningHub) {
+        try {
+          await this.userLearningHub.learnFromInteraction({
+            userId: request.userId,
+            message: request.content,
+            response: enhancedResponse.content,
+            metadata: {
+              mode: request.data?.mode,
+              satisfaction: enhancedResponse.metadata?.satisfaction,
+              timestamp: new Date()
+            }
+          });
+        } catch (error) {
+          console.warn('⚠️ User learning update skipped:', error.message);
+          // Continue without learning - doesn't break anything
+        }
+      }
       
       // 8. Track success
       this.performanceMetrics.successfulResponses++;
@@ -471,6 +517,21 @@ Provide a direct, helpful, and accurate response to this question. Do not ask fo
         // Determine system prompt based on mode
         let systemPrompt = undefined;
         
+        // Add user learning context to system prompt (if available)
+        let userLearningContext = '';
+        if (context.userLearning) {
+          const learning = context.userLearning;
+          if (learning.communicationStyle) {
+            userLearningContext += '\n' + learning.communicationStyle;
+          }
+          if (learning.businessContext) {
+            userLearningContext += '\n' + learning.businessContext;
+          }
+          if (learning.preferences) {
+            userLearningContext += '\n' + learning.preferences;
+          }
+        }
+        
         if (request.data?.mode === 'cmo') {
           // CMO/Marketing mode system prompt
           const subMode = request.data?.subMode || 'general';
@@ -514,9 +575,9 @@ Current marketing focus: ${subMode === 'seo' ? 'SEO optimization' :
                            subMode === 'ads' ? 'Paid advertising' :
                            subMode === 'content' ? 'Content strategy' :
                            subMode === 'analytics' ? 'Marketing analytics' :
-                           'General marketing strategy'}`;
+                           'General marketing strategy'}${userLearningContext ? '\n\nUser Preferences:\n' + userLearningContext : ''}`;
           
-          console.log('📊 Using CMO/Marketing Mode system prompt');
+          console.log('📊 Using CMO/Marketing Mode system prompt' + (userLearningContext ? ' with user learning' : ''));
         } else if (request.data?.mode === 'travel') {
           // Import travel mode prompt
           const { TRAVEL_MODE_SYSTEM_PROMPT } = await import('../../prompts/travelModePrompt.js');
@@ -542,8 +603,13 @@ Current marketing focus: ${subMode === 'seo' ? 'SEO optimization' :
             .replace('{knowledgeBaseContent}', knowledgeBaseContent)
             .replace('{userQuery}', request.content.split('Relevant information from knowledge base:')[0].trim())
             .replace('{conversationHistory}', conversationHistory || 'No previous conversation');
+          
+          // Append user learning context if available
+          if (userLearningContext) {
+            systemPrompt += '\n\nUser Preferences:\n' + userLearningContext;
+          }
             
-          console.log('🌍 Using Travel Mode system prompt');
+          console.log('🌍 Using Travel Mode system prompt' + (userLearningContext ? ' with user learning' : ''));
         } else if (request.content.includes('Relevant information from knowledge base:') || request.data?.hasKnowledgeContext) {
           systemPrompt = 'You are Tala, a helpful and knowledgeable travel assistant. You MUST use the knowledge base information provided to give a direct, complete answer. NEVER ask for more details, clarification, or say things like "Could you provide more specific information" or "What aspect would you like to know about". Instead, use the knowledge base content to provide specific, actionable information. Be confident, direct, and helpful. If the knowledge base contains relevant information, use it to answer comprehensively.';
         }

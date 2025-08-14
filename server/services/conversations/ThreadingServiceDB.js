@@ -116,11 +116,20 @@ export class ThreadingServiceDB {
       threadId = cachedThread.id;
     }
     
-    // Add message to database
+    // Add message to database with all required fields
     const result = await this.conversationService.addMessage({
       conversation_id: threadId,
       role: message.role || 'user',
       content: message.content,
+      model_used: message.metadata?.model || message.model_used,
+      provider: message.metadata?.provider || message.provider,
+      prompt_tokens: message.metadata?.prompt_tokens || message.prompt_tokens,
+      completion_tokens: message.metadata?.completion_tokens || message.completion_tokens,
+      total_tokens: message.metadata?.total_tokens || message.total_tokens,
+      cost: message.metadata?.cost || message.cost,
+      response_time_ms: message.metadata?.response_time_ms || message.response_time_ms,
+      context_used: message.metadata?.sources || message.context_used || [],
+      entities_extracted: message.metadata?.entities || message.entities_extracted || [],
       metadata: {
         ...message.metadata,
         timestamp: new Date().toISOString()
