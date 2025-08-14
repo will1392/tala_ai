@@ -8,6 +8,12 @@ import express from 'express';
 import TalaIntelligence from '../services/intelligence/TalaIntelligence.js';
 import { requireAuth, authenticate } from '../middleware/auth.js';
 import UserProfileService from '../services/user/UserProfileService.js';
+import clientManager from '../services/ClientManager.js';
+import ConversationSummarizer from '../services/ConversationSummarizer.js';
+import { markdownToText } from '../utils/markdownToText.js';
+import ComprehensiveSearch from '../services/search/ComprehensiveSearch.js';
+import { sendStatusUpdate, sendProgressUpdate, completeStatusStream } from './chatStatus.js';
+import { requireCredits } from '../middleware/creditsMiddleware.js';
 
 
 // STARTUP VERIFICATION - Added 2025-08-06T02:41:31.289Z
@@ -17,6 +23,7 @@ console.log('   - This should fix Greece/Iceland document access');
 
 const router = express.Router();
 const userProfileService = new UserProfileService();
+const conversationSummarizer = new ConversationSummarizer();
 
 // Initialize intelligence system
 const intelligenceConfig = {
@@ -50,7 +57,7 @@ router.post('/v2', authenticate, async (req, res) => {
   try {
     const {
       message,
-      conversationId,
+      conversationId: rawConversationId,
       location,
       device,
       attachments,
@@ -59,16 +66,100 @@ router.post('/v2', authenticate, async (req, res) => {
       fastResponse,
       mode,
       subMode,
-      searchKnowledge
+      searchKnowledge,
+      requestId
     } = req.body;
+    
+    // CRITICAL: Reject frontend-generated IDs
+    let conversationId = rawConversationId;
+    if (conversationId && conversationId.startsWith('conv-')) {
+      console.log('⚠️ Rejecting frontend conversation ID:', conversationId);
+      conversationId = null; // Force backend to create new ID
+    }
     
     // DEBUG: Log mode extraction
     console.log('🔍 DEBUG - Mode extraction:');
     console.log('   - mode from body:', mode);
     console.log('   - mode type:', typeof mode);
     console.log('   - mode === "travel":', mode === 'travel');
+    console.log('   - mode === "cmo":', mode === 'cmo');
     console.log('   - message:', message);
     console.log('   - message includes "tell me about":', message?.toLowerCase().includes('tell me about'));
+    
+    // Handle CMO/Marketing mode FIRST - before travel mode
+    if (mode === 'cmo') {
+      console.log('📊 CMO/Marketing mode detected - Processing marketing request');
+      console.log('📊 Full request data:', {
+        message: message?.substring(0, 100),
+        mode,
+        subMode,
+        hasMetadata: !!req.body.requestMetadata,
+        metadata: req.body.requestMetadata
+      });
+      
+      try {
+        // For CMO mode, use the intelligence system directly without travel validation
+        const intelligentResponse = await intelligence.processRequest({
+          userId: req.userId,
+          organizationId: req.organizationId,
+          content: message,
+          conversationId,
+          source: 'chat',
+          timestamp: new Date(),
+          location,
+          device,
+          data: {
+            mode: 'cmo',
+            subMode: req.body.subMode || 'general',
+            attachments,
+            preferences: {
+              responseStyle: preferredStyle || 'professional',
+              costOptimization,
+              fastResponse
+            },
+            // Include any marketing metadata
+            requestMetadata: req.body.requestMetadata,
+            // Skip travel validation
+            skipTaskExtraction: true,
+            skipTravelValidation: true
+          }
+        });
+        
+        console.log('📊 CMO Intelligence Response:', {
+          hasResponse: !!intelligentResponse.response,
+          responseType: typeof intelligentResponse.response,
+          responsePreview: typeof intelligentResponse.response === 'string' 
+            ? intelligentResponse.response.substring(0, 200)
+            : intelligentResponse.response?.content?.substring(0, 200)
+        });
+        
+        // Extract the actual response text
+        const responseText = typeof intelligentResponse.response === 'string' 
+          ? intelligentResponse.response 
+          : intelligentResponse.response?.content || intelligentResponse.response;
+        
+        return res.json({
+          success: true,
+          response: responseText,
+          mode: 'cmo',
+          subMode: req.body.subMode || 'general',
+          metadata: intelligentResponse.metadata,
+          conversationId: intelligentResponse.metadata.threadId || conversationId,
+          sources: intelligentResponse.metadata.sources || []
+        });
+      } catch (cmoError) {
+        console.error('❌ CMO processing failed:', cmoError.message);
+        
+        // Fallback to a simple response
+        return res.json({
+          success: true,
+          response: `I'll help you with your marketing question. ${message}\n\nFor marketing strategy and implementation, I recommend focusing on your target audience, clear messaging, and measurable goals. What specific aspect of marketing would you like to explore?`,
+          mode: 'cmo',
+          conversationId,
+          sources: []
+        });
+      }
+    }
     
     // CRITICAL FIX: Use simple flow for ALL travel queries
     // The original simple KB access is the foundation of Tala
@@ -82,55 +173,133 @@ router.post('/v2', authenticate, async (req, res) => {
       console.log('🌍 USING SIMPLE TRAVEL FLOW - Bypassing intelligence system');
       
       try {
-        console.log('🔍 Simple flow: Starting imports...');
-        // Simple, direct knowledge base search like the original
-        const { QdrantClient } = await import('@qdrant/qdrant-js');
-        const OpenAI = await import('openai');
-        const { EnhancedResponseGenerator } = await import('../services/EnhancedResponseGenerator.js');
-        console.log('✅ Simple flow: Imports successful');
+        // Send status update: Initializing
+        if (requestId) {
+          sendStatusUpdate(requestId, 'Initializing Tala AI systems...');
+          sendProgressUpdate(requestId, 'initializing', {});
+        }
         
-        console.log('🔍 Simple flow: Initializing Qdrant client...');
-        const qdrant = new QdrantClient({
-          url: process.env.QDRANT_URL,
-          apiKey: process.env.QDRANT_API_KEY,
-        });
-        console.log('✅ Simple flow: Qdrant client initialized');
+        console.log('🔍 Simple flow: Getting clients from ClientManager...');
+        // Use ClientManager for efficient client reuse
+        const qdrant = await clientManager.getQdrantClient();
+        const openai = await clientManager.getOpenAIClient();
+        const EnhancedResponseGenerator = await clientManager.getEnhancedResponseGenerator();
+        console.log('✅ Simple flow: All clients ready');
         
-        console.log('🔍 Simple flow: Initializing OpenAI client...');
-        const openai = new OpenAI.default({
-          apiKey: process.env.OPENAI_API_KEY,
-        });
-        console.log('✅ Simple flow: OpenAI client initialized');
+        // Send status update: Loading context
+        if (requestId) {
+          sendStatusUpdate(requestId, 'Loading conversation context...');
+          sendProgressUpdate(requestId, 'context', {});
+        }
         
-        // Simple embedding
-        console.log('🔍 Simple flow: Generating embedding for:', message);
-        const embedding = await openai.embeddings.create({
-          model: 'text-embedding-3-small',
-          input: message,
-        });
-        console.log('✅ Simple flow: Embedding generated');
+        // Get conversation history first for comprehensive search
+        let conversationHistory = [];
+        if (conversationId) {
+          try {
+            const historyResult = await intelligence.threadingService.getThreadMessages(
+              conversationId,
+              { limit: 10 }
+            );
+            conversationHistory = historyResult || [];
+            console.log('📚 Retrieved', conversationHistory.length, 'messages for comprehensive search');
+          } catch (error) {
+            console.log('⚠️ Could not retrieve conversation history:', error.message);
+          }
+        }
         
-        // Simple search - get more results for better synthesis
-        console.log('🔍 Simple flow: Searching Qdrant...');
-        const searchResults = await qdrant.search('tala_admin_knowledge', {
-          vector: embedding.data[0].embedding,
-          limit: 5, // Increased from 3 to get more options
-          with_payload: true
-        });
-        console.log('✅ Simple flow: Search complete, found', searchResults.length, 'results');
+        // Try comprehensive search first, fallback to simple search
+        let searchResults = [];
+        let searchMethod = 'comprehensive';
+        
+        try {
+          console.log('🔍 Attempting comprehensive search for maximum coverage...');
+          
+          // Send status update: Searching
+          if (requestId) {
+            sendStatusUpdate(requestId, 'Searching travel knowledge base...');
+            sendProgressUpdate(requestId, 'searching', { 
+              method: 'comprehensive',
+              query: message.substring(0, 50) + '...'
+            });
+          }
+          
+          const comprehensiveSearch = new ComprehensiveSearch(qdrant, openai);
+          
+          // Perform comprehensive search
+          searchResults = await comprehensiveSearch.search(
+            message,
+            conversationHistory,
+            {
+              mode: 'travel',
+              exhaustive: true
+            }
+          );
+          
+          console.log('✅ Comprehensive search complete, found', searchResults.length, 'results');
+          
+          // Send status update: Found results, moving to analyzing
+          if (requestId) {
+            sendProgressUpdate(requestId, 'search_complete', { 
+              resultsFound: searchResults.length,
+              topResult: searchResults[0]?.payload?.metadata?.title || 'Unknown'
+            });
+            // Move to analyzing stage
+            setTimeout(() => {
+              sendStatusUpdate(requestId, 'Analyzing search results...');
+              sendProgressUpdate(requestId, 'analyzing', {
+                documentsToAnalyze: searchResults.length
+              });
+            }, 500);
+          }
+        } catch (comprehensiveError) {
+          console.warn('⚠️ Comprehensive search failed, falling back to simple search:', comprehensiveError.message);
+          searchMethod = 'simple';
+          
+          // Fallback to original simple search
+          console.log('🔍 Simple flow: Generating embedding for:', message);
+          const embedding = await openai.embeddings.create({
+            model: 'text-embedding-3-small',
+            input: message,
+          });
+          console.log('✅ Simple flow: Embedding generated');
+          
+          console.log('🔍 Simple flow: Searching Qdrant with optimized parameters...');
+          searchResults = await qdrant.search('tala_admin_knowledge', {
+            vector: embedding.data[0].embedding,
+            limit: 5,
+            with_payload: true,
+            score_threshold: 0.4,
+            params: {
+              hnsw_ef: 128,
+              exact: false
+            }
+          });
+          console.log('✅ Simple flow: Search complete, found', searchResults.length, 'results');
+        }
+        
+        console.log(`📊 Search method used: ${searchMethod}, Results: ${searchResults.length}`);
         
         if (searchResults.length > 0) {
-          // Get conversation history if available
-          let conversationHistory = [];
+          // Reuse conversation history from above or get it if not available
           if (conversationId) {
             try {
               // Try to get recent messages from the conversation
               const historyResult = await intelligence.threadingService.getThreadMessages(
                 conversationId,
-                { limit: 5 }
+                { limit: 30 }
               );
               conversationHistory = historyResult || [];
               console.log('📚 Retrieved', conversationHistory.length, 'messages from history');
+              
+              // Apply pruning if needed for simple flow too
+              const metrics = conversationSummarizer.getConversationMetrics(conversationHistory);
+              if (metrics.needsPruning || metrics.pruningRecommended) {
+                console.log('🔄 Pruning conversation for simple flow...');
+                conversationHistory = await conversationSummarizer.processConversationHistory(
+                  conversationHistory,
+                  openai
+                );
+              }
             } catch (error) {
               console.log('⚠️ Could not retrieve conversation history:', error.message);
               // Continue without history
@@ -139,6 +308,16 @@ router.post('/v2', authenticate, async (req, res) => {
           
           // Use enhanced response generator
           console.log('🎯 Using Enhanced Response Generator');
+          
+          // Send status update: Generating response
+          if (requestId) {
+            sendStatusUpdate(requestId, 'Generating your personalized response...');
+            sendProgressUpdate(requestId, 'generating', { 
+              sourcesCount: searchResults.length,
+              model: 'GPT-5 Nano'
+            });
+          }
+          
           const responseGenerator = new EnhancedResponseGenerator();
           
           const { response, sourcesUsed, selectionMetadata } = await responseGenerator.generateResponse({
@@ -148,8 +327,14 @@ router.post('/v2', authenticate, async (req, res) => {
             openaiClient: openai
           });
           
+          // Send status update: Finalizing
+          if (requestId) {
+            sendStatusUpdate(requestId, 'Finalizing response...');
+          }
+          
           // Save the conversation messages to ThreadingService
           let finalConversationId = conversationId;
+          let cleanResponse = response; // Initialize cleanResponse with original response
           
           try {
             // Create thread if needed
@@ -157,7 +342,7 @@ router.post('/v2', authenticate, async (req, res) => {
               const newThread = await intelligence.threadingService.createThread({
                 userId: req.userId,
                 organizationId: req.organizationId,
-                title: `Travel Query: ${message.substring(0, 50)}...`,
+                title: `${message.substring(0, 50)}...`,
                 metadata: {
                   mode: 'travel',
                   source: 'chat'
@@ -169,20 +354,23 @@ router.post('/v2', authenticate, async (req, res) => {
               // Ensure thread exists
               try {
                 await intelligence.threadingService.getThread(conversationId);
+                finalConversationId = conversationId;
               } catch (err) {
-                // Thread doesn't exist, create it
+                // Thread doesn't exist, create new one (don't reuse the ID)
+                console.log('⚠️ Thread not found for ID:', conversationId, '- creating new thread');
                 const newThread = await intelligence.threadingService.createThread({
-                  id: conversationId,
+                  // Don't pass the ID - let backend generate it
                   userId: req.userId,
                   organizationId: req.organizationId,
-                  title: `Travel Query: ${message.substring(0, 50)}...`,
+                  title: `${message.substring(0, 50)}...`,
                   metadata: {
                     mode: 'travel',
-                    source: 'chat'
+                    source: 'chat',
+                    originalRequestId: conversationId // Store for reference but don't use as ID
                   }
                 });
                 finalConversationId = newThread.id;
-                console.log('📝 Created thread for existing ID:', finalConversationId);
+                console.log('📝 Created new thread with backend ID:', finalConversationId);
               }
             }
             
@@ -197,16 +385,27 @@ router.post('/v2', authenticate, async (req, res) => {
               }
             });
             
-            // Save assistant response
+            // Convert markdown to plain text before saving and sending
+            cleanResponse = markdownToText(response);
+            console.log('🧹 Converted markdown to plain text for storage and response');
+            
+            // Save assistant response (clean version)
             await intelligence.threadingService.addMessage(finalConversationId, {
               role: 'assistant',
-              content: response,
+              content: cleanResponse,
               timestamp: new Date(),
-              model_used: 'gpt-4o-mini',
+              model_used: 'gpt-5-nano-2025-08-07',
               provider: 'openai',
               metadata: {
                 sourcesUsed: sourcesUsed?.length || 0,
-                mode: 'travel'
+                sources: sourcesUsed.map(source => ({
+                  title: source.title,
+                  type: 'document',
+                  score: source.score,
+                  sectionsUsed: source.sectionsUsed
+                })) || [],
+                mode: 'travel',
+                originalFormat: 'markdown' // Track that we converted it
               }
             });
             
@@ -217,9 +416,15 @@ router.post('/v2', authenticate, async (req, res) => {
           }
           
           // Return in the expected format
+          
+          // Complete status stream
+          if (requestId) {
+            completeStatusStream(requestId);
+          }
+          
           return res.json({
             success: true,
-            response: response,
+            response: cleanResponse,
             sources: sourcesUsed.map(source => ({
               title: source.title,
               type: 'document',
@@ -228,7 +433,7 @@ router.post('/v2', authenticate, async (req, res) => {
             })),
             conversationId: finalConversationId,
             metadata: {
-              model: 'gpt-4o-mini',
+              model: 'gpt-5-nano-2025-08-07',
               mode: 'travel',
               simpleFlow: true,
               enhanced: true,
@@ -240,6 +445,8 @@ router.post('/v2', authenticate, async (req, res) => {
           // No results found
           let finalConversationId = conversationId;
           const noResultsResponse = "I couldn't find specific information about that destination in my travel guides. Could you please be more specific about what you'd like to know?";
+          // Clean the response before saving
+          const cleanNoResultsResponse = markdownToText(noResultsResponse);
           
           // Save messages even when no results found
           try {
@@ -248,7 +455,7 @@ router.post('/v2', authenticate, async (req, res) => {
               const newThread = await intelligence.threadingService.createThread({
                 userId: req.userId,
                 organizationId: req.organizationId,
-                title: `Travel Query: ${message.substring(0, 50)}...`,
+                title: `${message.substring(0, 50)}...`,
                 metadata: {
                   mode: 'travel',
                   source: 'chat'
@@ -264,7 +471,7 @@ router.post('/v2', authenticate, async (req, res) => {
                   id: conversationId,
                   userId: req.userId,
                   organizationId: req.organizationId,
-                  title: `Travel Query: ${message.substring(0, 50)}...`,
+                  title: `${message.substring(0, 50)}...`,
                   metadata: {
                     mode: 'travel',
                     source: 'chat'
@@ -283,11 +490,11 @@ router.post('/v2', authenticate, async (req, res) => {
             
             await intelligence.threadingService.addMessage(finalConversationId, {
               role: 'assistant',
-              content: noResultsResponse,
+              content: cleanNoResultsResponse,
               timestamp: new Date(),
-              model_used: 'gpt-4o-mini',
+              model_used: 'gpt-5-nano-2025-08-07',
               provider: 'openai',
-              metadata: { mode: 'travel' }
+              metadata: { mode: 'travel', originalFormat: 'markdown' }
             });
             
             console.log('💾 Saved no-results conversation to ThreadingService');
@@ -297,7 +504,7 @@ router.post('/v2', authenticate, async (req, res) => {
           
           return res.json({
             success: true,
-            response: noResultsResponse,
+            response: cleanNoResultsResponse,
             sources: [],
             conversationId: finalConversationId
           });
@@ -367,18 +574,33 @@ router.post('/v2', authenticate, async (req, res) => {
       // Continue without user profile
     }
     
-    // Get conversation history for context-aware search
+    // Get conversation history for context-aware search with intelligent pruning
     let conversationHistory = [];
     if (conversationId) {
       try {
+        // Fetch more messages initially to allow for summarization
         const historyResult = await intelligence.threadingService.getThreadMessages(
           conversationId,
-          { limit: 10 }
+          { limit: 30 } // Increased to allow summarization of older messages
         );
         conversationHistory = historyResult || [];
         console.log(`📚 Retrieved ${conversationHistory.length} messages from conversation history`);
+        
+        // Check if conversation needs pruning
+        const metrics = conversationSummarizer.getConversationMetrics(conversationHistory);
+        console.log('📊 Conversation metrics:', metrics);
+        
+        if (metrics.needsPruning || metrics.pruningRecommended) {
+          console.log('🔄 Pruning conversation history to prevent token overflow...');
+          const openai = await clientManager.getOpenAIClient();
+          conversationHistory = await conversationSummarizer.processConversationHistory(
+            conversationHistory, 
+            openai
+          );
+          console.log(`✅ Conversation pruned to ${conversationHistory.length} messages`);
+        }
       } catch (error) {
-        console.warn('Failed to retrieve conversation history:', error);
+        console.warn('Failed to retrieve or prune conversation history:', error);
       }
     }
     
@@ -399,20 +621,10 @@ router.post('/v2', authenticate, async (req, res) => {
       console.log('📊 Mode:', mode, 'SearchKnowledge:', searchKnowledge);
       
       try {
-        // Import necessary modules
-        const { QdrantClient } = await import('@qdrant/qdrant-js');
-        const OpenAI = await import('openai');
-        const { ContextAwareSearch } = await import('../services/search/ContextAwareSearch.js');
-        
-        // Initialize services
-        const qdrant = new QdrantClient({
-          url: process.env.QDRANT_URL || 'https://2769f27d-a9f0-4361-8f88-3ac61f081dd1.europe-west3-0.gcp.cloud.qdrant.io:6333',
-          apiKey: process.env.QDRANT_API_KEY,
-        });
-        
-        const openai = new OpenAI.default({
-          apiKey: process.env.OPENAI_API_KEY,
-        });
+        // Use ClientManager for efficient client reuse
+        const qdrant = await clientManager.getQdrantClient();
+        const openai = await clientManager.getOpenAIClient();
+        const { ContextAwareSearch } = await clientManager.getContextAwareSearch();
         
         const contextAwareSearch = new ContextAwareSearch();
         
@@ -432,7 +644,7 @@ router.post('/v2', authenticate, async (req, res) => {
           console.error('❌ Collection check failed:', collError.message);
         }
         
-        // Perform context-aware search with conversation history
+        // Perform context-aware search with optimized parameters
         const searchResults = await contextAwareSearch.performContextAwareSearch({
           qdrantClient: qdrant,
           openaiClient: openai,
@@ -441,7 +653,11 @@ router.post('/v2', authenticate, async (req, res) => {
           conversationHistory: conversationHistory,
           searchOptions: {
             limit: 5,
-            scoreThreshold: 0.0  // More permissive threshold to get relevant results
+            scoreThreshold: 0.4,  // Increased threshold for better quality results
+            params: {
+              hnsw_ef: 128,  // Better search accuracy
+              exact: false   // Use approximate search for speed
+            }
           }
         });
         
@@ -617,9 +833,12 @@ router.post('/v2', authenticate, async (req, res) => {
     });
     
     // Send successful response with sources
+    // Convert markdown to plain text
+    const cleanResponse = markdownToText(intelligentResponse.response.content);
+    
     res.json({
       success: true,
-      response: intelligentResponse.response.content,
+      response: cleanResponse,
       metadata: {
         ...intelligentResponse.metadata,
         suggestions: intelligentResponse.response.suggestions,

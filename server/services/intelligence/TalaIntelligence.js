@@ -10,7 +10,7 @@ import ContextManager from '../context/ContextManager.js';
 import MemoryManager from '../memory/MemoryManager.js';
 import ProfileManager from '../profiles/ProfileManager.js';
 import AgentOrchestrator from '../agents/AgentOrchestrator.js';
-import ThreadingServiceDB from '../conversations/ThreadingServiceDB.js';
+import ThreadingServiceHybrid from '../conversations/ThreadingServiceHybrid.js';
 import { LearningEngine } from './LearningEngine.js';
 import { CompressionService } from '../compression/CompressionService.js';
 
@@ -80,7 +80,7 @@ export class TalaIntelligence {
     this.memoryManager = new MemoryManager();
     this.profileManager = new ProfileManager();
     this.agentOrchestrator = new AgentOrchestrator();
-    this.threadingService = new ThreadingServiceDB();
+    this.threadingService = new ThreadingServiceHybrid(); // Use hybrid for database/memory fallback
     this.learningEngine = new LearningEngine();
     this.compressionService = new CompressionService();
     
@@ -136,6 +136,15 @@ export class TalaIntelligence {
   async processRequest(request) {
     const startTime = Date.now();
     const requestId = this.generateRequestId();
+    
+    console.log('🧠 TalaIntelligence.processRequest called with:', {
+      mode: request.data?.mode,
+      skipFlags: {
+        skipTaskExtraction: request.data?.skipTaskExtraction,
+        skipTravelValidation: request.data?.skipTravelValidation
+      },
+      content: request.content?.substring(0, 100)
+    });
     
     try {
       // Track metrics
@@ -273,10 +282,10 @@ export class TalaIntelligence {
     }
     
     return {
-      contextWindow,
-      relevantMemories,
+      contextWindow: Array.isArray(contextWindow) ? contextWindow : [],
+      relevantMemories: relevantMemories || [],
       thread,
-      recentMessages,
+      recentMessages: recentMessages || [],
       userProfile
     };
   }
@@ -377,30 +386,192 @@ export class TalaIntelligence {
     if (strategy === 'direct-response') {
       // No agent needed - use LLM router for general chat
       console.log(`💬 Handling general chat request via LLM router`);
+      console.log(`📚 Has knowledge context: ${request.data?.hasKnowledgeContext || request.content.includes('knowledge base')}`);
+      console.log(`📝 Request content preview: ${request.content.substring(0, 100)}...`);
       
       try {
         // Initialize LLM router if needed
         if (!this.llmRouter) {
-          const { default: LLMRouter } = await import('../llm/LLMRouter.js');
-          this.llmRouter = new LLMRouter({
-            enableLogging: false,
-            costOptimization: true
-          });
+          console.log('🔧 Initializing LLM Router...');
+          try {
+            const { default: LLMRouter } = await import('../llm/LLMRouter.js');
+            this.llmRouter = new LLMRouter({
+              enableLogging: false,
+              costOptimization: true
+            });
+            console.log('✅ LLM Router initialized');
+          } catch (initError) {
+            console.error('❌ Failed to initialize LLM Router:', initError.message);
+            throw initError;
+          }
         }
+        
+        // Build enhanced query with appropriate context
+        let enhancedQuery = request.content;
+        
+        // For CMO mode, enhance the query with marketing context
+        if (request.data?.mode === 'cmo') {
+          const marketingContext = request.data?.requestMetadata;
+          
+          if (marketingContext?.growthPlanStep) {
+            enhancedQuery = `Marketing Context: User is working on "${marketingContext.growthPlanStep.label}"
+Task Description: ${marketingContext.growthPlanStep.description || 'Marketing task'}
+Expected Deliverables: ${marketingContext.growthPlanStep.outputs?.join(', ') || 'Marketing materials'}
+
+User's Question: ${request.content}
+
+Provide specific, actionable marketing advice. Focus on practical steps and real examples.`;
+          } else {
+            enhancedQuery = `Marketing Question: ${request.content}
+
+Provide specific, actionable marketing advice tailored to this question. Include practical steps, tools, and examples.`;
+          }
+          
+          console.log('📊 Enhanced CMO query with marketing context');
+        }
+        // Check if we have knowledge base context in the request
+        else if (request.content.includes('Relevant information from knowledge base:')) {
+          console.log('📚 Knowledge base context detected - using it for response');
+          // Extract the user's original question and the knowledge base info
+          const parts = request.content.split('Relevant information from knowledge base:');
+          const userQuestion = parts[0].trim();
+          let knowledgeInfo = parts[1];
+          
+          // Extract user context if present (it might be at the end now)
+          let userContextInfo = '';
+          if (knowledgeInfo && knowledgeInfo.includes('User Context:')) {
+            const contextParts = knowledgeInfo.split('User Context:');
+            knowledgeInfo = contextParts[0].trim();
+            userContextInfo = contextParts[1] ? `\n\nUser Context:\n${contextParts[1].trim()}` : '';
+          }
+          
+          // Create a clear instruction for the LLM to use the knowledge base information
+          enhancedQuery = `Answer the following question using the knowledge base information provided.
+
+User's Question: ${userQuestion}
+
+Knowledge Base Information:
+${knowledgeInfo}${userContextInfo}
+
+Instructions: 
+1. Provide a direct, informative answer based on the knowledge base information above
+2. Be specific, helpful, and conversational
+3. Do NOT ask for more details or clarification - use the information provided to give a complete answer
+4. When possible, reference that this information comes from your knowledge base (e.g., "Based on the travel documents in my knowledge base..." or "According to the information I have...")
+5. Structure your response to be comprehensive and useful`;
+          
+          console.log('📝 Enhanced query preview:', enhancedQuery.substring(0, 200) + '...');
+        } else if (request.data?.hasKnowledgeContext) {
+          console.log('📚 Knowledge context flag detected');
+          enhancedQuery = `${request.content}
+
+Provide a direct, helpful, and accurate response to this question. Do not ask for more details or clarification.`;
+        }
+        
+        // Determine system prompt based on mode
+        let systemPrompt = undefined;
+        
+        if (request.data?.mode === 'cmo') {
+          // CMO/Marketing mode system prompt
+          const subMode = request.data?.subMode || 'general';
+          const marketingContext = request.data?.requestMetadata?.growthPlanStep || null;
+          
+          systemPrompt = `You are Tala, an expert marketing consultant and strategist. You specialize in helping businesses grow through effective marketing strategies.
+
+${marketingContext ? `Context: The user is working on a marketing growth plan step called "${marketingContext.label}". ${marketingContext.description || ''}` : ''}
+
+Your expertise includes:
+- Digital marketing strategy
+- SEO and content marketing
+- Social media marketing
+- Email marketing campaigns
+- Paid advertising (PPC, social ads)
+- Brand development and positioning
+- Marketing analytics and metrics
+- Growth hacking techniques
+- Customer acquisition and retention
+
+Instructions:
+1. Provide specific, actionable marketing advice
+2. Use real-world examples and best practices
+3. Be practical and results-oriented
+4. Focus on measurable outcomes
+5. Tailor advice to the user's specific context
+6. Suggest tools, templates, or resources when relevant
+7. Break down complex strategies into clear steps
+8. NEVER give generic advice - be specific to marketing
+
+When the user says things like "I don't know where to start" or "ideas", provide:
+- Specific marketing strategies relevant to their goal
+- Step-by-step action plans
+- Marketing templates or frameworks they can use
+- Real examples from successful campaigns
+- Metrics to track success
+
+Current marketing focus: ${subMode === 'seo' ? 'SEO optimization' : 
+                           subMode === 'email' ? 'Email marketing' :
+                           subMode === 'social' ? 'Social media marketing' :
+                           subMode === 'ads' ? 'Paid advertising' :
+                           subMode === 'content' ? 'Content strategy' :
+                           subMode === 'analytics' ? 'Marketing analytics' :
+                           'General marketing strategy'}`;
+          
+          console.log('📊 Using CMO/Marketing Mode system prompt');
+        } else if (request.data?.mode === 'travel') {
+          // Import travel mode prompt
+          const { TRAVEL_MODE_SYSTEM_PROMPT } = await import('../../prompts/travelModePrompt.js');
+          
+          // Extract knowledge base content if present
+          let knowledgeBaseContent = '';
+          let conversationHistory = '';
+          
+          if (request.content.includes('Relevant information from knowledge base:')) {
+            const parts = request.content.split('Relevant information from knowledge base:');
+            knowledgeBaseContent = parts[1] ? parts[1].trim() : '';
+          }
+          
+          // Include conversation history
+          if (Array.isArray(context.contextWindow) && context.contextWindow.length > 0) {
+            conversationHistory = context.contextWindow.slice(-5).map(msg => 
+              `${msg.role === 'user' ? 'User' : 'Tala'}: ${msg.content}`
+            ).join('\n');
+          }
+          
+          // Build travel-specific system prompt
+          systemPrompt = TRAVEL_MODE_SYSTEM_PROMPT
+            .replace('{knowledgeBaseContent}', knowledgeBaseContent)
+            .replace('{userQuery}', request.content.split('Relevant information from knowledge base:')[0].trim())
+            .replace('{conversationHistory}', conversationHistory || 'No previous conversation');
+            
+          console.log('🌍 Using Travel Mode system prompt');
+        } else if (request.content.includes('Relevant information from knowledge base:') || request.data?.hasKnowledgeContext) {
+          systemPrompt = 'You are Tala, a helpful and knowledgeable travel assistant. You MUST use the knowledge base information provided to give a direct, complete answer. NEVER ask for more details, clarification, or say things like "Could you provide more specific information" or "What aspect would you like to know about". Instead, use the knowledge base content to provide specific, actionable information. Be confident, direct, and helpful. If the knowledge base contains relevant information, use it to answer comprehensively.';
+        }
+        
+        // Log the system prompt being used
+        console.log('🤖 LLM Router called with:', {
+          hasSystemPrompt: !!systemPrompt,
+          systemPromptPreview: systemPrompt?.substring(0, 200),
+          enhancedQueryPreview: enhancedQuery.substring(0, 100),
+          mode: request.data?.mode
+        });
         
         // Route the query through LLM
         const llmResponse = await this.llmRouter.routeQuery(
-          request.content,
+          enhancedQuery,
           {
             userId: request.userId,
-            conversationHistory: context.contextWindow.slice(-5), // Last 5 messages
+            conversationHistory: Array.isArray(context.contextWindow) ? context.contextWindow.slice(-5) : [], // Last 5 messages
             userPreferences: context.userProfile.preferences
           },
           {
             maxTokens: 1000,
-            temperature: 0.7
+            temperature: 0.7,
+            systemPrompt
           }
         );
+        
+        console.log('🤖 LLM Response preview:', llmResponse.content?.substring(0, 200) + '...');
         
         return {
           result: {
@@ -411,28 +582,99 @@ export class TalaIntelligence {
             strategy: 'direct-response',
             model: llmResponse.metadata?.model,
             timestamp: new Date(),
+            hadKnowledgeContext: request.data?.hasKnowledgeContext || request.content.includes('knowledge base'),
             ...llmResponse.routing
           }
         };
       } catch (error) {
-        console.error('LLM router failed, using fallback response:', error);
+        console.error('❌ LLM router failed:', error.message);
+        console.error('Full error:', error);
         
-        // Fallback to a helpful response
+        // Check if we have knowledge context to provide a better fallback
+        if (request.content.includes('Relevant information from knowledge base:') || request.data?.hasKnowledgeContext) {
+          // Extract the user's original question and knowledge base content
+          const parts = request.content.split('Relevant information from knowledge base:');
+          const userQuestion = parts[0].replace(/User Context:.*$/s, '').trim();
+          const knowledgeInfo = parts[1] || '';
+          
+          // Try to provide a helpful response even in fallback mode
+          let fallbackResponse = `I apologize for the technical issue. Let me help you with your question about "${userQuestion}"\n\n`;
+          
+          // If we have knowledge info, try to extract key points
+          if (knowledgeInfo) {
+            const lines = knowledgeInfo.split('\n').filter(line => line.trim() && !line.startsWith('[') && !line.startsWith('---'));
+            if (lines.length > 0) {
+              fallbackResponse += `Based on our knowledge base, here's what I can tell you:\n\n`;
+              // Take first few relevant lines
+              const relevantLines = lines.slice(0, 5).join('\n');
+              fallbackResponse += relevantLines + '\n\n';
+              fallbackResponse += `Please let me know if you need any additional information.`;
+            }
+          } else {
+            fallbackResponse += `I have information about this topic in our knowledge base. Let me share what I know about it.`;
+          }
+          
+          return {
+            result: {
+              response: fallbackResponse,
+              type: 'general-response'
+            },
+            metadata: {
+              strategy: 'direct-response',
+              error: error.message,
+              fallback: true,
+              hadKnowledgeContext: true,
+              timestamp: new Date()
+            }
+          };
+        }
+        
+        // Check if this is CMO mode for proper fallback
+        if (request.data?.mode === 'cmo') {
+          const cleanMessage = request.content.replace(/Marketing Context:.*$/s, '').replace(/Marketing Question:.*$/s, '').trim();
+          return {
+            result: {
+              response: `I'll help you with your marketing challenge! You mentioned: "${cleanMessage}"
+
+Here's how I can assist you:
+
+**For Creating a Landing Page:**
+• Start with a clear value proposition above the fold
+• Use compelling headlines and benefit-focused copy
+• Include social proof (testimonials, logos, stats)
+• Create a strong, contrasting CTA button
+• A/B test different versions to optimize conversion
+
+**Marketing Best Practices:**
+• Define your target audience personas first
+• Set measurable KPIs (conversion rate, CAC, LTV)
+• Use tools like Unbounce, Leadpages, or Webflow for quick setup
+• Track with Google Analytics and heatmap tools
+
+Would you like specific templates or a step-by-step implementation plan?`,
+              type: 'general-response'
+            },
+            metadata: {
+              strategy: 'direct-response',
+              error: error.message,
+              fallback: true,
+              mode: 'cmo',
+              timestamp: new Date()
+            }
+          };
+        }
+        
+        // Generic fallback for non-knowledge queries
+        const cleanMessage = request.content.replace(/User Context:.*$/s, '').trim();
         return {
           result: {
-            response: `I understand you're asking: "${request.content}". I'm here to help with various tasks including:
-            
-            • Creating tasks or reminders
-            • Planning travel itineraries
-            • Parsing travel emails and documents
-            • Extracting action items from conversations
-            
-            Could you please provide more details about what you need help with?`,
+            response: `I'm here to help! You asked: "${cleanMessage}"\n\nI can assist you with:\n• Travel planning and itineraries\n• Destination information\n• Travel documents and requirements\n• General travel advice\n\nWhat specific information would you like to know?`,
             type: 'general-response'
           },
           metadata: {
             strategy: 'direct-response',
             error: error.message,
+            fallback: true,
             timestamp: new Date()
           }
         };
@@ -552,10 +794,22 @@ export class TalaIntelligence {
     await this.threadingService.addMessage(thread.id, {
       role: 'assistant',
       content: response.content,
+      model_used: response.metadata?.model || response.model,
+      provider: response.metadata?.provider || response.provider,
+      prompt_tokens: response.usage?.promptTokens || response.prompt_tokens,
+      completion_tokens: response.usage?.completionTokens || response.completion_tokens,
+      total_tokens: response.usage?.totalTokens || response.total_tokens,
+      cost: response.usage?.cost || response.cost,
+      response_time_ms: executionTime,
+      context_used: response.sources || response.context_used || [],
+      entities_extracted: response.entities || [],
       metadata: {
         agents: routingDecision.selectedAgents.map(a => a.id),
         executionTime,
-        compressed: context.contextWindow.length < context.recentMessages.length
+        compressed: context.contextWindow.length < context.recentMessages.length,
+        model: response.metadata?.model,
+        provider: response.metadata?.provider,
+        routing: response.metadata?.routing || {}
       }
     });
     
@@ -616,6 +870,21 @@ export class TalaIntelligence {
    * Analyze task to determine type and complexity
    */
   async analyzeTask(request, context) {
+    // CRITICAL: Check skip flags FIRST before any analysis
+    if (request.data?.skipTaskExtraction || request.data?.skipTravelValidation) {
+      console.log('⏭️ Skipping task analysis due to skip flags:', {
+        skipTaskExtraction: request.data?.skipTaskExtraction,
+        skipTravelValidation: request.data?.skipTravelValidation
+      });
+      return {
+        type: 'general',
+        complexity: 0.2,
+        requiresMultipleDomains: false,
+        extractedData: {},
+        requirements: []
+      };
+    }
+    
     const content = request.content.toLowerCase();
     
     // Determine task type
@@ -625,8 +894,51 @@ export class TalaIntelligence {
     const extractedData = {};
     const requirements = [];
     
-    // Travel/booking related
-    if (content.includes('flight') || content.includes('hotel') || 
+    // Check if this is a travel information query (not planning/booking)
+    const travelInfoKeywords = [
+      'what', 'when', 'where', 'how', 'why', 'tell me about', 'information',
+      'northern lights', 'aurora', 'weather', 'climate', 'culture', 'cuisine',
+      'attractions', 'sights', 'best time', 'visa', 'currency', 'language',
+      'customs', 'traditions', 'festivals', 'events', 'history', 'geography'
+    ];
+    
+    const hasTravelInfoKeyword = travelInfoKeywords.some(keyword => content.includes(keyword));
+    const hasTravelContext = content.includes('travel') || content.includes('visit') || 
+                           content.includes('destination') || content.includes('tourist') ||
+                           content.includes('vacation') || content.includes('holiday');
+    
+    // Travel information queries - keep as general for knowledge base usage
+    if (hasTravelInfoKeyword && (hasTravelContext || request.data?.mode === 'travel')) {
+      type = 'general'; // Keep as general to use knowledge base
+      complexity = 0.3; // Simple complexity
+      console.log('🌍 Travel information query detected - routing as general for knowledge base');
+      
+      // Return early to prevent override by task creation logic
+      return {
+        type,
+        complexity,
+        extractedData,
+        requiresMultipleDomains,
+        requirements
+      };
+    }
+    // Also check if we already have knowledge context
+    else if (request.data?.hasKnowledgeContext || content.includes('relevant information from knowledge base')) {
+      type = 'general'; // Keep as general to use the knowledge base info directly
+      complexity = 0.3;
+      console.log('📚 Knowledge base context present - routing as general for direct response');
+      
+      // Return early to prevent override by task creation logic
+      return {
+        type,
+        complexity,
+        extractedData,
+        requiresMultipleDomains,
+        requirements
+      };
+    }
+    // Travel planning/booking related
+    else if (content.includes('flight') || content.includes('hotel') || 
         content.includes('travel') || content.includes('itinerary') ||
         content.includes('plan') || content.includes('trip')) {
       
@@ -657,11 +969,16 @@ export class TalaIntelligence {
     const hasCreateKeyword = createKeywords.some(keyword => content.includes(keyword));
     const hasTaskKeyword = taskKeywords.some(keyword => content.includes(keyword));
     
-    // Also check for task-like phrases
-    const taskPhrases = ['remind me', 'need to remember', 'don\'t forget', 'i need to'];
+    // Also check for task-like phrases - but be more specific
+    const taskPhrases = ['remind me to', 'need to remember to', 'don\'t forget to', 'i need to do'];
     const hasTaskPhrase = taskPhrases.some(phrase => content.includes(phrase));
     
-    if ((hasCreateKeyword && hasTaskKeyword) || hasTaskPhrase) {
+    // Check if this is an information request (not a task creation)
+    const infoRequestPatterns = ['tell me about', 'what is', 'what are', 'when is', 'where is', 
+                                'how is', 'why is', 'explain', 'describe', 'information about'];
+    const isInfoRequest = infoRequestPatterns.some(pattern => content.includes(pattern));
+    
+    if (!isInfoRequest && ((hasCreateKeyword && hasTaskKeyword) || hasTaskPhrase)) {
       type = 'create-task';
       complexity = 0.3; // Keep it simple to avoid multi-agent flow
       // Extract task details if provided

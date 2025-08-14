@@ -1,0 +1,1428 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
+import { 
+  Send, 
+  Paperclip,
+  Plus,
+  ChevronDown,
+  Menu,
+  X,
+  ArrowUp,
+  Sparkles,
+  Mic,
+  MicOff,
+  Plane,
+  WifiOff,
+  Wifi,
+  Clock,
+  RefreshCw
+} from 'lucide-react';
+import { cn } from '../utils/cn';
+import useConversation from '../hooks/useConversation';
+import useRetryableRequest from '../hooks/useRetryableRequest';
+import { marketingContext } from '../services/MarketingContextService';
+import Markdown from '../components/shared/Markdown';
+import StatusProgress from '../components/chat/StatusProgress';
+import { useStatusUpdates } from '../hooks/useStatusUpdates';
+import { ThemeToggle } from '../components/shared/ThemeToggle';
+import Skeleton from '../components/shared/Skeleton';
+import Spinner from '../components/shared/Spinner';
+import TypingDots from '../components/shared/TypingDots';
+import { useToast } from '../components/toast/ToastProvider';
+import { normalizeError } from '../lib/errors';
+import { useIsMobile } from '../hooks/useBreakpoint';
+import Drawer from '../components/shared/Drawer';
+import { useTour } from '../components/tour/TourProvider';
+import { Button } from '../components/ui/Button';
+import { Textarea } from '../components/ui/Textarea';
+import { Card, CardContent } from '../components/ui/Card';
+import { Modal } from '../components/ui/Modal';
+import { announceChatStatus } from '../utils/announceToScreenReader';
+
+type MarketingMode = 
+  | 'general' 
+  | 'seo' 
+  | 'email' 
+  | 'social' 
+  | 'ads' 
+  | 'content' 
+  | 'analytics';
+
+interface Message {
+  id: string;
+  content: string;
+  sender: 'user' | 'assistant';
+  timestamp: Date;
+  mode?: 'travel' | 'marketing';
+  marketingMode?: MarketingMode;
+  sources?: Array<{
+    title: string;
+    type: string;
+    score: number;
+  }>;
+  failed?: boolean;
+  retrying?: boolean;
+}
+
+const marketingModes = [
+  { id: 'general' as MarketingMode, label: 'Marketing Assistant' },
+  { id: 'seo' as MarketingMode, label: 'SEO Specialist' },
+  { id: 'email' as MarketingMode, label: 'Email Marketing' },
+  { id: 'social' as MarketingMode, label: 'Social Media' },
+  { id: 'ads' as MarketingMode, label: 'Paid Advertising' },
+  { id: 'content' as MarketingMode, label: 'Content Strategy' },
+  { id: 'analytics' as MarketingMode, label: 'Analytics' }
+];
+
+
+export const TalaFinalChat: React.FC = () => {
+  const location = useLocation();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false); // For showing typing indicator
+  const [loadingHistory, setLoadingHistory] = useState(false); // For loading conversation history
+  const [isMarketingMode, setIsMarketingMode] = useState(false); // Travel is default
+  const [currentMarketingMode, setCurrentMarketingMode] = useState<MarketingMode>('general');
+  const [showModeDropdown, setShowModeDropdown] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true); // Show by default to see conversations
+  const [isRecording, setIsRecording] = useState(false);
+  const [userName, setUserName] = useState('Will'); // This would come from user profile
+  const [currentRequestId, setCurrentRequestId] = useState<string | undefined>();
+  const [hasLoadedInitialConversation, setHasLoadedInitialConversation] = useState(false);
+  const [growthPlanContext, setGrowthPlanContext] = useState<any>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const mainContentRef = useRef<HTMLElement>(null);
+  const loadedConversationsRef = useRef<Set<string>>(new Set());
+  
+  // Use toast hook
+  const { push: pushToast } = useToast();
+  
+  // Check if mobile
+  const isMobile = useIsMobile();
+  
+  // Use tour hook
+  const { start: startTour } = useTour();
+  
+  // Use status updates hook
+  const { currentStage, statusMessage, details } = useStatusUpdates(currentRequestId, isLoading);
+  
+  // Use conversation hook for persistence
+  const {
+    conversationId,
+    setConversationId,
+    createNewConversation,
+    updateConversation,
+    clearConversation,
+    conversations,
+    switchConversation,
+    loadConversationList
+  } = useConversation({ 
+    userId: 'admin-1',
+    autoLoad: false  // Don't auto-load last conversation (but still load the list)
+  });
+  
+  // Load conversation list on component mount
+  useEffect(() => {
+    loadConversationList();
+  }, []); // Empty dependency array = run once on mount
+  
+  // Handle incoming conversation from growth plan help
+  useEffect(() => {
+    if (!hasLoadedInitialConversation && location.state) {
+      setHasLoadedInitialConversation(true);
+      
+      const { continueConversation, initialContext } = location.state as any;
+      
+      if (continueConversation && initialContext) {
+        console.log('📥 Loading conversation from growth plan:', continueConversation);
+        
+        // IMPORTANT: Mark this conversation as already loaded to prevent reload
+        loadedConversationsRef.current.add(continueConversation);
+        
+        // Switch to marketing mode
+        setIsMarketingMode(true);
+        setCurrentMarketingMode('general');
+        
+        // Store the growth plan context for future messages
+        if (initialContext.step) {
+          setGrowthPlanContext(initialContext.step);
+        }
+        
+        // Check if we have the conversation in marketing context
+        const storedConversation = marketingContext.getConversation(continueConversation);
+        
+        if (storedConversation || initialContext.messages) {
+          const messagesToLoad = storedConversation?.messages || initialContext.messages || [];
+          
+          // Convert the messages to the format expected by the chat
+          const formattedMessages: Message[] = messagesToLoad.map((msg: any, index: number) => ({
+            id: `imported-${index}-${Date.now()}`,
+            content: msg.content,
+            sender: msg.role === 'assistant' ? 'assistant' : 'user',
+            timestamp: new Date(),
+            mode: 'marketing',
+            marketingMode: 'general'
+          }));
+          
+          // Add a continuation message if we have context about the step
+          if (initialContext.step) {
+            const continuationMessage: Message = {
+              id: `system-${Date.now()}`,
+              content: `Continuing our conversation about: "${initialContext.step.label}". Feel free to ask me anything else about this marketing task or any other marketing questions!`,
+              sender: 'assistant',
+              timestamp: new Date(),
+              mode: 'marketing',
+              marketingMode: 'general'
+            };
+            
+            formattedMessages.push(continuationMessage);
+          }
+          
+          // Set messages first
+          setMessages(formattedMessages);
+          
+          // Save to localStorage immediately so it persists
+          const storageKey = `tala_messages_${continueConversation}`;
+          localStorage.setItem(storageKey, JSON.stringify(formattedMessages));
+          console.log('💾 Saved imported messages to localStorage');
+          
+          // Then set the conversation ID (this might trigger loadConversationMessages but it's already marked as loaded)
+          if (continueConversation) {
+            setConversationId(continueConversation);
+          }
+          
+          // Clear the active conversation from marketing context after loading
+          marketingContext.clearConversation(continueConversation);
+        }
+      }
+    }
+  }, [location.state, hasLoadedInitialConversation]);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('Current conversationId:', conversationId);
+    console.log('Conversations list:', conversations);
+  }, [conversationId, conversations]);
+  
+  // Load messages when conversation changes
+  const loadConversationMessages = async (convId: string) => {
+    if (!convId) {
+      setMessages([]);
+      return;
+    }
+    
+    try {
+      setLoadingHistory(true);
+      console.log('🔄 Loading messages for conversation:', convId);
+      
+      // Always try backend first - this is our source of truth
+      const response = await fetch(`/api/conversations/${convId}/messages`, {
+        headers: {
+          'x-user-id': 'admin-1'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Backend messages response:', data);
+        
+        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+          // Convert backend messages to our Message format
+          // Handle both ThreadingService and ConversationService formats
+          const formattedMessages = data.messages.map((msg: any) => ({
+            id: msg.id || msg.index?.toString() || Date.now().toString(),
+            content: msg.content || msg.message || '',
+            sender: msg.sender || (msg.role === 'assistant' ? 'assistant' : 'user'),
+            timestamp: new Date(msg.timestamp || msg.created_at || msg.createdAt),
+            mode: msg.metadata?.mode || msg.mode || 'travel',
+            marketingMode: msg.metadata?.marketingMode || msg.marketingMode,
+            sources: msg.metadata?.sources || msg.sources || []
+          }));
+          setMessages(formattedMessages);
+          console.log(`✅ Loaded ${formattedMessages.length} messages from backend`);
+          
+          // CRITICAL: Update mode based on loaded messages
+          // Check if any messages indicate marketing mode
+          const hasMarketingMessages = formattedMessages.some((msg: Message) => 
+            msg.mode === 'marketing' || msg.mode === 'cmo' || msg.marketingMode
+          );
+          
+          if (hasMarketingMessages) {
+            console.log('🎯 Marketing mode detected in loaded conversation');
+            setIsMarketingMode(true);
+            // Set the marketing sub-mode if available
+            const marketingMsg = formattedMessages.find((msg: Message) => msg.marketingMode);
+            if (marketingMsg?.marketingMode) {
+              setCurrentMarketingMode(marketingMsg.marketingMode);
+            }
+          }
+          
+          // Cache in localStorage for offline access
+          const storageKey = `tala_messages_${convId}`;
+          localStorage.setItem(storageKey, JSON.stringify(formattedMessages));
+        } else {
+          console.log('⚠️ No messages found in backend for:', convId);
+          
+          // Fallback to localStorage cache if backend has no messages
+          const storageKey = `tala_messages_${convId}`;
+          const cached = localStorage.getItem(storageKey);
+          if (cached) {
+            const cachedMessages = JSON.parse(cached);
+            setMessages(cachedMessages);
+            console.log('📦 Loaded from cache:', cachedMessages.length, 'messages');
+            
+            // Update mode based on cached messages
+            const hasMarketingMessages = cachedMessages.some((msg: Message) => 
+              msg.mode === 'marketing' || msg.mode === 'cmo' || msg.marketingMode
+            );
+            
+            if (hasMarketingMessages) {
+              console.log('🎯 Marketing mode detected in cached conversation');
+              setIsMarketingMode(true);
+              const marketingMsg = cachedMessages.find((msg: Message) => msg.marketingMode);
+              if (marketingMsg?.marketingMode) {
+                setCurrentMarketingMode(marketingMsg.marketingMode);
+              }
+            }
+          } else {
+            setMessages([]);
+          }
+        }
+      } else {
+        console.log('❌ Backend request failed:', response.status);
+        
+        // Fallback to localStorage cache
+        const storageKey = `tala_messages_${convId}`;
+        const cached = localStorage.getItem(storageKey);
+        if (cached) {
+          const cachedMessages = JSON.parse(cached);
+          setMessages(cachedMessages);
+          console.log('📦 Using cached messages (backend unavailable)');
+          
+          // Update mode based on cached messages
+          const hasMarketingMessages = cachedMessages.some((msg: Message) => 
+            msg.mode === 'marketing' || msg.mode === 'cmo' || msg.marketingMode
+          );
+          
+          if (hasMarketingMessages) {
+            console.log('🎯 Marketing mode detected in cached conversation');
+            setIsMarketingMode(true);
+            const marketingMsg = cachedMessages.find((msg: Message) => msg.marketingMode);
+            if (marketingMsg?.marketingMode) {
+              setCurrentMarketingMode(marketingMsg.marketingMode);
+            }
+          }
+        } else {
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error loading messages:', error);
+      
+      // Last resort: try localStorage
+      const storageKey = `tala_messages_${convId}`;
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        const cachedMessages = JSON.parse(cached);
+        setMessages(cachedMessages);
+        console.log('📦 Using cached messages (error fallback)');
+        
+        // Update mode based on cached messages
+        const hasMarketingMessages = cachedMessages.some((msg: Message) => 
+          msg.mode === 'marketing' || msg.mode === 'cmo' || msg.marketingMode
+        );
+        
+        if (hasMarketingMessages) {
+          console.log('🎯 Marketing mode detected in cached conversation');
+          setIsMarketingMode(true);
+          const marketingMsg = cachedMessages.find((msg: Message) => msg.marketingMode);
+          if (marketingMsg?.marketingMode) {
+            setCurrentMarketingMode(marketingMsg.marketingMode);
+          }
+        }
+      } else {
+        setMessages([]);
+      }
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+  
+  // Use retryable request hook for error recovery
+  const {
+    executeWithRetry,
+    isOnline,
+    connectionStatus,
+    requestQueue,
+    clearQueue,
+    isRetrying
+  } = useRetryableRequest({
+    maxRetries: 3,
+    initialDelay: 1000,
+    onRetry: (attempt) => {
+      console.log(`Retry attempt ${attempt}`);
+    }
+  });
+
+  // Get current mode display
+  const currentModeDisplay = marketingModes.find(m => m.id === currentMarketingMode);
+  
+  // Load messages when conversation changes or component mounts
+  useEffect(() => {
+    if (conversationId && !loadedConversationsRef.current.has(conversationId)) {
+      loadedConversationsRef.current.add(conversationId);
+      loadConversationMessages(conversationId);
+    }
+  }, [conversationId]);
+  
+  // Save messages on unmount or window close
+  useEffect(() => {
+    const saveCurrentMessages = () => {
+      if (conversationId && messages.length > 0 && !conversationId.startsWith('conv-')) {
+        const storageKey = `tala_messages_${conversationId}`;
+        localStorage.setItem(storageKey, JSON.stringify(messages));
+        console.log(`Saved ${messages.length} messages for conversation ${conversationId}`);
+      }
+    };
+    
+    // Save on window close/refresh
+    window.addEventListener('beforeunload', saveCurrentMessages);
+    
+    // Save on component unmount
+    return () => {
+      saveCurrentMessages();
+      window.removeEventListener('beforeunload', saveCurrentMessages);
+    };
+  }, [conversationId, messages]);
+
+  // Only scroll to bottom for user messages, not assistant responses
+  useEffect(() => {
+    if (messages.length > 0 && messages[messages.length - 1].sender === 'user') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowModeDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+    
+    // Announce message sending
+    announceChatStatus('message-sent');
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: input,
+      sender: 'user',
+      timestamp: new Date(),
+      mode: isMarketingMode ? 'marketing' : 'travel',
+      marketingMode: isMarketingMode ? currentMarketingMode : undefined
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const messageText = input; // Store input before clearing
+    setInput('');
+    setIsLoading(true);
+    setIsTyping(true); // Show typing indicator
+    
+    // Generate a unique request ID for status tracking
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setCurrentRequestId(requestId);
+
+    try {
+      // Don't create our own ID - let backend handle it
+      console.log('Sending message with conversationId:', conversationId || 'new');
+      console.log('Request ID for status tracking:', requestId);
+      
+      // Use retryable request - backend will create/use conversation
+      const data = await executeWithRetry(async () => {
+        // Build request based on mode - match what works in GrowthPlanView
+        let requestBody;
+        
+        if (isMarketingMode) {
+          // Marketing mode - use CMO mode in backend
+          requestBody = {
+            message: messageText, // Send the user's actual message
+            conversationId: conversationId,
+            mode: 'cmo', // CRITICAL: Use CMO mode for marketing requests
+            subMode: currentMarketingMode, // Pass the specific marketing mode (seo, email, etc.)
+            searchKnowledge: true,
+            preferredStyle: 'professional',
+            costOptimization: false,
+            fastResponse: false,
+            device: 'web',
+            attachments: [],
+            requestId: requestId
+          };
+          
+          // If we have growth plan context, include it in the request metadata
+          if (growthPlanContext) {
+            requestBody.requestMetadata = {
+              type: 'marketing_help',
+              subType: 'growth_plan',
+              growthPlanStep: {
+                label: growthPlanContext.label,
+                description: growthPlanContext.description,
+                outputs: growthPlanContext.outputs
+              }
+            };
+          }
+        } else {
+          // Travel mode - keep as is
+          requestBody = {
+            message: messageText,
+            mode: 'travel', // Only specify mode for travel
+            conversationId: conversationId,
+            searchKnowledge: true,
+            requestId: requestId
+          };
+        }
+        
+        const response = await fetch(`/api/chat/v2`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': 'admin-1'
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(error || 'Failed to get response');
+        }
+
+        return response.json();
+      });
+      
+      // Store the raw response (we'll render markdown in the component)
+      console.log('📚 Response data sources:', data.sources); // Debug log
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response, // Keep raw markdown
+        sender: 'assistant',
+        timestamp: new Date(),
+        sources: data.sources || [],
+        mode: userMessage.mode, // Preserve the mode from the user message
+        marketingMode: userMessage.marketingMode // Also preserve marketing sub-mode
+      };
+      console.log('📌 Assistant message with sources:', assistantMessage.sources); // Debug log
+
+      // CRITICAL: Always use backend's conversation ID
+      const backendConversationId = data.conversationId;
+      console.log('🔑 Backend conversation ID:', backendConversationId);
+      
+      // If backend returned a conversation ID, use it
+      if (backendConversationId) {
+        // This could be a new conversation or existing one
+        if (!conversationId || conversationId !== backendConversationId) {
+          console.log('📝 Setting conversation ID from backend:', backendConversationId);
+          setConversationId(backendConversationId);
+          
+          // Update conversation metadata
+          const conversationMeta = {
+            id: backendConversationId,
+            title: messageText.substring(0, 50) + (messageText.length > 50 ? '...' : ''),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            messageCount: messages.length + 2,
+            mode: isMarketingMode ? 'marketing' : 'travel'
+          };
+          
+          // Update conversation in hook (this will sync with backend)
+          updateConversation(conversationMeta);
+          
+          // Refresh the conversation list to show the new conversation in sidebar
+          loadConversationList();
+          
+          // Also update localStorage for offline access
+          const listKey = `tala_conversations_admin-1`;
+          const existing = JSON.parse(localStorage.getItem(listKey) || '[]');
+          const existingIndex = existing.findIndex((c: any) => c.id === backendConversationId);
+          
+          if (existingIndex >= 0) {
+            // Update existing conversation
+            existing[existingIndex] = { ...existing[existingIndex], ...conversationMeta };
+          } else {
+            // Add new conversation
+            existing.unshift(conversationMeta);
+          }
+          
+          localStorage.setItem(listKey, JSON.stringify(existing.slice(0, 50)));
+          localStorage.setItem('tala_current_conversation', JSON.stringify(conversationMeta));
+        }
+      }
+      
+      setMessages(prev => {
+        const newMessages = [...prev, assistantMessage];
+        
+        // Cache messages immediately after update
+        if (backendConversationId) {
+          const storageKey = `tala_messages_${backendConversationId}`;
+          localStorage.setItem(storageKey, JSON.stringify(newMessages));
+          console.log('💾 Cached', newMessages.length, 'messages for', backendConversationId);
+        }
+        
+        // Announce message received
+        announceChatStatus('message-received');
+        
+        return newMessages;
+      });
+
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      
+      // Remove the user message if request failed completely
+      const normalizedError = normalizeError(error);
+      
+      if (!isOnline) {
+        pushToast({
+          kind: 'error',
+          title: 'Connection lost',
+          message: 'You are offline. Message has been queued.'
+        });
+      } else if (error.message.includes('aborted')) {
+        pushToast({
+          kind: 'warning',
+          message: 'Request was cancelled'
+        });
+        setMessages(prev => prev.filter(m => m.id !== userMessage.id));
+      } else {
+        pushToast({
+          kind: 'error',
+          title: normalizedError.title,
+          message: normalizedError.message,
+          action: normalizedError.docsHref ? {
+            label: 'View troubleshooting',
+            onClick: () => window.open(normalizedError.docsHref, '_blank')
+          } : undefined
+        });
+        // Keep the message but mark it as failed
+        setMessages(prev => prev.map(m => 
+          m.id === userMessage.id 
+            ? { ...m, failed: true } as Message 
+            : m
+        ));
+      }
+    } finally {
+      setIsLoading(false);
+      setIsTyping(false); // Hide typing indicator
+      setCurrentRequestId(undefined); // Clear request ID when done
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const toggleVoiceRecording = () => {
+    setIsRecording(!isRecording);
+    if (!isRecording) {
+      pushToast({
+        kind: 'info',
+        message: 'Voice recording started'
+      });
+      // Implement actual voice recording here
+    } else {
+      pushToast({
+        kind: 'info',
+        message: 'Voice recording stopped'
+      });
+      // Process the recording
+    }
+  };
+
+  const startNewChat = () => {
+    // Save current messages before clearing (only if not a frontend ID)
+    if (conversationId && messages.length > 0 && !conversationId.startsWith('conv-')) {
+      const storageKey = `tala_messages_${conversationId}`;
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+      console.log('💾 Saved current conversation before starting new');
+    }
+    
+    // Clear messages and conversation
+    setMessages([]);
+    clearConversation(); // This returns null, backend will create new ID
+    
+    // Clear growth plan context when starting new chat
+    setGrowthPlanContext(null);
+    
+    // Announce new chat
+    announceChatStatus('new-chat');
+    
+    console.log('🆕 Started new chat (backend will create ID on first message)');
+  };
+  
+  // Retry a failed message
+  const retryMessage = async (message: Message) => {
+    if (!message.failed || message.retrying) return;
+    
+    // Mark as retrying
+    setMessages(prev => prev.map(m => 
+      m.id === message.id 
+        ? { ...m, retrying: true, failed: false } 
+        : m
+    ));
+    
+    // Recreate the request
+    try {
+      const data = await executeWithRetry(async () => {
+        const response = await fetch(`/api/chat/v2`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': 'admin-1'
+          },
+          body: JSON.stringify({
+            message: message.content,
+            mode: message.mode === 'marketing' ? 'cmo' : 'travel',
+            subMode: message.marketingMode,
+            conversationId: conversationId || createNewConversation(),
+            searchKnowledge: message.mode !== 'marketing'
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to get response');
+        return response.json();
+      });
+      
+      // Update message as successful
+      setMessages(prev => prev.map(m => 
+        m.id === message.id 
+          ? { ...m, retrying: false, failed: false } 
+          : m
+      ));
+      
+      // Add assistant response
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response, // Keep raw markdown, renderMarkdown will handle it
+        sender: 'assistant',
+        timestamp: new Date(),
+        sources: data.sources || [],
+        mode: message.mode // Preserve the mode from the original message
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      pushToast({
+        kind: 'success',
+        message: 'Message sent successfully'
+      });
+      
+    } catch (error) {
+      // Mark as failed again
+      setMessages(prev => prev.map(m => 
+        m.id === message.id 
+          ? { ...m, retrying: false, failed: true } 
+          : m
+      ));
+      const normalizedError = normalizeError(error);
+      pushToast({
+        kind: 'error',
+        title: 'Retry failed',
+        message: normalizedError.message
+      });
+    }
+  };
+
+  return (
+    <div className={cn(
+      "flex h-[calc(100vh-4rem)] relative",
+      "bg-white dark:bg-secondary-800",
+      "text-gray-900 dark:text-white",
+      "transition-colors duration-200",
+      isMarketingMode && "border-2 border-primary/50 dark:border-white"
+    )}>
+      {/* Skip to main content link for keyboard navigation */}
+      <a 
+        href="#main-chat-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 bg-primary text-white px-4 py-2 rounded-lg"
+      >
+        Skip to main content
+      </a>
+      {/* Sidebar for conversation history - Desktop */}
+      {!isMobile && (
+        <AnimatePresence>
+          {showSidebar && (
+            <motion.div
+              initial={{ x: -260 }}
+              animate={{ x: 0 }}
+              exit={{ x: -260 }}
+              className={cn(
+                "w-[260px] flex flex-col shadow-2xl",
+                "bg-gray-50 dark:bg-secondary-700",
+                "border-r border-gray-200 dark:border-white/10"
+              )}
+            >
+              <div className={cn(
+                "p-3 flex items-center justify-between",
+                "border-b border-gray-200 dark:border-white/10"
+              )}>
+                <div className="text-sm font-medium text-gray-700 dark:text-white/80">
+                  Chat History
+                </div>
+                <Button
+                  onClick={() => setShowSidebar(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="p-2 min-h-[44px] min-w-[44px]"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+              <div className="text-sm text-gray-600 dark:text-white/60 px-3 py-2">
+                Recent Conversations
+              </div>
+              <ul className="space-y-1" role="list">
+                {loadingHistory && conversations.length === 0 ? (
+                  // Show skeleton while loading conversation history
+                  <>
+                    {[...Array(5)].map((_, i) => (
+                      <li key={i} className="px-3 py-2">
+                        <Skeleton className="h-4 w-full mb-1" />
+                        <Skeleton className="h-3 w-2/3" />
+                      </li>
+                    ))}
+                  </>
+                ) : conversations.slice(0, 10).map((conv) => (
+                  <li
+                    key={conv.id}
+                    role="listitem"
+                  >
+                    <button
+                    onClick={async () => {
+                      // Don't reload if already selected
+                      if (conv.id === conversationId) return;
+                      
+                      // Save current messages before switching
+                      if (conversationId && messages.length > 0) {
+                        const storageKey = `tala_messages_${conversationId}`;
+                        localStorage.setItem(storageKey, JSON.stringify(messages));
+                      }
+                      
+                      // Mark as not loaded so useEffect will reload it
+                      loadedConversationsRef.current.delete(conv.id);
+                      
+                      // Switch conversation (this will trigger the useEffect)
+                      switchConversation(conv.id);
+                      
+                      // Announce conversation switch
+                      announceChatStatus('conversation-switched');
+                      
+                      // Focus main content area for screen readers
+                      setTimeout(() => mainContentRef.current?.focus(), 100);
+                    }}
+                    className={cn(
+                      "w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors",
+                      conv.id === conversationId && "bg-white/10"
+                    )}
+                    aria-label={`Conversation: ${conv.title || 'Untitled'}, last updated ${new Date(conv.updatedAt).toLocaleString()}`}
+                    aria-current={conv.id === conversationId ? "true" : undefined}
+                  >
+                    <div className="text-sm text-gray-800 dark:text-white/80 truncate">
+                      {conv.title || 'Untitled Conversation'}
+                    </div>
+                    <time className="text-xs text-gray-500 dark:text-white/40 mt-0.5" dateTime={conv.updatedAt}>
+                      {new Date(conv.updatedAt).toLocaleString()}
+                    </time>
+                  </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    )}
+    
+      {/* Sidebar for conversation history - Mobile */}
+      {isMobile && (
+        <Drawer open={showSidebar} onClose={() => setShowSidebar(false)} side="left">
+          <div className="flex flex-col h-full bg-gray-50 dark:bg-secondary-700">
+            <div className={cn(
+              "p-4 flex items-center justify-between",
+              "border-b border-gray-200 dark:border-white/10"
+            )}>
+              <div className="text-base font-medium text-gray-700 dark:text-white/80">
+                Chat History
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="text-sm text-gray-600 dark:text-white/60 px-3 py-2">
+                Recent Conversations
+              </div>
+              <ul className="space-y-2" role="list">
+                {loadingHistory && conversations.length === 0 ? (
+                  <>
+                    {[...Array(5)].map((_, i) => (
+                      <li key={i} className="px-3 py-3">
+                        <Skeleton className="h-4 w-full mb-1" />
+                        <Skeleton className="h-3 w-2/3" />
+                      </li>
+                    ))}
+                  </>
+                ) : conversations.slice(0, 10).map((conv) => (
+                  <li
+                    key={conv.id}
+                    role="listitem"
+                  >
+                    <button
+                    onClick={async () => {
+                      if (conv.id === conversationId) return;
+                      
+                      if (conversationId && messages.length > 0) {
+                        const storageKey = `tala_messages_${conversationId}`;
+                        localStorage.setItem(storageKey, JSON.stringify(messages));
+                      }
+                      
+                      loadedConversationsRef.current.delete(conv.id);
+                      switchConversation(conv.id);
+                      setShowSidebar(false); // Close drawer after selection
+                      
+                      // Clear growth plan context when switching conversations
+                      setGrowthPlanContext(null);
+                      
+                      // Announce conversation switch
+                      announceChatStatus('conversation-switched');
+                      
+                      // Focus main content area for screen readers
+                      setTimeout(() => mainContentRef.current?.focus(), 100);
+                    }}
+                    className={cn(
+                      "w-full text-left px-4 py-3 hover:bg-white/5 rounded-lg cursor-pointer transition-colors min-h-[56px]",
+                      conv.id === conversationId && "bg-white/10"
+                    )}
+                    aria-label={`Conversation: ${conv.title || 'Untitled'}, last updated ${new Date(conv.updatedAt).toLocaleString()}`}
+                    aria-current={conv.id === conversationId ? "true" : undefined}
+                  >
+                    <div className="text-sm text-gray-800 dark:text-white/80 truncate">
+                      {conv.title || 'Untitled Conversation'}
+                    </div>
+                    <time className="text-xs text-gray-500 dark:text-white/40 mt-1" dateTime={conv.updatedAt}>
+                      {new Date(conv.updatedAt).toLocaleString()}
+                    </time>
+                  </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Drawer>
+      )}
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between px-3 md:px-6 py-3 border-b border-white/10">
+          <div className="flex items-center gap-2 md:gap-3">
+            <Button
+              onClick={() => setShowSidebar(!showSidebar)}
+              variant="secondary"
+              size="md"
+              className="bg-white/10 hover:bg-white/15 text-sm"
+              data-tour="chat-history"
+              aria-label={showSidebar ? "Hide chat history" : "Show chat history"}
+              aria-expanded={showSidebar}
+            >
+              <Menu className="w-4 h-4" aria-hidden="true" />
+              <span className="hidden sm:inline">History</span>
+            </Button>
+            <Button
+              onClick={startNewChat}
+              variant={isMarketingMode ? "secondary" : "ghost"}
+              size="md"
+              className={cn(
+                "text-sm",
+                isMarketingMode 
+                  ? "bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20" 
+                  : "text-primary hover:bg-primary/10"
+              )}
+              data-tour="new-chat"
+              aria-label="Start new chat conversation"
+            >
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              <span className="hidden sm:inline">New chat</span>
+            </Button>
+          </div>
+          
+          {/* Connection Status Indicator and Theme Toggle */}
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Growth Plan Context Indicator */}
+            {growthPlanContext && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-sm">
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden sm:inline">Context: {growthPlanContext.label}</span>
+                <span className="sm:hidden">Marketing</span>
+                <button
+                  onClick={() => {
+                    setGrowthPlanContext(null);
+                    pushToast({
+                      kind: 'info',
+                      message: 'Growth plan context cleared'
+                    });
+                  }}
+                  className="ml-1 hover:text-purple-300"
+                  aria-label="Clear growth plan context"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            
+            {/* Help Button */}
+            <Button
+              onClick={() => startTour()}
+              variant="secondary"
+              size="md"
+              className="text-sm"
+              aria-label="Show quick tour and help information"
+            >
+              <span className="hidden sm:inline">Help</span>
+              <span className="sm:hidden" aria-hidden="true">?</span>
+            </Button>
+            
+            {/* Theme Toggle */}
+            <div data-tour="theme-toggle">
+              <ThemeToggle variant="dropdown" showLabel={!isMobile} />
+            </div>
+            
+            {requestQueue.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm" role="status" aria-live="polite">
+                <Clock className="w-4 h-4" aria-hidden="true" />
+                <span>{requestQueue.length} messages queued</span>
+                <Button
+                  onClick={clearQueue}
+                  variant="ghost"
+                  size="sm"
+                  className="ml-1 p-1 min-h-0 min-w-0 hover:text-yellow-300"
+                  aria-label="Clear message queue"
+                >
+                  <X className="w-3 h-3" aria-hidden="true" />
+                </Button>
+              </div>
+            )}
+            
+            {isRetrying && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-sm animate-pulse" role="status" aria-live="assertive">
+                <RefreshCw className="w-4 h-4 animate-spin" aria-hidden="true" />
+                <span>Retrying message...</span>
+              </div>
+            )}
+            
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
+              connectionStatus === 'online' 
+                ? "bg-green-500/20 text-green-400"
+                : connectionStatus === 'offline'
+                ? "bg-red-500/20 text-red-400"
+                : "bg-yellow-500/20 text-yellow-400"
+            )}>
+              {connectionStatus === 'online' ? (
+                <>
+                  <Wifi className="w-4 h-4" />
+                  <span>Online</span>
+                </>
+              ) : connectionStatus === 'offline' ? (
+                <>
+                  <WifiOff className="w-4 h-4" />
+                  <span>Offline</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Messages Area */}
+        <main 
+          id="main-chat-content" 
+          ref={mainContentRef}
+          className="flex-1 overflow-y-auto" 
+          role="main" 
+          aria-label="Chat messages" 
+          tabIndex={-1}
+        >
+        <div className="max-w-[48rem] mx-auto">
+          <div className="py-8 px-6">
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center max-w-3xl">
+                  {/* Tala Icon with Primary Teal Color */}
+                  <div className="mb-8">
+                    <div className={cn(
+                      "inline-flex items-center justify-center w-16 h-16 rounded-2xl",
+                      isMarketingMode 
+                        ? "bg-white" 
+                        : "bg-gradient-to-br from-primary to-primary-dark"
+                    )}>
+                      {isMarketingMode ? (
+                        <Sparkles className="w-8 h-8 text-gray-900" />
+                      ) : (
+                        <Plane className="w-8 h-8 text-gray-900 dark:text-white" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Large Welcome Text */}
+                  <h1 className="text-4xl font-light mb-3 text-gray-900 dark:text-white">
+                    {isMarketingMode 
+                      ? `How can I help with marketing today, ${userName}?`
+                      : `Hey, ${userName}!`
+                    }
+                  </h1>
+                  
+                  {/* Subtitle */}
+                  <p className="text-gray-600 dark:text-white/60 text-base">
+                    {isMarketingMode 
+                      ? 'I can help with SEO, email campaigns, social media, and more'
+                      : "I'm TALA, the Travel Agent Learning Assistant. In Travel Mode, I can help you with all things travel. Ask me a question and I'll help."
+                    }
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {messages.map((message, index) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    "group",
+                    message.sender === 'user' && "bg-white/5",
+                    index > 0 && "border-t border-white/10"
+                  )}
+                >
+                  <div className="max-w-[48rem] mx-auto py-6 px-4">
+                    <div className="flex gap-6">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        {message.sender === 'user' ? (
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium",
+                            message.mode === 'marketing'
+                              ? "bg-gray-200 dark:bg-white/20 text-gray-900 dark:text-white"
+                              : "bg-primary/20 text-primary"
+                          )}>
+                            {userName[0]}
+                          </div>
+                        ) : (
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center",
+                            message.mode === 'marketing'
+                              ? "bg-white"
+                              : "bg-gradient-to-br from-primary to-primary-dark"
+                          )}>
+                            {message.mode === 'marketing' ? (
+                              <Sparkles className="w-4 h-4 text-gray-900" />
+                            ) : (
+                              <Plane className="w-4 h-4 text-white" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Message Content */}
+                      <div className="flex-1 overflow-hidden">
+                        <div className="max-w-none">
+                          {/* Failed/Retrying Status */}
+                          {message.failed && (
+                            <div className="flex items-center gap-2 mb-2 text-red-400 text-sm">
+                              <WifiOff className="w-4 h-4" />
+                              <span>Failed to send</span>
+                              <Button
+                                onClick={() => retryMessage(message)}
+                                variant="ghost"
+                                size="sm"
+                                className="ml-2 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-xs min-h-0"
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                Retry
+                              </Button>
+                            </div>
+                          )}
+                          {message.retrying && (
+                            <div className="flex items-center gap-2 mb-2 text-blue-400 text-sm animate-pulse">
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Retrying...</span>
+                            </div>
+                          )}
+                          {message.sender === 'assistant' ? (
+                            <div className={cn(
+                              "text-gray-900 dark:text-white/90",
+                              message.failed && "opacity-50"
+                            )}>
+                              <Markdown content={message.content} />
+                            </div>
+                          ) : (
+                            <div className={cn(
+                              "text-gray-900 dark:text-white/90 whitespace-pre-wrap leading-relaxed",
+                              message.failed && "opacity-50"
+                            )}>
+                              {message.content}
+                            </div>
+                          )}
+                          
+                          {/* Sources */}
+                          {console.log(`Message ${message.id} sources:`, message.sources)}
+                          {message.sources && message.sources.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                              <div className="text-xs text-gray-600 dark:text-white/60 mb-2">Sources:</div>
+                              <div className="flex flex-wrap gap-2">
+                                {message.sources.map((source, idx) => (
+                                  <div 
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100 dark:bg-white/5 text-xs text-gray-800 dark:text-white/80"
+                                  >
+                                    <span className={cn(
+                                      "w-1.5 h-1.5 rounded-full",
+                                      message.mode === 'marketing' ? "bg-white" : "bg-primary"
+                                    )} />
+                                    <span>{source.title}</span>
+                                    <span className="text-gray-500 dark:text-white/40">({Math.round(source.score * 100)}%)</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Status Progress Indicator */}
+              <StatusProgress 
+                currentStage={currentStage}
+                details={details}
+                isProcessing={isLoading}
+              />
+              
+              {/* Show typing indicator when assistant is responding */}
+              {isTyping && (
+                <div className="border-t border-white/10">
+                  <div className="max-w-[48rem] mx-auto py-6 px-4">
+                    <div className="flex gap-6">
+                      <div className="flex-shrink-0">
+                        <div className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center",
+                          isMarketingMode
+                            ? "bg-white"
+                            : "bg-gradient-to-br from-primary to-primary-dark"
+                        )}>
+                          {isMarketingMode ? (
+                            <Sparkles className="w-4 h-4 text-gray-900" />
+                          ) : (
+                            <Plane className="w-4 h-4 text-white" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <TypingDots />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {/* Input Area - Fixed at bottom */}
+      <div className={cn(
+        "backdrop-blur-sm",
+        "border-t border-gray-200 dark:border-white/10",
+        "bg-white/80 dark:bg-secondary-700",
+        "pb-[var(--safe-bottom)]" // iOS safe area
+      )}>
+        <div className="px-3 sm:px-6 md:px-12 lg:px-20 py-4 md:py-6">
+          <div className="relative">
+            <Textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder={isMarketingMode 
+                ? "Ask about marketing..."
+                : "Where would you like to travel?"
+              }
+              aria-label={isMarketingMode ? "Marketing question input" : "Travel question input"}
+              className={cn(
+                "rounded-2xl md:rounded-[3rem]",
+                "pl-4 md:pl-8 pr-16 md:pr-52 py-3 md:py-5",
+                "bg-gray-100 dark:bg-white/5",
+                "h-[100px] md:h-[140px]",
+                "text-sm md:text-base leading-relaxed",
+                "resize-none"
+              )}
+              rows={4}
+              data-tour="chat-input"
+            />
+            
+            {/* Controls positioned inside the input with more spacing */}
+            <div className="absolute right-2 md:right-6 bottom-2 md:bottom-5 flex items-center gap-1 md:gap-3">
+              {/* Attachment - Hidden on mobile */}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="hidden md:flex p-2.5 min-w-[44px] min-h-[44px] text-gray-600 dark:text-white/60"
+              >
+                <Paperclip className="w-4 h-4" />
+              </Button>
+
+              {/* Voice Input - Hidden on mobile */}
+              <Button
+                onClick={toggleVoiceRecording}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "hidden md:flex p-2.5 min-w-[44px] min-h-[44px]",
+                  isRecording 
+                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" 
+                    : "text-gray-600 dark:text-white/60"
+                )}
+              >
+                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </Button>
+
+              {/* Mode Toggle - Fixed width to prevent movement */}
+              <div className="ml-1 md:ml-2" data-tour="mode-selector">
+                <Button
+                  onClick={() => setIsMarketingMode(!isMarketingMode)}
+                  variant={isMarketingMode ? "secondary" : "primary"}
+                  size="sm"
+                  className={cn(
+                    "text-xs md:text-sm font-medium w-[80px] md:w-[110px]",
+                    isMarketingMode && "bg-white text-gray-900 hover:bg-gray-100"
+                  )}
+                >
+                  {isMarketingMode ? (
+                    <>
+                      <Sparkles className="w-3 md:w-4 h-3 md:h-4" />
+                      <span className="hidden sm:inline">Marketing</span>
+                      <span className="sm:hidden">Mkt</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plane className="w-3 md:w-4 h-3 md:h-4" />
+                      <span className="hidden sm:inline">Travel</span>
+                      <span className="sm:hidden">Trvl</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Marketing Mode Selector - Hidden on mobile */}
+              <div className="hidden md:block relative w-[140px]" ref={dropdownRef}>
+                {isMarketingMode ? (
+                  <>
+                    <Button
+                      onClick={() => setShowModeDropdown(!showModeDropdown)}
+                      variant="ghost"
+                      size="sm"
+                      className="px-2.5 py-2 text-sm text-white/80 hover:bg-white/10"
+                    >
+                      <span className="text-xs">{currentModeDisplay?.label}</span>
+                      <ChevronDown className={cn(
+                        "w-3 h-3 transition-transform",
+                        showModeDropdown && "rotate-180"
+                      )} />
+                    </Button>
+
+                    {/* Dropdown */}
+                    <AnimatePresence>
+                      {showModeDropdown && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="absolute bottom-full right-0 mb-2 w-48 bg-secondary-800 rounded-xl shadow-xl border border-white/10 py-1 overflow-hidden"
+                        >
+                          {marketingModes.map((mode) => (
+                            <Button
+                              key={mode.id}
+                              onClick={() => {
+                                setCurrentMarketingMode(mode.id);
+                                setShowModeDropdown(false);
+                              }}
+                              variant="ghost"
+                              size="sm"
+                              className={cn(
+                                "w-full justify-start px-3 py-2 text-sm hover:bg-white/5",
+                                currentMarketingMode === mode.id && "bg-white/10 text-primary"
+                              )}
+                            >
+                              <span>{mode.label}</span>
+                            </Button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  <div className="w-full" /> // Empty space holder
+                )}
+              </div>
+
+              {/* Send Button with more spacing */}
+              <div className="ml-1 md:ml-3">
+                <Button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading}
+                  variant="primary"
+                  size="md"
+                  className={cn(
+                    "p-3 md:p-2.5 min-w-[44px] min-h-[44px]",
+                    input.trim() && !isLoading
+                      ? "shadow-glow-sm"
+                      : "bg-white/5 text-white/30 opacity-50"
+                  )}
+                  aria-label="Send message"
+                >
+                  <ArrowUp className="w-5 h-5" aria-hidden="true" />
+                  <span className="sr-only">Send</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Helper Text */}
+          <div className="mt-2 text-center max-w-[48rem] mx-auto">
+            <p className="text-xs text-white/40">
+              {isMarketingMode 
+                ? `${currentModeDisplay?.label} mode • Press Enter to send`
+                : 'Travel mode • Press Enter to send'
+              } • Tala can make mistakes
+            </p>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  );
+};
