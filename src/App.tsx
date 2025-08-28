@@ -86,7 +86,7 @@ function App() {
                 <>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/" element={<PremiumLayout />}>
-                    <Route path="dashboard" element={<PremiumDashboardContent />} />
+                    <Route path="dashboard" element={<PremiumDashboard />} />
                     <Route path="chat" element={<TalaFinalChat />} />
                     <Route path="chat-redesigned" element={<TalaFinalChatRedesigned />} />
                     <Route path="chat-demo" element={<ChatView />} />

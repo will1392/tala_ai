@@ -20,7 +20,8 @@ import {
   CheckCircle,
   AlertCircle,
   Download,
-  Upload
+  Upload,
+  Mail
 } from 'lucide-react';
 import type { MarketingProfile, Goal, GrowthPlan, EvidenceItem } from '../types/marketing';
 import { generateRealisticGoals, generateRecommendations } from '../services/marketing/RealisticGoalGenerator';
@@ -28,6 +29,8 @@ import { getSkillLevel } from '../config/marketingAssessment';
 import { marketingContext } from '../services/MarketingContextService';
 import { marketingStorage, getStorageStatus, exportMarketingData, importMarketingData } from '../services/MarketingStorageService';
 import { QuarterlyCheckIn } from '../components/marketing/QuarterlyCheckIn';
+import { DirectMailDashboard } from '../components/marketing/DirectMailDashboard';
+import { useToast } from '../components/toast/ToastProvider';
 
 export default function MarketingDashboard() {
   const [activeTab, setActiveTab] = useState('assessment');
@@ -35,6 +38,7 @@ export default function MarketingDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const brandId = 'test-brand-1'; // For testing
+  const { push: pushToast } = useToast();
 
   // Load profile data
   useEffect(() => {
@@ -573,6 +577,14 @@ export default function MarketingDashboard() {
             <Target className="w-4 h-4" />
             Goals
           </TabsTrigger>
+          <TabsTrigger 
+            value="campaigns"
+            disabled={!profile?.assessment}
+            className="flex items-center gap-2"
+          >
+            <Mail className="w-4 h-4" />
+            Direct Mail
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="assessment">
@@ -639,6 +651,13 @@ export default function MarketingDashboard() {
               handleUpdateGoal(goalId, progress);
             }}
             onRefresh={loadProfile}
+          />
+        </TabsContent>
+
+        <TabsContent value="campaigns">
+          <DirectMailDashboard
+            brandId={brandId}
+            profile={profile}
           />
         </TabsContent>
       </Tabs>

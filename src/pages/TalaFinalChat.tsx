@@ -85,6 +85,7 @@ export const TalaFinalChat: React.FC = () => {
   const [loadingHistory, setLoadingHistory] = useState(false); // For loading conversation history
   const [isMarketingMode, setIsMarketingMode] = useState(false); // Travel is default
   const [currentMarketingMode, setCurrentMarketingMode] = useState<MarketingMode>('general');
+  const [directMailConsultation, setDirectMailConsultation] = useState(false);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true); // Show by default to see conversations
   const [isRecording, setIsRecording] = useState(false);
@@ -125,10 +126,41 @@ export const TalaFinalChat: React.FC = () => {
     autoLoad: false  // Don't auto-load last conversation (but still load the list)
   });
   
-  // Load conversation list on component mount
+  // Load conversation list on component mount and check URL params
   useEffect(() => {
     loadConversationList();
-  }, []); // Empty dependency array = run once on mount
+    
+    // Check URL parameters for mode
+    const searchParams = new URLSearchParams(location.search);
+    const mode = searchParams.get('mode');
+    
+    if (mode === 'direct-mail-consultation') {
+      console.log('🎯 Direct Mail Consultation mode detected from URL');
+      setIsMarketingMode(true);
+      setCurrentMarketingMode('general');
+      setDirectMailConsultation(true);
+      
+      // Create initial welcome message
+      const welcomeMessage: Message = {
+        id: `welcome-${Date.now()}`,
+        content: `Welcome! I'm your direct mail campaign expert, and I'm here to help you launch a successful postcard campaign that drives real bookings for your travel agency.
+
+I'll guide you through a comprehensive consultation to ensure we create a campaign that resonates with your ideal clients and achieves your business goals.
+
+Let's begin with understanding your business. What type of travel experiences does your agency specialize in? (e.g., luxury cruises, adventure travel, family vacations, etc.)`,
+        sender: 'assistant',
+        timestamp: new Date(),
+        mode: 'marketing',
+        marketingMode: 'general'
+      };
+      
+      setMessages([welcomeMessage]);
+      
+      // Create new conversation for direct mail consultation
+      const newConvId = createNewConversation('Direct Mail Campaign Consultation');
+      setConversationId(newConvId);
+    }
+  }, [location.search]); // Re-run when URL changes
   
   // Handle incoming conversation from growth plan help
   useEffect(() => {
@@ -453,13 +485,20 @@ export const TalaFinalChat: React.FC = () => {
         // Build request based on mode - match what works in GrowthPlanView
         let requestBody;
         
+        // Build conversation history for context
+        const conversationHistory = messages.map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        }));
+        
         if (isMarketingMode) {
           // Marketing mode - use CMO mode in backend
           requestBody = {
             message: messageText, // Send the user's actual message
             conversationId: conversationId,
+            conversationHistory: conversationHistory, // Include conversation history
             mode: 'cmo', // CRITICAL: Use CMO mode for marketing requests
-            subMode: currentMarketingMode, // Pass the specific marketing mode (seo, email, etc.)
+            subMode: directMailConsultation ? 'directMail' : currentMarketingMode, // Force directMail for consultations
             searchKnowledge: true,
             preferredStyle: 'professional',
             costOptimization: false,
@@ -469,8 +508,18 @@ export const TalaFinalChat: React.FC = () => {
             requestId: requestId
           };
           
+          // Add direct mail consultation context
+          if (directMailConsultation) {
+            requestBody.requestMetadata = {
+              type: 'direct_mail_consultation',
+              subType: 'campaign_questionnaire',
+              consultationType: 'new_campaign',
+              userId: 'admin-1',
+              brandId: 'test-brand-1'
+            };
+          }
           // If we have growth plan context, include it in the request metadata
-          if (growthPlanContext) {
+          else if (growthPlanContext) {
             requestBody.requestMetadata = {
               type: 'marketing_help',
               subType: 'growth_plan',
@@ -487,6 +536,7 @@ export const TalaFinalChat: React.FC = () => {
             message: messageText,
             mode: 'travel', // Only specify mode for travel
             conversationId: conversationId,
+            conversationHistory: conversationHistory, // Include conversation history
             searchKnowledge: true,
             requestId: requestId
           };

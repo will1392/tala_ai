@@ -14,6 +14,7 @@ import ThreadingServiceHybrid from '../conversations/ThreadingServiceHybrid.js';
 import { LearningEngine } from './LearningEngine.js';
 import { CompressionService } from '../compression/CompressionService.js';
 import UserLearningHub from '../learning/UserLearningHub.js';
+import { cmoChatHandler } from '../cmo/CMOChatHandler.js';
 
 // Mock Context Manager for testing
 class MockContextManager {
@@ -109,6 +110,9 @@ export class TalaIntelligence {
       memorySaveRate: 0
     };
     
+    // Expose CMO Assistant for context detection
+    this.cmoAssistant = cmoChatHandler.assistant;
+    
     this.initialized = false;
   }
   
@@ -126,7 +130,8 @@ export class TalaIntelligence {
         this.profileManager.initialize(),
         this.agentOrchestrator.initialize(),
         this.threadingService.initialize(),
-        this.learningEngine.initialize()
+        this.learningEngine.initialize(),
+        cmoChatHandler.initialize()
       ]);
       
       // Load learning data
@@ -192,16 +197,39 @@ export class TalaIntelligence {
         }
       }
       
-      // 4. Determine routing strategy
-      const routingDecision = await this.makeRoutingDecision(request, context, userProfile);
-      console.log(`🎯 Routing strategy: ${routingDecision.strategy}`);
+      // 4. Check if this is a CMO request that should bypass normal routing
+      let routingDecision;
+      let agentResponse;
       
-      // 5. Execute with selected agent(s)
-      const agentResponse = await this.executeWithAgents(
-        routingDecision,
-        request,
-        context
-      );
+      if (request.data?.mode === 'cmo') {
+        // For CMO mode, bypass normal routing and go directly to CMO processing
+        console.log('🎯 CMO mode detected - bypassing normal routing');
+        routingDecision = {
+          strategy: 'direct-response',
+          selectedAgents: [],
+          taskAnalysis: { type: 'cmo', complexity: 0.5 },
+          confidence: 1.0,
+          reasoning: 'CMO mode - using specialized CMO assistant'
+        };
+        
+        // Execute directly with CMO logic
+        agentResponse = await this.executeWithAgents(
+          routingDecision,
+          request,
+          context
+        );
+      } else {
+        // Normal routing for non-CMO requests
+        routingDecision = await this.makeRoutingDecision(request, context, userProfile);
+        console.log(`🎯 Routing strategy: ${routingDecision.strategy}`);
+        
+        // 5. Execute with selected agent(s)
+        agentResponse = await this.executeWithAgents(
+          routingDecision,
+          request,
+          context
+        );
+      }
       
       // 6. Process and enhance response
       const enhancedResponse = await this.enhanceResponse(
@@ -455,25 +483,71 @@ export class TalaIntelligence {
         // Build enhanced query with appropriate context
         let enhancedQuery = request.content;
         
-        // For CMO mode, enhance the query with marketing context
+        // For CMO mode, use the CMO Chat Handler
         if (request.data?.mode === 'cmo') {
-          const marketingContext = request.data?.requestMetadata;
+          console.log('📊 Using CMO Chat Handler for marketing query');
+          console.log('📊 CMO Assistant available?', !!this.cmoAssistant);
+          console.log('📊 CMO Assistant type:', typeof this.cmoAssistant);
+          const cmoStartTime = Date.now();
           
-          if (marketingContext?.growthPlanStep) {
-            enhancedQuery = `Marketing Context: User is working on "${marketingContext.growthPlanStep.label}"
-Task Description: ${marketingContext.growthPlanStep.description || 'Marketing task'}
-Expected Deliverables: ${marketingContext.growthPlanStep.outputs?.join(', ') || 'Marketing materials'}
-
-User's Question: ${request.content}
-
-Provide specific, actionable marketing advice. Focus on practical steps and real examples.`;
-          } else {
-            enhancedQuery = `Marketing Question: ${request.content}
-
-Provide specific, actionable marketing advice tailored to this question. Include practical steps, tools, and examples.`;
+          try {
+            if (!this.cmoAssistant) {
+              throw new Error('CMO Assistant is not initialized');
+            }
+            // Process through CMO Assistant which includes specialized agents
+            // Use conversation history from request data if available, otherwise from threading service
+            const conversationHistory = request.data?.conversationHistory || 
+                                      context?.conversationHistory || 
+                                      this.threadingService?.messageHistory || 
+                                      [];
+            
+            console.log(`💬 Conversation history available: ${conversationHistory.length} messages`);
+            
+            const cmoResponse = await this.cmoAssistant.processQuery(request.content, {
+              conversationId: request.conversationId,
+              userId: request.userId,
+              subMode: request.data?.subMode || 'general',  // This will be the detected subMode from intelligentChat.js
+              conversationHistory,
+              includeKnowledge: true,
+              fieldContext: request.data?.fieldContext,  // Pass field assistance context
+              requestMetadata: request.data?.requestMetadata,
+              userLearningContext: request.data?.userLearningContext
+            });
+            
+            console.log('📊 CMO Response received:', {
+              hasResponse: !!cmoResponse,
+              hasAgent: !!cmoResponse?.metadata?.agent,
+              agent: cmoResponse?.metadata?.agent
+            });
+            
+            // Return the CMO response in the expected format
+            // CMOResponse v2 uses 'content' property, not 'response'
+            const responseText = cmoResponse.content || cmoResponse.response || '';
+            
+            return {
+              result: {
+                response: responseText,
+                mode: 'cmo',
+                subMode: cmoResponse.subMode || request.data?.subMode || 'general',
+                agent: cmoResponse.metadata?.agent || 'cmo',
+                sources: cmoResponse.sources || [],
+                quickActions: cmoResponse.ui?.quickActions || cmoResponse.quickActions || [],
+                followUpQuestions: cmoResponse.ui?.followUpQuestions || cmoResponse.followUpQuestions || [],
+                confidence: cmoResponse.confidence || 0.9
+              },
+              metadata: {
+                ...cmoResponse.metadata,
+                source: 'cmo_assistant',
+                processingTime: Date.now() - cmoStartTime,
+                enhanced: true
+              }
+            };
+          } catch (error) {
+            console.error('❌ Error processing CMO request:', error.message);
+            console.error('❌ Full error details:', error);
+            console.error('❌ Stack trace:', error.stack);
+            // Fall through to default processing
           }
-          
-          console.log('📊 Enhanced CMO query with marketing context');
         }
         // Check if we have knowledge base context in the request
         else if (request.content.includes('Relevant information from knowledge base:')) {
@@ -536,8 +610,30 @@ Provide a direct, helpful, and accurate response to this question. Do not ask fo
           // CMO/Marketing mode system prompt
           const subMode = request.data?.subMode || 'general';
           const marketingContext = request.data?.requestMetadata?.growthPlanStep || null;
+          const fieldContext = request.data?.fieldContext || null;
           
-          systemPrompt = `You are Tala, an expert marketing consultant and strategist. You specialize in helping businesses grow through effective marketing strategies.
+          // Special prompt for field assistance
+          if (subMode === 'field_assistance' && fieldContext) {
+            systemPrompt = `You are Tala, an expert marketing consultant helping a user fill out a direct mail consultation form.
+
+Field Details:
+- Field Name: ${fieldContext.fieldLabel}
+- Field Type: ${fieldContext.fieldType}
+${fieldContext.fieldOptions ? `- Available Options: ${fieldContext.fieldOptions.join(', ')}` : ''}
+${fieldContext.currentValue ? `- Current Value: "${fieldContext.currentValue}"` : '- The field is currently empty'}
+${fieldContext.sectionContext?.sectionTitle ? `- Section: ${fieldContext.sectionContext.sectionTitle}` : ''}
+
+Instructions:
+1. Explain what this field is asking for and why it's important
+2. Provide context on how this impacts their direct mail campaign
+3. Give a specific, actionable suggestion
+4. Format your suggestion clearly: "I suggest using: [your suggestion]"
+${fieldContext.fieldType === 'select' ? '5. Recommend one of the available options with reasoning' : ''}
+${fieldContext.fieldType === 'textarea' ? '5. Provide a well-written example response they can use' : ''}
+
+Be helpful, specific, and practical. Focus on what will work best for their direct mail campaign success.`;
+          } else {
+            systemPrompt = `You are Tala, an expert marketing consultant and strategist. You specialize in helping businesses grow through effective marketing strategies.
 
 ${marketingContext ? `Context: The user is working on a marketing growth plan step called "${marketingContext.label}". ${marketingContext.description || ''}` : ''}
 
@@ -576,8 +672,9 @@ Current marketing focus: ${subMode === 'seo' ? 'SEO optimization' :
                            subMode === 'content' ? 'Content strategy' :
                            subMode === 'analytics' ? 'Marketing analytics' :
                            'General marketing strategy'}${userLearningContext ? '\n\nUser Preferences:\n' + userLearningContext : ''}`;
+          }
           
-          console.log('📊 Using CMO/Marketing Mode system prompt' + (userLearningContext ? ' with user learning' : ''));
+          console.log('📊 Using CMO/Marketing Mode system prompt' + (userLearningContext ? ' with user learning' : '') + (fieldContext ? ' for field assistance' : ''));
         } else if (request.data?.mode === 'travel') {
           // Import travel mode prompt
           const { TRAVEL_MODE_SYSTEM_PROMPT } = await import('../../prompts/travelModePrompt.js');
@@ -798,6 +895,13 @@ Would you like specific templates or a step-by-step implementation plan?`,
       enhancedContent = enhancedContent.response;
     }
     
+    // For CMO responses, we should already have the text
+    // Double-check that we have a string, not the full result object
+    if (enhancedContent && typeof enhancedContent === 'object' && agentResponse.metadata?.source === 'cmo_assistant') {
+      console.log('⚠️ CMO response still an object in enhanceResponse, extracting text');
+      enhancedContent = enhancedContent.response || enhancedContent.content || JSON.stringify(enhancedContent);
+    }
+    
     // Apply user preferences
     if (userProfile.preferences.responseStyle) {
       enhancedContent = this.applyResponseStyle(
@@ -806,8 +910,24 @@ Would you like specific templates or a step-by-step implementation plan?`,
       );
     }
     
-    // Add contextual information if relevant
-    if (context.relevantMemories.length > 0 && userProfile.preferences.includeContext) {
+    // Add contextual information if relevant - SKIP for CMO mode to preserve agent responses
+    const isCMOResponse = agentResponse.metadata?.source === 'cmo_assistant' || 
+                         agentResponse.result?.mode === 'cmo';
+    
+    console.log('🔍 TalaIntelligence enhanceResponse:', {
+      isCMOResponse,
+      source: agentResponse.metadata?.source,
+      mode: agentResponse.result?.mode,
+      hasMemories: context.relevantMemories.length > 0,
+      includeContext: userProfile.preferences.includeContext,
+      enhancedContentType: typeof enhancedContent,
+      enhancedContentPreview: typeof enhancedContent === 'string' ? 
+        enhancedContent.substring(0, 100) : 
+        JSON.stringify(enhancedContent).substring(0, 100)
+    });
+    
+    if (context.relevantMemories.length > 0 && userProfile.preferences.includeContext && !isCMOResponse) {
+      console.log('⚠️ Adding contextual references - this might be the echo issue!');
       enhancedContent = this.addContextualReferences(
         enhancedContent,
         context.relevantMemories
@@ -1325,6 +1445,12 @@ Would you like specific templates or a step-by-step implementation plan?`,
   addContextualReferences(content, memories) {
     if (memories.length === 0) return content;
     
+    console.log('🔍 addContextualReferences called with:', {
+      contentType: typeof content,
+      contentPreview: typeof content === 'string' ? content.substring(0, 100) : 'object',
+      memoriesCount: memories.length
+    });
+    
     const references = memories
       .slice(0, 3)
       .map((m, i) => {
@@ -1335,6 +1461,7 @@ Would you like specific templates or a step-by-step implementation plan?`,
       .join('\n');
     
     if (typeof content === 'string') {
+      console.log('⚠️ Appending Related context to string content');
       content += `\n\n📌 Related context:\n${references}`;
     } else if (typeof content === 'object') {
       content.contextualReferences = references;
@@ -1684,9 +1811,9 @@ Would you like specific templates or a step-by-step implementation plan?`,
     console.log('🛑 Shutting down Tala Intelligence...');
     
     await Promise.all([
-      this.contextManager.shutdown(),
-      this.memoryManager.close(),
-      this.profileManager.shutdown(),
+      this.contextManager?.shutdown ? this.contextManager.shutdown() : Promise.resolve(),
+      this.memoryManager?.close ? this.memoryManager.close() : Promise.resolve(),
+      this.profileManager?.shutdown ? this.profileManager.shutdown() : Promise.resolve(),
       this.agentOrchestrator.shutdown(),
       this.threadingService.shutdown(),
       this.learningEngine.shutdown()

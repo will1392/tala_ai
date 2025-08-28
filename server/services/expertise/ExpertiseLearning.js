@@ -252,6 +252,12 @@ class ExpertiseLearning {
    */
   async storeInteractionData(userId, analysis) {
     try {
+      // Check if database is available
+      if (!this.db || !this.db.supabase) {
+        console.log('Database not available, skipping interaction storage');
+        return;
+      }
+      
       const { error } = await this.db.supabase
         .from('expertise_interactions')
         .insert({
@@ -348,6 +354,12 @@ class ExpertiseLearning {
    */
   async checkForAdjustment(userId) {
     try {
+      // Check if database is available
+      if (!this.db || !this.db.supabase) {
+        console.log('Database not available, skipping adjustment check');
+        return null;
+      }
+      
       // Get recent interactions
       const { data: interactions } = await this.db.supabase
         .from('expertise_interactions')
@@ -510,6 +522,11 @@ class ExpertiseLearning {
    */
   async getCurrentLevel(userId) {
     try {
+      // Check if database is available
+      if (!this.db || !this.db.supabase) {
+        console.log('Database not available, returning default level');
+        return 'beginner';
+      }
       const { data: user } = await this.db.supabase
         .from('users')
         .select('marketing_expertise_level, expertise_assessment_date')

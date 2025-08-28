@@ -13,7 +13,10 @@ export class CompressionService {
   async compressConversation(params) {
     const { messages, strategy = 'intelligent', targetTokens = 4000 } = params;
     
-    if (!messages || messages.length === 0) {
+    // Ensure messages is an array
+    const messageArray = Array.isArray(messages) ? messages : [];
+    
+    if (!messageArray || messageArray.length === 0) {
       return {
         messages: [],
         compressionRatio: 0,
@@ -22,12 +25,12 @@ export class CompressionService {
     }
     
     // Simple compression: keep recent messages and summarize older ones
-    let compressed = [...messages];
+    let compressed = [...messageArray];
     
-    if (messages.length > 10) {
+    if (messageArray.length > 10) {
       // Keep last 5 messages and create summary of earlier ones
-      const recentMessages = messages.slice(-5);
-      const olderMessages = messages.slice(0, -5);
+      const recentMessages = messageArray.slice(-5);
+      const olderMessages = messageArray.slice(0, -5);
       
       const summary = {
         role: 'system',
@@ -39,7 +42,7 @@ export class CompressionService {
       compressed = [summary, ...recentMessages];
     }
     
-    const originalLength = JSON.stringify(messages).length;
+    const originalLength = JSON.stringify(messageArray).length;
     const compressedLength = JSON.stringify(compressed).length;
     const compressionRatio = compressedLength / originalLength;
     

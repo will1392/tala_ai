@@ -342,7 +342,7 @@ export const PremiumLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState("home");
-  const [notifications] = useState(5);
+  const [notifications] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
   const location = useLocation();
 

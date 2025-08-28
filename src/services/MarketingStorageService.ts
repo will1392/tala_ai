@@ -38,29 +38,72 @@ class MarketingStorageService {
    * Initialize storage layers in priority order
    */
   private initializeStorageLayers() {
-    // 1. Server Database (highest priority)
+    // 1. Server Database (highest priority, but optional)
     this.layers.push({
       name: 'database',
       priority: 1,
-      available: true,
+      available: false, // Start as unavailable, will check on first use
       save: async (key, data) => {
-        const response = await fetch(`${this.baseUrl}/api/marketing-profile/${key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (!response.ok) throw new Error('Database save failed');
+        try {
+          const response = await fetch(`${this.baseUrl}/api/marketing-profile/${key}`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-user-id': 'admin-1'
+            },
+            body: JSON.stringify(data)
+          });
+          if (response.status === 404) {
+            // API not available, mark as unavailable
+            this.layers[0].available = false;
+            throw new Error('API endpoint not found');
+          }
+          if (!response.ok) throw new Error('Database save failed');
+          // Mark as available if successful
+          this.layers[0].available = true;
+        } catch (error) {
+          // Mark as unavailable on network errors
+          this.layers[0].available = false;
+          throw error;
+        }
       },
       load: async (key) => {
-        const response = await fetch(`${this.baseUrl}/api/marketing-profile/${key}`);
-        if (!response.ok) throw new Error('Database load failed');
-        return response.json();
+        try {
+          const response = await fetch(`${this.baseUrl}/api/marketing-profile/${key}`, {
+            headers: { 'x-user-id': 'admin-1' }
+          });
+          if (response.status === 404) {
+            // Could be endpoint not found or profile not found
+            // Check if it's the endpoint
+            if (!response.headers.get('content-type')?.includes('json')) {
+              this.layers[0].available = false;
+              throw new Error('API endpoint not found');
+            }
+          }
+          if (!response.ok) throw new Error('Database load failed');
+          this.layers[0].available = true;
+          return response.json();
+        } catch (error) {
+          this.layers[0].available = false;
+          throw error;
+        }
       },
       delete: async (key) => {
-        const response = await fetch(`${this.baseUrl}/api/marketing-profile/${key}`, {
-          method: 'DELETE'
-        });
-        if (!response.ok) throw new Error('Database delete failed');
+        try {
+          const response = await fetch(`${this.baseUrl}/api/marketing-profile/${key}`, {
+            method: 'DELETE',
+            headers: { 'x-user-id': 'admin-1' }
+          });
+          if (response.status === 404) {
+            this.layers[0].available = false;
+            throw new Error('API endpoint not found');
+          }
+          if (!response.ok) throw new Error('Database delete failed');
+          this.layers[0].available = true;
+        } catch (error) {
+          this.layers[0].available = false;
+          throw error;
+        }
       }
     });
 
@@ -273,6 +316,11 @@ class MarketingStorageService {
    * Queue data for sync when connection is restored
    */
   private queueForSync(item: any) {
+    // Don't queue if API is not available
+    if (!this.layers[0].available) {
+      return;
+    }
+    
     // Prevent duplicates
     const exists = this.syncQueue.some(
       q => q.key === item.key && q.type === item.type
@@ -299,17 +347,19 @@ class MarketingStorageService {
       this.syncQueue = JSON.parse(savedQueue);
     }
 
-    // Check for sync every 30 seconds
+    // Check for sync every 30 seconds - but only if API is available
     setInterval(() => {
-      if (!this.isSyncing && this.syncQueue.length > 0 && navigator.onLine) {
+      if (!this.isSyncing && this.syncQueue.length > 0 && navigator.onLine && this.layers[0].available) {
         this.processSyncQueue();
       }
     }, 30000);
 
-    // Also sync when coming online
+    // Also sync when coming online - but check API availability first
     window.addEventListener('online', () => {
-      console.log('📡 Connection restored, syncing...');
-      this.processSyncQueue();
+      if (this.layers[0].available) {
+        console.log('📡 Connection restored, syncing...');
+        this.processSyncQueue();
+      }
     });
   }
 
@@ -318,6 +368,29 @@ class MarketingStorageService {
    */
   private async processSyncQueue() {
     if (this.isSyncing || this.syncQueue.length === 0) return;
+    
+    // Check if database is available before trying to sync
+    if (!this.layers[0].available) {
+      // Try one test request to see if API is now available
+      try {
+        const testResponse = await fetch(`${this.baseUrl}/api/marketing-profile/test`, {
+          headers: { 'x-user-id': 'admin-1' }
+        });
+        if (testResponse.status === 404) {
+          // API still not available, clear the queue to stop retrying
+          console.log('📡 Marketing API not available, clearing sync queue');
+          this.syncQueue = [];
+          localStorage.setItem('marketing_sync_queue', '[]');
+          return;
+        }
+        // API is available, mark it
+        this.layers[0].available = true;
+      } catch (error) {
+        // Network error or API not available
+        console.log('📡 Cannot reach marketing API, skipping sync');
+        return;
+      }
+    }
     
     this.isSyncing = true;
     const queue = [...this.syncQueue];
@@ -330,14 +403,21 @@ class MarketingStorageService {
           // Remove from queue
           this.syncQueue = this.syncQueue.filter(q => q !== item);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Sync failed for item:', item, error);
         
-        // Increment attempts
+        // If API is not found, stop trying
+        if (error.message === 'API endpoint not found') {
+          console.log('📡 Marketing API not available, clearing sync queue');
+          this.syncQueue = [];
+          break;
+        }
+        
+        // Increment attempts for other errors
         item.attempts++;
         
         // Remove if too many attempts
-        if (item.attempts > 5) {
+        if (item.attempts > 3) {
           this.syncQueue = this.syncQueue.filter(q => q !== item);
         }
       }

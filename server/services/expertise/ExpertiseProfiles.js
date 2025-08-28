@@ -81,7 +81,19 @@ class ExpertiseProfiles {
       'ab-testing': 'cro',
       'user-experience': 'cro',
       'funnel-optimization': 'cro',
-      'website-optimization': 'cro'
+      'website-optimization': 'cro',
+      
+      // Direct Mail topics
+      'directmail': 'direct_mail',
+      'directMail': 'direct_mail',  // Add camelCase version from ContextDetector
+      'direct-mail': 'direct_mail',
+      'direct_mail': 'direct_mail',
+      'postcard': 'direct_mail',
+      'postcards': 'direct_mail',
+      'direct-mail-campaign': 'direct_mail',
+      'mail-campaign': 'direct_mail',
+      'postal-marketing': 'direct_mail',
+      'print-marketing': 'direct_mail'
     };
     
     // Learning styles and preferences
@@ -185,7 +197,8 @@ class ExpertiseProfiles {
       ppc: { level: 1, confidence: 0.5, last_interaction: null },
       content: { level: 1, confidence: 0.5, last_interaction: null },
       analytics: { level: 1, confidence: 0.5, last_interaction: null },
-      cro: { level: 1, confidence: 0.5, last_interaction: null }
+      cro: { level: 1, confidence: 0.5, last_interaction: null },
+      direct_mail: { level: 1, confidence: 0.5, last_interaction: null }
     };
     
     // Convert overall level to numeric
@@ -324,6 +337,15 @@ class ExpertiseProfiles {
    * Get expertise level for specific topic
    */
   async getTopicExpertise(userId, topic) {
+    // Return default if no database
+    if (!this.db || !this.db.supabase) {
+      return {
+        level: 0.5,
+        confidence: 0.5,
+        interactions: 0,
+        lastSeen: null
+      };
+    }
     try {
       const profile = await this.getUserProfile(userId);
       if (!profile) {
@@ -538,6 +560,18 @@ class ExpertiseProfiles {
    */
   async getUserProfile(userId) {
     try {
+      // Check if database is available
+      if (!this.db || !this.db.supabase) {
+        console.log('Database not available, returning default profile');
+        return {
+          overall_level: 'beginner',
+          channel_expertise: {},
+          preferences: this.getDefaultCommunicationPreferences(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+      
       const { data, error } = await this.db.supabase
         .from('user_expertise_profiles')
         .select('profile_data')

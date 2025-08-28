@@ -238,8 +238,8 @@ class ContextOptimizer {
     if (query.match(/social|facebook|instagram/i)) {
       contexts.push({ context: 'social', confidence: 0.9 });
     }
-    if (query.match(/mail|postcard|flyer/i)) {
-      contexts.push({ context: 'directMail', confidence: 0.9 });
+    if (query.match(/mail|postcard|postcards|flyer|mailer|mailing/i)) {
+      contexts.push({ context: 'directMail', confidence: 0.95 });
     }
     
     // If no specific type mentioned, return all possibilities
@@ -352,7 +352,7 @@ class ContextOptimizer {
       { pattern: /\b(seo|search engine|google rank|serp)\b/i, context: 'seo' },
       { pattern: /\b(email|newsletter|mailchimp|campaign monitor)\b/i, context: 'email' },
       { pattern: /\b(social media|facebook|instagram|twitter|linkedin)\b/i, context: 'social' },
-      { pattern: /\b(direct mail|postcard|flyer|usps)\b/i, context: 'directMail' },
+      { pattern: /\b(postcard|postcards|direct mail|flyer|usps|mailer|mailing)\b/i, context: 'directMail' },
       { pattern: /\b(google ads|ppc|adwords|paid search)\b/i, context: 'ads' }
     ];
     

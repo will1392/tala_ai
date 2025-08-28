@@ -3,7 +3,7 @@
  * Collects basic information about the user and their business
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, X, User, Building, Target, DollarSign, Users } from 'lucide-react';
 import { ProgressBar } from '../cmo/onboarding/ProgressBar';
@@ -37,6 +37,18 @@ export const UserProfileOnboarding: React.FC<UserProfileOnboardingProps> = ({
   const [step, setStep] = useState(0);
   const [profile, setProfile] = useState<Partial<UserProfile>>(initialData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onSkip) {
+        onSkip();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    return () => document.removeEventListener('keydown', handleEscKey);
+  }, [onSkip]);
 
   const steps = [
     {
@@ -175,13 +187,24 @@ export const UserProfileOnboarding: React.FC<UserProfileOnboardingProps> = ({
     { value: 'client-acquisition', label: 'Acquiring new clients' }
   ];
 
+  // Handle clicking outside modal
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && onSkip) {
+      onSkip();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 backdrop-blur-sm overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 backdrop-blur-sm overflow-y-auto"
+      onClick={handleBackdropClick}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full my-4 flex flex-col min-h-[70vh] max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-8 py-6 text-white">

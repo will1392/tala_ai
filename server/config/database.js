@@ -11,8 +11,8 @@ import { fileURLToPath } from 'url';
 
 // Load environment variables
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Config is in /server/config, so go up two levels to reach root
-dotenv.config({ path: path.join(__dirname, '../../.env') });
+// Config is in /server/config, .env is in /server
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
 /**
  * Database configuration object

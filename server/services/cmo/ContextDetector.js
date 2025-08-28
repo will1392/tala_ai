@@ -12,7 +12,14 @@ import { contextOptimizer } from './ContextOptimizer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const patterns = JSON.parse(readFileSync(join(__dirname, '../../knowledge/cmo/patterns.json'), 'utf8'));
+let patterns = {};
+try {
+  patterns = JSON.parse(readFileSync(join(__dirname, '../../knowledge/cmo/patterns.json'), 'utf8'));
+  console.log('✅ Loaded CMO patterns successfully. Keys:', Object.keys(patterns));
+} catch (error) {
+  console.error('❌ Failed to load CMO patterns:', error.message);
+  console.error('❌ Attempted path:', join(__dirname, '../../knowledge/cmo/patterns.json'));
+}
 
 export class ContextDetector {
   constructor() {
@@ -184,10 +191,19 @@ export class ContextDetector {
     Object.entries(patterns).forEach(([subMode, data]) => {
       let score = 0;
       
+      // Debug: Check if data exists
+      if (!data || !data.keywords) {
+        console.log(`⚠️ Missing data for subMode: ${subMode}`);
+        return;
+      }
+      
       // Check keywords (higher weight)
       data.keywords.forEach(keyword => {
         if (message.toLowerCase().includes(keyword.toLowerCase())) {
           score += 0.3;
+          if (subMode === 'directMail') {
+            console.log(`🎯 DirectMail keyword match: "${keyword}" in message`);
+          }
         }
       });
       
@@ -195,6 +211,9 @@ export class ContextDetector {
       data.phrases.forEach(phrase => {
         if (message.toLowerCase().includes(phrase.toLowerCase())) {
           score += 0.5;
+          if (subMode === 'directMail') {
+            console.log(`🎯 DirectMail phrase match: "${phrase}" in message`);
+          }
         }
       });
       
@@ -214,6 +233,13 @@ export class ContextDetector {
       
       scores[subMode] = Math.min(score, 1.0); // Cap at 1.0
     });
+
+    console.log('📊 Context scores for message:', message);
+    console.log('📊 Scores:', scores);
+    console.log('📊 Debug - patterns object exists?', !!patterns);
+    console.log('📊 Debug - directMail patterns:', patterns.directMail ? 
+      { keywords: patterns.directMail.keywords.slice(0, 5), phrases: patterns.directMail.phrases.slice(0, 5) } : 
+      'NOT FOUND');
 
     return scores;
   }

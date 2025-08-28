@@ -1,24 +1,67 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { CheckCircle, Sparkles, ArrowRight, X } from 'lucide-react';
 import { Button } from '../shared/Button';
 
 interface OnboardingCompleteProps {
   userName?: string;
-  onContinue: () => void;
+  userProfile?: any; // Accept userProfile for compatibility
+  expertiseProfile?: any; // Accept expertiseProfile for compatibility
+  onContinue?: () => void; // Make optional for compatibility
+  onComplete?: () => void; // Accept both onContinue and onComplete
 }
 
 export const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({ 
   userName, 
-  onContinue 
+  userProfile,
+  expertiseProfile,
+  onContinue,
+  onComplete
 }) => {
+  // Use onComplete if provided, otherwise use onContinue
+  const handleClose = onComplete || onContinue || (() => {});
+  
+  // Extract name from userProfile if userName not provided
+  const displayName = userName || userProfile?.name;
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscKey);
+    return () => document.removeEventListener('keydown', handleEscKey);
+  }, [handleClose]);
+
+  // Handle clicking outside modal
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handleClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div 
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm"
+      onClick={handleBackdropClick}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-8"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-8 relative"
+        onClick={(e) => e.stopPropagation()}
       >
+        {/* Close button */}
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -35,7 +78,7 @@ export const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
           className="text-center"
         >
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-            Perfect! I'm Ready to Help {userName ? `You, ${userName}` : 'You'}
+            Perfect! I'm Ready to Help {displayName ? `You, ${displayName}` : 'You'}
           </h2>
           
           <div className="space-y-4 mb-8">
@@ -81,7 +124,7 @@ export const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
             <Button
               variant="primary"
               size="lg"
-              onClick={onContinue}
+              onClick={handleClose}
               className="inline-flex items-center gap-2"
             >
               Let's Get Started

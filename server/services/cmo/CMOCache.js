@@ -4,7 +4,7 @@
  * High-performance caching for CMO operations
  */
 
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import { performanceConfig, performanceUtils } from '../../config/performance.js';
 
 export class CMOCache {

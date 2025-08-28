@@ -67,7 +67,9 @@ router.post('/v2', authenticate, async (req, res) => {
       mode,
       subMode,
       searchKnowledge,
-      requestId
+      requestId,
+      conversationHistory = [],  // Add this to receive history from frontend
+      context = {} // Add context for field assistance
     } = req.body;
     
     // CRITICAL: Reject frontend-generated IDs
@@ -87,7 +89,7 @@ router.post('/v2', authenticate, async (req, res) => {
     console.log('   - message includes "tell me about":', message?.toLowerCase().includes('tell me about'));
     
     // Handle CMO/Marketing mode FIRST - before travel mode
-    if (mode === 'cmo') {
+    if (mode === 'cmo' || mode === 'marketing') {
       console.log('📊 CMO/Marketing mode detected - Processing marketing request');
       console.log('📊 Full request data:', {
         message: message?.substring(0, 100),
@@ -98,6 +100,16 @@ router.post('/v2', authenticate, async (req, res) => {
       });
       
       try {
+        // Check if this is a field assistance request
+        const isFieldAssistance = context.task === 'field_assistance';
+        if (isFieldAssistance) {
+          console.log('📝 Field assistance request detected:', {
+            fieldId: context.fieldId,
+            fieldLabel: context.fieldLabel,
+            fieldType: context.fieldType
+          });
+        }
+        
         // Get user learning context if available
         let userLearningContext = null;
         if (intelligence.userLearningHub) {
@@ -111,6 +123,88 @@ router.post('/v2', authenticate, async (req, res) => {
           }
         }
         
+        // Detect marketing context for proper subMode
+        let detectedSubMode = req.body.subMode || 'general';
+        
+        // Check conversation history for ongoing conversations
+        let isOngoingConversation = false;
+        let ongoingSubMode = null;
+        
+        if (conversationHistory && conversationHistory.length > 0) {
+          // Check recent messages for marketing context
+          for (const msg of conversationHistory.slice(-4)) {
+            const msgContent = msg.content?.toLowerCase() || '';
+            
+            // Direct mail keywords
+            if (msgContent.includes('postcard') || msgContent.includes('direct mail') || 
+                msgContent.includes('mailer') || msgContent.includes('river cruise') ||
+                msgContent.includes('affluent households') || msgContent.includes('pieces):')) {
+              isOngoingConversation = true;
+              ongoingSubMode = 'directMail';
+              console.log('🔍 Detected ongoing direct mail conversation from history');
+              break;
+            }
+            
+            // Could add other marketing channel detection here
+            // SEO keywords
+            if (msgContent.includes('seo') || msgContent.includes('search engine') || 
+                msgContent.includes('keywords') || msgContent.includes('meta description')) {
+              isOngoingConversation = true;
+              ongoingSubMode = 'seo';
+              break;
+            }
+          }
+        }
+        
+        if (isOngoingConversation && ongoingSubMode) {
+          detectedSubMode = ongoingSubMode;
+          console.log('🔍 Using ongoing conversation subMode:', detectedSubMode);
+        }
+        
+        // Only detect new context if not in ongoing conversation
+        if (!isOngoingConversation) {
+          console.log('🔍 DEBUG: Starting context detection for message:', message.substring(0, 50));
+          console.log('🔍 DEBUG: intelligence object exists?', !!intelligence);
+          console.log('🔍 DEBUG: intelligence.cmoAssistant exists?', !!intelligence.cmoAssistant);
+          
+          try {
+            const contextDetector = intelligence.cmoAssistant?.contextDetector;
+            console.log('🔍 DEBUG: contextDetector exists?', !!contextDetector);
+            
+            if (contextDetector) {
+              console.log('🔍 Using ContextDetector for marketing subMode detection');
+              const contextAnalysis = await contextDetector.detectMarketingContext(message);
+              const topic = contextAnalysis.primaryContext;
+              console.log('🔍 Detected marketing context:', { topic, confidence: contextAnalysis.confidence });
+              
+              if (topic && contextAnalysis.confidence > 0.3) {
+                // Map detected topic to subMode
+                // Direct mapping since expertiseProfiles is not available in the wrapper
+                const topicToChannelMap = {
+                  'directMail': 'directMail',
+                  'direct_mail': 'directMail',
+                  'seo': 'seo',
+                  'email': 'email',
+                  'social': 'social',
+                  'ads': 'ads'
+                };
+                
+                detectedSubMode = topicToChannelMap[topic] || topic || 'general';
+                console.log('🔍 Mapped topic to subMode:', { topic, channel: detectedSubMode });
+              } else {
+                console.log('🔍 Context confidence too low or no topic detected');
+              }
+            } else {
+              console.log('❌ ContextDetector not available in intelligence.cmoAssistant');
+            }
+          } catch (contextError) {
+            console.warn('⚠️ Context detection failed, using default subMode:', contextError.message);
+            console.warn('⚠️ Context detection error stack:', contextError.stack);
+          }
+        }
+        
+        console.log('🔍 Final subMode for CMO processing:', detectedSubMode);
+        
         // For CMO mode, use the intelligence system directly without travel validation
         const intelligentResponse = await intelligence.processRequest({
           userId: req.userId,
@@ -123,7 +217,7 @@ router.post('/v2', authenticate, async (req, res) => {
           device,
           data: {
             mode: 'cmo',
-            subMode: req.body.subMode || 'general',
+            subMode: isFieldAssistance ? 'field_assistance' : detectedSubMode,
             attachments,
             preferences: {
               responseStyle: preferredStyle || 'professional',
@@ -134,41 +228,105 @@ router.post('/v2', authenticate, async (req, res) => {
             requestMetadata: req.body.requestMetadata,
             // Include user learning context
             userLearningContext,
+            // Include conversation history
+            conversationHistory,
             // Skip travel validation
             skipTaskExtraction: true,
-            skipTravelValidation: true
+            skipTravelValidation: true,
+            // Field assistance context
+            fieldContext: isFieldAssistance ? context : null
           }
         });
         
         console.log('📊 CMO Intelligence Response:', {
           hasResponse: !!intelligentResponse.response,
           responseType: typeof intelligentResponse.response,
+          responseKeys: intelligentResponse.response ? Object.keys(intelligentResponse.response) : [],
           responsePreview: typeof intelligentResponse.response === 'string' 
             ? intelligentResponse.response.substring(0, 200)
-            : intelligentResponse.response?.content?.substring(0, 200)
+            : (intelligentResponse.response?.content || intelligentResponse.response || '').toString().substring(0, 200),
+          success: intelligentResponse.success,
+          error: intelligentResponse.error
         });
         
-        // Extract the actual response text
-        const responseText = typeof intelligentResponse.response === 'string' 
-          ? intelligentResponse.response 
-          : intelligentResponse.response?.content || intelligentResponse.response;
+        // Extract the actual response text from the nested structure
+        let responseText = '';
+        
+        // Debug logging to understand the response structure
+        console.log('📊 CMO Response Structure Debug:', {
+          hasResponse: !!intelligentResponse.response,
+          responseKeys: intelligentResponse.response ? Object.keys(intelligentResponse.response) : [],
+          hasResult: !!intelligentResponse.response?.result,
+          resultKeys: intelligentResponse.response?.result ? Object.keys(intelligentResponse.response.result) : [],
+          contentType: typeof intelligentResponse.response?.content,
+          contentPreview: typeof intelligentResponse.response?.content === 'string' 
+            ? intelligentResponse.response.content.substring(0, 100) 
+            : JSON.stringify(intelligentResponse.response?.content).substring(0, 100) || 'no content',
+          fullResponse: JSON.stringify(intelligentResponse, null, 2)
+        });
+        
+        // The response from TalaIntelligence.enhanceResponse has this structure:
+        // { content: <enhanced content>, metadata: {...}, suggestions: [...] }
+        // For CMO mode, the enhanced content is the text from agentResponse.result.response
+        
+        if (intelligentResponse.response?.content) {
+          // This is the enhanced content from TalaIntelligence
+          const content = intelligentResponse.response.content;
+          if (typeof content === 'string') {
+            responseText = content;
+          } else if (content && typeof content === 'object') {
+            // This shouldn't happen for CMO responses after our fix
+            console.error('⚠️ Unexpected object content in CMO response:', content);
+            responseText = JSON.stringify(content);
+          }
+        } else if (intelligentResponse.response?.result?.response) {
+          // Fallback: direct access to result
+          responseText = intelligentResponse.response.result.response;
+        } else if (typeof intelligentResponse.response === 'string') {
+          responseText = intelligentResponse.response;
+        } else if (intelligentResponse.content) {
+          responseText = intelligentResponse.content;
+        } else {
+          console.error('⚠️ Could not extract response text from:', intelligentResponse);
+          responseText = 'I apologize, but I encountered an error processing your request.';
+        }
+        
+        // Check if response is empty or echoing the user's message
+        if (!responseText || (typeof responseText === 'string' && responseText.trim() === message.trim())) {
+          console.error('⚠️ WARNING: Response is empty or echoing user message!');
+          console.error('⚠️ User message:', message);
+          console.error('⚠️ Response text:', responseText);
+          console.error('⚠️ Full response structure:', JSON.stringify(intelligentResponse, null, 2));
+          
+          // Try to extract from deeper structures
+          if (intelligentResponse.response?.result?.content) {
+            responseText = intelligentResponse.response.result.content;
+            console.log('🔧 Found content in result.content:', responseText.substring(0, 100));
+          }
+        }
+        
+        // Extract metadata from the nested structure
+        const responseMetadata = intelligentResponse.response?.metadata || intelligentResponse.metadata || {};
         
         return res.json({
           success: true,
           response: responseText,
           mode: 'cmo',
-          subMode: req.body.subMode || 'general',
-          metadata: intelligentResponse.metadata,
-          conversationId: intelligentResponse.metadata.threadId || conversationId,
-          sources: intelligentResponse.metadata.sources || []
+          subMode: intelligentResponse.response?.result?.subMode || detectedSubMode,
+          metadata: responseMetadata,
+          conversationId: responseMetadata.threadId || conversationId,
+          sources: responseMetadata.sources || [],
+          confidence: intelligentResponse.response?.result?.confidence || responseMetadata.confidence
         });
       } catch (cmoError) {
         console.error('❌ CMO processing failed:', cmoError.message);
+        console.error('❌ Full error:', cmoError);
+        console.error('❌ Stack trace:', cmoError.stack);
         
         // Fallback to a simple response
         return res.json({
           success: true,
-          response: `I'll help you with your marketing question. ${message}\n\nFor marketing strategy and implementation, I recommend focusing on your target audience, clear messaging, and measurable goals. What specific aspect of marketing would you like to explore?`,
+          response: `I'll help you with your marketing question.\n\nFor marketing strategy and implementation, I recommend focusing on your target audience, clear messaging, and measurable goals. What specific aspect of marketing would you like to explore?`,
           mode: 'cmo',
           conversationId,
           sources: []
@@ -590,7 +748,7 @@ router.post('/v2', authenticate, async (req, res) => {
     }
     
     // Get conversation history for context-aware search with intelligent pruning
-    let conversationHistory = [];
+    conversationHistory = []; // Reset conversation history
     if (conversationId) {
       try {
         // Fetch more messages initially to allow for summarization

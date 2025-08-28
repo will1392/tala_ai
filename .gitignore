@@ -158,3 +158,8 @@ credentials*.json
 *google*
 *aws*
 *azure*
+
+# User data files
+data/learning/*.json
+server/data/metrics/*.json
+server/data/memory/*.json

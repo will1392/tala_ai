@@ -6,7 +6,7 @@
  */
 
 import { cmoKnowledgeBase } from './CMOKnowledgeBase.js';
-import { cmoAssistant } from './CMOAssistant.js';
+import { cmoAssistant } from './migration/CMOCompatibilityWrapper.js';
 
 class CMOChatHandler {
   constructor() {
@@ -22,6 +22,7 @@ class CMOChatHandler {
     if (this.initialized) return;
     
     try {
+      console.log('🔍 CMOChatHandler: Initializing, assistant exists?', !!this.assistant);
       await this.assistant.initialize();
       this.initialized = true;
       console.log('✅ CMO Chat Handler initialized');
@@ -43,10 +44,33 @@ class CMOChatHandler {
     } = context;
     
     try {
+      console.log('🔍 CMOChatHandler: Processing message through assistant...');
+      console.log('🔍 CMOChatHandler: Assistant initialized?', !!this.assistant);
+      console.log('🔍 CMOChatHandler: Assistant has processQuery?', typeof this.assistant?.processQuery);
+      console.log('🔍 CMOChatHandler: Assistant has processMessage?', typeof this.assistant?.processMessage);
+      
       // Process query through assistant
-      const assistantResponse = await this.assistant.processQuery(message, {
-        category: subMode,
-        subMode: subMode
+      let assistantResponse;
+      try {
+        console.log('🔍 CMOChatHandler: About to call processQuery...');
+        assistantResponse = await this.assistant.processQuery(message, {
+          userId,
+          conversationId,
+          category: subMode,
+          subMode: subMode,
+          conversationHistory, // Pass conversationHistory explicitly
+          ...context
+        });
+        console.log('🔍 CMOChatHandler: processQuery returned');
+      } catch (processError) {
+        console.error('❌ CMOChatHandler: Error calling processMessage:', processError);
+        throw processError;
+      }
+      
+      console.log('🔍 CMOChatHandler: Assistant response:', {
+        hasContent: !!assistantResponse?.content,
+        hasResults: !!assistantResponse?.results,
+        keys: assistantResponse ? Object.keys(assistantResponse) : []
       });
       
       // Format the response
@@ -57,7 +81,7 @@ class CMOChatHandler {
       );
       
       return {
-        response: formattedResponse.content,
+        response: formattedResponse.response,
         mode: 'cmo',
         subMode: subMode,
         knowledge: assistantResponse.results,
@@ -88,27 +112,108 @@ class CMOChatHandler {
     const { results, queryType, suggestions, additionalContext } = assistantResponse;
     const { subMode } = context;
     
+    console.log('🔍 CMOChatHandler formatResponse:', {
+      hasResults: !!results,
+      resultsLength: results?.length || 0,
+      queryType,
+      hasAssistantResponse: !!assistantResponse,
+      assistantResponseKeys: Object.keys(assistantResponse || {}),
+      hasContent: !!assistantResponse?.content,
+      contentType: typeof assistantResponse?.content,
+      contentLength: assistantResponse?.content?.length,
+      contentPreview: assistantResponse?.content?.substring(0, 100) || 'no content'
+    });
+    
+    // Debug: Log the full assistantResponse structure
+    console.log('🔍 Full assistantResponse:', JSON.stringify(assistantResponse, null, 2));
+    
     let content = '';
     const sources = [];
     
-    // Add greeting or context based on query type
-    content += this.getResponseIntro(queryType, subMode);
-    
-    // Include knowledge results
-    if (results && results.length > 0) {
-      content += this.formatKnowledgeResults(results, queryType);
+    // Check if assistantResponse has specialized agent content
+    if (assistantResponse.content) {
+      console.log('🔍 Found direct content in assistantResponse');
+      content = assistantResponse.content;
+    } else if (assistantResponse.response) {
+      console.log('🔍 Found response in assistantResponse');
+      content = assistantResponse.response;
+    } else if (assistantResponse.recommendations || assistantResponse.benchmarks || assistantResponse.metrics) {
+      console.log('🔍 Building content from structured data');
+      // Build content from structured data
       
-      // Add sources
-      results.forEach(result => {
-        sources.push({
-          title: result.title,
-          category: result.category,
-          score: result.score
+      // Add greeting or context based on query type
+      content += this.getResponseIntro(queryType, subMode);
+      
+      // Add metrics if available
+      if (assistantResponse.metrics) {
+        console.log('🔍 CMOChatHandler: metrics data structure:', JSON.stringify(assistantResponse.metrics, null, 2));
+        content += '\n\n📊 **Key Metrics:**\n';
+        Object.entries(assistantResponse.metrics).forEach(([key, value]) => {
+          content += this.formatObjectValue(key, value, '• ');
         });
-      });
+      }
+      
+      // Add benchmarks if available
+      if (assistantResponse.benchmarks) {
+        console.log('🔍 CMOChatHandler: benchmarks data structure:', JSON.stringify(assistantResponse.benchmarks, null, 2));
+        content += '\n\n📈 **Industry Benchmarks:**\n';
+        Object.entries(assistantResponse.benchmarks).forEach(([key, value]) => {
+          content += this.formatObjectValue(key, value, '• ');
+        });
+      }
+      
+      // Add recommendations if available
+      if (assistantResponse.recommendations && assistantResponse.recommendations.length > 0) {
+        content += '\n\n💡 **Recommendations:**\n';
+        assistantResponse.recommendations.forEach(rec => {
+          if (typeof rec === 'string') {
+            content += `• ${rec}\n`;
+          } else if (rec.message) {
+            content += `• ${rec.message}\n`;
+          }
+        });
+      }
+      
+      // Add examples if available
+      if (assistantResponse.examples && assistantResponse.examples.length > 0) {
+        content += '\n\n📝 **Examples:**\n';
+        assistantResponse.examples.forEach(example => {
+          if (typeof example === 'string') {
+            content += `• ${example}\n`;
+          } else if (example.description) {
+            content += `• ${example.description}\n`;
+          }
+        });
+      }
+      
+      // Add next steps if available
+      if (assistantResponse.nextSteps && assistantResponse.nextSteps.length > 0) {
+        content += '\n\n👉 **Next Steps:**\n';
+        assistantResponse.nextSteps.forEach((step, index) => {
+          content += `${index + 1}. ${step}\n`;
+        });
+      }
     } else {
-      // No direct knowledge found
-      content += this.getNoResultsResponse(query, subMode);
+      console.log('🔍 Using default content building logic');
+      // Original logic
+      content += this.getResponseIntro(queryType, subMode);
+      
+      // Include knowledge results
+      if (results && results.length > 0) {
+        content += this.formatKnowledgeResults(results, queryType);
+        
+        // Add sources
+        results.forEach(result => {
+          sources.push({
+            title: result.title,
+            category: result.category,
+            score: result.score
+          });
+        });
+      } else {
+        // No direct knowledge found
+        content += this.getNoResultsResponse(query, subMode);
+      }
     }
     
     // Add quick actions or tools
@@ -129,9 +234,25 @@ class CMOChatHandler {
       content += `\n\n🎯 **Quick Tip:** ${additionalContext.quickTip.content}`;
     }
     
+    console.log('🔍 CMOChatHandler formatResponse final content length:', content.length);
+    console.log('🔍 CMOChatHandler formatResponse final content preview:', content.substring(0, 100));
+    
+    // Check if content is empty and we're echoing the query
+    if (!content.trim() || content.trim() === query) {
+      console.error('⚠️ WARNING: formatResponse returning empty or echo content!');
+      console.error('⚠️ Query:', query);
+      console.error('⚠️ Content:', content);
+    }
+    
     return {
-      content: content.trim(),
-      sources
+      response: content.trim(),
+      content: content.trim(), // Some code expects 'content' field
+      sources,
+      confidence: assistantResponse.confidence || 0.8,
+      metadata: assistantResponse.metadata || {},
+      quickActions: assistantResponse.quickActions || [],
+      followUpQuestions: assistantResponse.followUpQuestions || [],
+      subMode: assistantResponse.subMode || context.subMode || subMode
     };
   }
 
@@ -356,6 +477,11 @@ class CMOChatHandler {
    * Get relevant quick actions
    */
   getRelevantQuickActions(queryType, subMode) {
+    // Check if assistant has getQuickActions method
+    if (!this.assistant.getQuickActions) {
+      return []; // Return empty array if method doesn't exist
+    }
+    
     const actions = this.assistant.getQuickActions(subMode || 'general');
     
     // Filter actions based on query type
@@ -405,6 +531,38 @@ class CMOChatHandler {
    */
   titleCase(str) {
     return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  /**
+   * Format object values recursively to handle nested structures
+   */
+  formatObjectValue(key, value, prefix = '') {
+    let content = '';
+    
+    if (typeof value === 'object' && value !== null) {
+      if (Array.isArray(value)) {
+        // Handle arrays by joining simple values, or formatting complex ones
+        const formattedArray = value.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return JSON.stringify(item);
+          }
+          return String(item);
+        });
+        content += `${prefix}${this.titleCase(key)}: ${formattedArray.join(', ')}\n`;
+      } else {
+        // Handle nested objects
+        content += `${prefix}${this.titleCase(key)}:\n`;
+        Object.entries(value).forEach(([subKey, subValue]) => {
+          // Recursive call for nested objects
+          content += this.formatObjectValue(subKey, subValue, prefix + '  - ');
+        });
+      }
+    } else {
+      // Simple value
+      content += `${prefix}${this.titleCase(key)}: ${value}\n`;
+    }
+    
+    return content;
   }
 
   /**

@@ -23,10 +23,9 @@ class CMOKnowledgeBase {
     this.knowledge = new Map();
     this.initialized = false;
     
-    // OpenAI for embeddings
-    this.openai = options.openai || new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
+    // OpenAI for embeddings - lazy initialization
+    this.openai = options.openai || null;
+    this._openaiApiKey = process.env.OPENAI_API_KEY || '';
     
     // Qdrant client
     this.qdrant = options.qdrant || new QdrantClient({
@@ -36,6 +35,20 @@ class CMOKnowledgeBase {
     
     this.collectionName = 'cmo_knowledge';
     this.vectorDimension = 1536; // OpenAI embedding dimension
+  }
+
+  /**
+   * Get OpenAI client with lazy initialization
+   */
+  getOpenAIClient() {
+    if (!this.openai) {
+      const apiKey = process.env.OPENAI_API_KEY || this._openaiApiKey;
+      if (!apiKey) {
+        throw new Error('OPENAI_API_KEY not configured');
+      }
+      this.openai = new OpenAI({ apiKey });
+    }
+    return this.openai;
   }
 
   /**
@@ -251,7 +264,8 @@ class CMOKnowledgeBase {
    */
   async generateEmbedding(text) {
     try {
-      const response = await this.openai.embeddings.create({
+      const openai = this.getOpenAIClient();
+      const response = await openai.embeddings.create({
         model: 'text-embedding-3-small',
         input: text
       });
@@ -267,10 +281,13 @@ class CMOKnowledgeBase {
    * Generate unique ID for knowledge item
    */
   generateId(category, item) {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
-    const title = (item.title || item.name || 'item').replace(/\s+/g, '-').substring(0, 20);
-    return `${category}-${title}-${timestamp}-${random}`;
+    // Generate a proper UUID v4
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+    return uuid;
   }
 
   /**
@@ -303,13 +320,15 @@ class CMOKnowledgeBase {
         }
       }
       
-      // Build filter
-      const filter = category ? {
-        must: [{
-          key: 'category',
-          match: { value: category }
-        }]
-      } : null;
+      // Build filter - temporarily disabled until indexes are created
+      const filter = null;
+      // TODO: Re-enable when indexes are created
+      // const filter = category ? {
+      //   must: [{
+      //     key: 'category',
+      //     match: { value: category }
+      //   }]
+      // } : null;
       
       // Search in Qdrant
       const results = await this.qdrant.search(this.collectionName, {
@@ -377,6 +396,21 @@ class CMOKnowledgeBase {
       item.topic === topic || 
       (item.topics && item.topics.includes(topic))
     );
+  }
+
+  /**
+   * Get knowledge by type across all categories
+   */
+  getByType(type) {
+    const results = [];
+    
+    // Search through all categories
+    for (const [category, items] of this.knowledge.entries()) {
+      const typeItems = items.filter(item => item.type === type);
+      results.push(...typeItems);
+    }
+    
+    return results;
   }
 
   /**

@@ -1,110 +1,107 @@
+#!/usr/bin/env node
+
 /**
- * Test CMO Conversation Flow
+ * Test conversational flow with Direct Mail Agent
  */
 
-import { cmoAssistant } from './services/cmo/CMOAssistant.js';
+import fetch from 'node-fetch';
 
-console.log('🧪 Testing CMO Conversation Flow System\n');
-
-const userId = 'test-user-123';
-
-async function simulateConversation() {
-  // Initialize CMO Assistant
-  await cmoAssistant.initialize();
+async function testConversationFlow() {
+  console.log('🧪 Testing Conversational Flow\n');
   
-  console.log('📝 Starting marketing conversation...\n');
+  // Simulated conversation ID
+  const conversationId = `test-conv-${Date.now()}`;
+  const conversationHistory = [];
   
-  // Turn 1: Discovery
-  console.log('👤 User: "I run an e-commerce store selling organic skincare products"');
-  let response = await cmoAssistant.processQuery(
-    "I run an e-commerce store selling organic skincare products",
-    { userId, expertise: 'intermediate' }
+  // First message
+  console.log('1️⃣ First Query: "Can you help me with a postcard campaign?"\n');
+  
+  const response1 = await fetch('http://localhost:3001/api/chat/intelligent', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': 'test-user'
+    },
+    body: JSON.stringify({
+      message: "Can you help me with a postcard campaign?",
+      conversationId,
+      mode: "cmo",
+      subMode: "direct_mail"
+    })
+  });
+  
+  const data1 = await response1.json();
+  console.log('Response 1:', data1.response?.substring(0, 200) + '...\n');
+  
+  // Add to history
+  conversationHistory.push(
+    { role: 'user', content: "Can you help me with a postcard campaign?" },
+    { role: 'assistant', content: data1.response }
   );
-  displayConversationState(response);
   
-  // Turn 2: Challenge
-  console.log('\n👤 User: "My main challenge is low email open rates - around 12%"');
-  response = await cmoAssistant.processQuery(
-    "My main challenge is low email open rates - around 12%",
-    { userId, expertise: 'intermediate' }
-  );
-  displayConversationState(response);
+  // Second message
+  console.log('2️⃣ Second Query: "I want to reach out to more lux clients, maybe some river cruises?"\n');
   
-  // Turn 3: Deep dive
-  console.log('\n👤 User: "Tell me more about subject line optimization"');
-  response = await cmoAssistant.processQuery(
-    "Tell me more about subject line optimization",
-    { userId, expertise: 'intermediate' }
-  );
-  displayConversationState(response);
+  const response2 = await fetch('http://localhost:3001/api/chat/intelligent', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': 'test-user'
+    },
+    body: JSON.stringify({
+      message: "I want to reach out to more lux clients, maybe some river cruises?",
+      conversationId,
+      mode: "cmo",
+      subMode: "direct_mail",
+      conversationHistory
+    })
+  });
   
-  // Turn 4: Related topic
-  console.log('\n👤 User: "What about send times? When should I send emails?"');
-  response = await cmoAssistant.processQuery(
-    "What about send times? When should I send emails?",
-    { userId, expertise: 'intermediate' }
-  );
-  displayConversationState(response);
+  const data2 = await response2.json();
+  console.log('Response 2:', data2.response?.substring(0, 300) + '...\n');
   
-  // Test navigation
-  console.log('\n🔙 Testing navigation - going back 2 steps...');
-  const navResult = await cmoAssistant.navigateBack(userId, 2);
-  console.log('Navigation result:', navResult);
-  
-  // Process follow-up
-  if (response.conversation?.followUpSuggestions?.[0]) {
-    console.log('\n🔄 Processing follow-up suggestion...');
-    const followUp = response.conversation.followUpSuggestions[0];
-    console.log(`Selected: "${followUp.text}"`);
-    
-    response = await cmoAssistant.processFollowUp(userId, followUp);
-    displayConversationState(response);
+  // Check if it's an echo
+  if (data2.response?.includes("i want to reach out to more lux clients")) {
+    console.log('❌ ERROR: Response is echoing the user input!');
+    console.log('\nFull response:', data2.response);
+  } else if (data2.response?.includes("Great!") || data2.response?.includes("Excellent") || data2.response?.includes("Perfect")) {
+    console.log('✅ SUCCESS: Response is continuing the conversation!');
+  } else {
+    console.log('⚠️  WARNING: Unexpected response format');
   }
   
-  // Get conversation summary
-  console.log('\n📊 Getting conversation summary...');
-  const summary = await cmoAssistant.getConversationSummary(userId);
-  console.log('Summary:', JSON.stringify(summary, null, 2));
+  // Add to history
+  conversationHistory.push(
+    { role: 'user', content: "I want to reach out to more lux clients, maybe some river cruises?" },
+    { role: 'assistant', content: data2.response }
+  );
+  
+  // Third message
+  console.log('\n3️⃣ Third Query: "Budget is around $5000"\n');
+  
+  const response3 = await fetch('http://localhost:3001/api/chat/intelligent', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-user-id': 'test-user'
+    },
+    body: JSON.stringify({
+      message: "Budget is around $5000",
+      conversationId,
+      mode: "cmo",
+      subMode: "direct_mail",
+      conversationHistory
+    })
+  });
+  
+  const data3 = await response3.json();
+  console.log('Response 3:', data3.response?.substring(0, 300) + '...\n');
+  
+  // Summary
+  console.log('\n📊 Conversation Summary:');
+  console.log('- First response asked about goals? ', data1.response?.includes('hoping to accomplish'));
+  console.log('- Second response acknowledged luxury/river cruise? ', !data2.response?.includes('i want to reach'));
+  console.log('- Third response discussed timeline/next steps? ', !data3.response?.includes('budget is around'));
 }
 
-function displayConversationState(response) {
-  if (!response.conversation) {
-    console.log('❌ No conversation data in response');
-    return;
-  }
-  
-  const { conversation } = response;
-  
-  console.log('\n--- Conversation State ---');
-  console.log(`📍 Stage: ${conversation.stage}`);
-  console.log(`🍞 Breadcrumbs: ${conversation.breadcrumbs.map(b => b.label).join(' > ')}`);
-  
-  if (conversation.memory?.businessInfo?.name) {
-    console.log(`🏢 Business: ${conversation.memory.businessInfo.name}`);
-  }
-  
-  if (conversation.memory?.previousMetrics?.length > 0) {
-    console.log(`📊 Remembered metrics: ${conversation.memory.previousMetrics.map(m => m.value).join(', ')}`);
-  }
-  
-  if (conversation.followUpSuggestions?.length > 0) {
-    console.log('\n💡 Follow-up suggestions:');
-    conversation.followUpSuggestions.forEach((s, i) => {
-      console.log(`  ${i + 1}. ${s.text}`);
-      if (s.reason) {
-        console.log(`     → ${s.reason}`);
-      }
-    });
-  }
-  
-  if (response.personalization) {
-    console.log('\n🎯 Personalization:');
-    console.log(`  Business: ${response.personalization.businessName}`);
-    if (response.personalization.previousChallenges?.length > 0) {
-      console.log(`  Challenges: ${response.personalization.previousChallenges.map(c => c.description).join(', ')}`);
-    }
-  }
-}
-
-// Run the test
-simulateConversation().catch(console.error);
+testConversationFlow().catch(console.error);

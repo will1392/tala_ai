@@ -23,6 +23,9 @@ import ExpertiseLearning from '../expertise/ExpertiseLearning.js';
 import ExpertiseProfiles from '../expertise/ExpertiseProfiles.js';
 import { ResponseTemplates, generateAdaptiveResponse } from '../../templates/cmo/expertise-responses.js';
 
+// Import specialized marketing agents router
+import marketingAgentRouter from '../agents/MarketingAgentRouter.js';
+
 class CMOAssistant {
   constructor() {
     this.knowledgeBase = cmoKnowledgeBase;
@@ -36,6 +39,10 @@ class CMOAssistant {
     this.communicationAdapter = new CommunicationAdapter();
     this.expertiseLearning = new ExpertiseLearning();
     this.expertiseProfiles = new ExpertiseProfiles();
+    
+    // Store reference to marketing agent router
+    this.marketingAgentRouter = marketingAgentRouter;
+    console.log('🔍 CMOAssistant constructor: marketingAgentRouter imported?', !!marketingAgentRouter);
     
     this.initialized = false;
   }
@@ -57,19 +64,165 @@ class CMOAssistant {
   }
 
   /**
+   * Process a query (wrapper for processMessage for backward compatibility)
+   */
+  async processQuery(message, options = {}) {
+    console.log('🔍 CMOAssistant: processQuery called with message:', message.substring(0, 50) + '...');
+    console.log('🔍 CMOAssistant: Options:', Object.keys(options));
+    console.log('🔍 CMOAssistant: subMode:', options.subMode);
+    
+    // Extract userId from options or use a default
+    const userId = options.userId || options.conversationId || 'default-user';
+    
+    // Call processMessage with the proper parameters
+    return this.processMessage(message, userId, options);
+  }
+
+  /**
    * Process a message with expertise-aware adaptations
    */
   async processMessage(message, userId, options = {}) {
     const startTime = Date.now();
+    console.log('🎯 CMOAssistant.processMessage called with:', {
+      message: message.substring(0, 50),
+      userId,
+      optionKeys: Object.keys(options),
+      options: JSON.stringify(options, null, 2)
+    });
     
     try {
+      // Check if this is a field assistance request
+      console.log('🗒️ Checking for field assistance:', {
+        subMode: options.subMode,
+        hasFieldContext: !!options.fieldContext,
+        fieldContext: options.fieldContext
+      });
+      
+      if (options.subMode === 'field_assistance' && options.fieldContext) {
+        console.log('📝 Processing field assistance request');
+        return await this.handleFieldAssistance(message, userId, options);
+      }
+      
       // Get user expertise profile
       const expertise = await this.getUserExpertise(userId);
       
+      // Check conversation history to detect if we're in an ongoing conversation
+      const conversationHistory = options.conversationHistory || [];
+      let isOngoingConversation = false;
+      let previousChannel = null;
+      
+      if (conversationHistory.length > 0) {
+        // Check if previous messages were about direct mail
+        const recentMessages = conversationHistory.slice(-3); // Look at last 3 messages
+        for (const msg of recentMessages) {
+          const msgText = msg.content?.toLowerCase() || '';
+          if (msgText.includes('postcard') || msgText.includes('direct mail') || msgText.includes('mailer')) {
+            isOngoingConversation = true;
+            previousChannel = 'direct_mail';
+            console.log('🔍 CMOAssistant: Detected ongoing direct mail conversation');
+            break;
+          }
+        }
+      }
+      
       // Detect marketing context and topic
       const contextAnalysis = await this.contextDetector.detectMarketingContext(message);
-      const topic = contextAnalysis.primaryContext || options.topic || 'general';
-      const channel = this.expertiseProfiles.mapTopicToChannel(topic);
+      console.log('🔍 CMOAssistant: contextAnalysis result:', {
+        primaryContext: contextAnalysis.primaryContext,
+        confidence: contextAnalysis.confidence
+      });
+      
+      // If we're in an ongoing conversation, use the previous channel
+      const topic = isOngoingConversation ? previousChannel : (contextAnalysis.primaryContext || options.topic || 'general');
+      const channel = isOngoingConversation ? previousChannel : this.expertiseProfiles.mapTopicToChannel(topic);
+      console.log('🔍 CMOAssistant: Mapping result:', { topic, channel, isOngoingConversation });
+      
+      // Check if a specialized agent should handle this query
+      console.log('🔍 CMOAssistant: Checking for specialized agent routing...');
+      console.log('🔍 CMOAssistant: marketingAgentRouter available?', !!this.marketingAgentRouter);
+      console.log('🔍 CMOAssistant: marketingAgentRouter.route available?', typeof this.marketingAgentRouter?.route);
+      console.log('🔍 CMOAssistant: Detected channel for routing:', channel);
+      console.log('🔍 CMOAssistant: Detected topic for routing:', topic);
+      
+      const specializedAgentResponse = this.marketingAgentRouter 
+        ? await this.marketingAgentRouter.route(message, {
+            userId,
+            expertise: expertise?.level || 'beginner',
+            detectedChannel: channel, // Pass the detected channel for better routing
+            detectedTopic: topic, // Pass the detected topic
+            businessType: options.businessType,
+            campaignGoal: options.campaignGoal,
+            targetAudience: options.targetAudience,
+            budget: options.budget,
+            timeline: options.timeline,
+            userExpertise: expertise?.level,
+            conversationHistory: options.conversationHistory || [], // Pass conversation history
+            conversationId: options.conversationId
+          })
+        : null;
+      
+      console.log('🔍 CMOAssistant: specializedAgentResponse received:', !!specializedAgentResponse);
+      if (specializedAgentResponse) {
+        console.log('🔍 CMOAssistant: Response type:', specializedAgentResponse.type);
+        console.log('🔍 CMOAssistant: Response agent:', specializedAgentResponse.agent);
+        console.log('🔍 CMOAssistant: Has content:', !!specializedAgentResponse.content);
+        console.log('🔍 CMOAssistant: Content structure:', specializedAgentResponse.content ? Object.keys(specializedAgentResponse.content) : 'no content');
+        console.log('🔍 CMOAssistant: Content.text preview:', specializedAgentResponse.content?.text?.substring(0, 100) || 'no text');
+      } else {
+        console.log('❌ CMOAssistant: No specialized agent response, falling back to default');
+      }
+      
+      // If specialized agent handled it, adapt and return response
+      if (specializedAgentResponse) {
+        console.log('📬 Using specialized agent response');
+        console.log('📬 Specialized response structure:', Object.keys(specializedAgentResponse));
+        console.log('📬 Response content type:', typeof specializedAgentResponse.content);
+        console.log('📬 Has content.text:', !!specializedAgentResponse.content?.text);
+        
+        // Extract response text correctly based on the structure
+        let responseText;
+        if (specializedAgentResponse.content && typeof specializedAgentResponse.content === 'object') {
+          // Content is an object with text property
+          responseText = specializedAgentResponse.content.text;
+          console.log('📬 Extracted text from content.text:', responseText?.substring(0, 100) + '...');
+        } else if (typeof specializedAgentResponse.content === 'string') {
+          // Content is directly a string
+          responseText = specializedAgentResponse.content;
+          console.log('📬 Content is string:', responseText.substring(0, 100) + '...');
+        }
+        
+        // Check if we actually got text
+        if (!responseText || 
+            responseText === message || 
+            (typeof responseText === 'string' && responseText.trim().length < 10)) {
+          console.log('⚠️ CMOAssistant: Specialized agent returned empty/echo response');
+          console.log('⚠️ Response content:', specializedAgentResponse.content);
+          console.log('⚠️ Extracted responseText:', responseText);
+          console.log('⚠️ User message:', message);
+          console.log('⚠️ Falling back to default response generation');
+          // Fall through to default response generation
+        } else {
+          // Adapt the specialized response based on user expertise
+          const adaptedSpecializedResponse = await this.adaptSpecializedResponse(
+            specializedAgentResponse,
+            expertise,
+            { topic, channel }
+          );
+          
+          // Track the interaction
+          const duration = Date.now() - startTime;
+          await this.trackInteractionLearning(userId, {
+            message,
+            response: adaptedSpecializedResponse,
+            context: { ...enhancedContext, specializedAgent: true },
+            duration,
+            topic,
+            channel
+          });
+          
+          return adaptedSpecializedResponse;
+        }
+      }
       
       // Get topic-specific expertise
       const topicExpertise = await this.expertiseProfiles.getTopicExpertise(userId, topic);
@@ -113,6 +266,133 @@ class CMOAssistant {
       
       // Fallback to basic processing
       return this.processQuery(message, { userId, ...options });
+    }
+  }
+
+  /**
+   * Handle field assistance requests
+   */
+  async handleFieldAssistance(message, userId, options) {
+    const { fieldContext } = options;
+    console.log('📝 Field assistance context:', fieldContext);
+    
+    try {
+      // Build a specialized prompt for field assistance
+      const fieldPrompt = `
+        The user needs help filling out the "${fieldContext.fieldLabel}" field in a direct mail consultation form.
+        Field Type: ${fieldContext.fieldType}
+        ${fieldContext.fieldOptions ? `Available Options: ${fieldContext.fieldOptions.join(', ')}` : ''}
+        ${fieldContext.currentValue ? `Current Value: "${fieldContext.currentValue}"` : 'The field is currently empty.'}
+        Section: ${fieldContext.sectionContext?.sectionTitle || 'Direct Mail Campaign'}
+        
+        User's Question: ${message}
+        
+        Please provide helpful guidance and a specific suggestion for what to put in this field.
+        ${fieldContext.fieldType === 'select' ? 'Recommend one of the available options.' : ''}
+        ${fieldContext.fieldType === 'textarea' ? 'Provide a well-written example response.' : ''}
+        
+        Format your response to:
+        1. Explain what this field is asking for
+        2. Provide context on why it's important
+        3. Give a specific suggestion using this format: "I suggest using: [your suggestion here]"
+      `;
+      
+      // Get expertise-based response
+      const expertise = await this.getUserExpertise(userId);
+      const enhancedContext = {
+        ...options,
+        topic: 'directMail',
+        channel: 'directMail',
+        expertise: expertise?.level || 'beginner',
+        intent: 'field_assistance'
+      };
+      
+      // Generate response using the knowledge base
+      const response = await this.knowledgeBase.query(fieldPrompt, {
+        category: 'direct-mail',
+        maxResults: 3
+      });
+      
+      console.log('📚 Knowledge base response:', {
+        hasResponse: !!response,
+        responseKeys: response ? Object.keys(response) : null,
+        contentLength: response?.content?.length,
+        contentPreview: response?.content?.substring(0, 100)
+      });
+      
+      // Enhance the response
+      const enhancedResponse = await this.responseEnhancer.enhance(response, {
+        userLevel: expertise.level,
+        context: enhancedContext,
+        format: 'conversational'
+      });
+      
+      console.log('🎆 Enhanced response:', {
+        hasResponse: !!enhancedResponse,
+        responseKeys: enhancedResponse ? Object.keys(enhancedResponse) : null,
+        responseLength: enhancedResponse?.response?.length,
+        responsePreview: enhancedResponse?.response?.substring(0, 100)
+      });
+      
+      const fieldAssistanceResponse = {
+        response: enhancedResponse.response,
+        subMode: 'field_assistance',
+        confidence: 0.9,
+        metadata: {
+          fieldContext,
+          expertise: expertise.level,
+          sources: response.sources || []
+        }
+      };
+      
+      console.log('📝 Field assistance response:', {
+        hasResponse: !!fieldAssistanceResponse.response,
+        responseLength: fieldAssistanceResponse.response?.length,
+        responsePreview: fieldAssistanceResponse.response?.substring(0, 100)
+      });
+      
+      return fieldAssistanceResponse;
+      
+    } catch (error) {
+      console.error('Error handling field assistance:', error);
+      
+      // Fallback response with helpful guidance
+      let fallbackResponse = `I'll help you with the "${fieldContext.fieldLabel}" field.\n\n`;
+      
+      if (fieldContext.fieldType === 'select' && fieldContext.fieldOptions) {
+        fallbackResponse += `This field asks you to select the type of travel experiences your agency specializes in. Here's what each option typically means:\n\n`;
+        
+        // Provide guidance for common options
+        const optionGuidance = {
+          'Luxury Cruises': 'High-end ocean cruises with premium amenities, often targeting affluent travelers seeking comfort and exclusive experiences.',
+          'River Cruises': 'Intimate river journeys through destinations like Europe, Asia, or the Americas, appealing to cultural enthusiasts and mature travelers.',
+          'Adventure Travel': 'Active, experiential trips involving outdoor activities, perfect for younger demographics or active seniors seeking unique experiences.',
+          'Family Vacations': 'Multi-generational trips with activities for all ages, typically to resorts, theme parks, or family-friendly destinations.',
+          'All-Inclusive Resorts': 'Hassle-free vacation packages where everything is included, popular with couples and families seeking relaxation.',
+          'Guided Tours': 'Escorted group travel with planned itineraries, ideal for first-time international travelers or those wanting expert guidance.',
+          'Custom/FIT Travel': 'Fully Independent Travel - personalized itineraries tailored to individual preferences, for experienced travelers.',
+          'Corporate Travel': 'Business travel management, including meetings, incentives, conferences, and exhibitions (MICE).'
+        };
+        
+        fieldContext.fieldOptions.forEach(option => {
+          if (optionGuidance[option]) {
+            fallbackResponse += `• **${option}**: ${optionGuidance[option]}\n`;
+          }
+        });
+        
+        fallbackResponse += `\nI suggest using: "${fieldContext.fieldOptions[0]}" if you primarily work with ${fieldContext.fieldOptions[0].toLowerCase()}, or select the option that best matches your main business focus.`;
+      } else if (fieldContext.fieldType === 'textarea') {
+        fallbackResponse += `This field is asking for your business goals. Here's a suggested response you can customize:\n\n`;
+        fallbackResponse += `I suggest using: "Increase bookings by 25% over the next 12 months by targeting affluent travelers interested in unique experiences. Expand our client base in the luxury travel segment while maintaining strong relationships with existing customers through personalized service and exclusive offerings."`;
+      } else {
+        fallbackResponse += `Please provide specific information that reflects your business focus and objectives. Be clear and concise about what makes your travel agency unique.`;
+      }
+      
+      return {
+        response: fallbackResponse,
+        subMode: 'field_assistance',
+        confidence: 0.7
+      };
     }
   }
 
@@ -363,6 +643,123 @@ class CMOAssistant {
     } catch (error) {
       console.error('Error adapting response for expertise:', error);
       return baseResponse; // Return original response on error
+    }
+  }
+
+  /**
+   * Adapt specialized agent response based on user expertise
+   */
+  async adaptSpecializedResponse(agentResponse, expertise, context) {
+    try {
+      // Extract content and metadata
+      const { content, metadata } = agentResponse;
+      
+      // Create adapted response structure
+      const adaptedResponse = {
+        content: content.text,  // Changed from 'text' to 'content' for CMOChatHandler compatibility
+        type: agentResponse.type,
+        agent: agentResponse.agent,
+        format: 'adaptive',
+        confidence: content.confidence || 'medium',
+        adaptationSource: 'specialized_agent',
+        metadata: {
+          ...metadata,
+          adapted: true,
+          originalAgent: agentResponse.agent,
+          userExpertise: expertise?.level || 'beginner'
+        }
+      };
+      
+      // Adapt language complexity based on expertise
+      if (expertise && expertise.level !== 'advanced') {
+        adaptedResponse.content = await this.communicationAdapter.adaptMessage(
+          content.text,
+          expertise.preferences || {},
+          context
+        );
+      }
+      
+      // Add structured data for UI rendering
+      if (content.structured) {
+        adaptedResponse.structured = content.structured;
+        
+        // Simplify metrics for beginners
+        if (expertise?.level === 'beginner' && content.structured.metrics) {
+          adaptedResponse.structured.metrics = this.simplifyMetrics(content.structured.metrics);
+        }
+      }
+      
+      // Add citations with expertise-appropriate explanations
+      if (content.citations && content.citations.length > 0) {
+        adaptedResponse.citations = content.citations.map(citation => ({
+          ...citation,
+          explanation: this.getCitationExplanation(citation, expertise?.level)
+        }));
+      }
+      
+      // Add next steps based on expertise
+      adaptedResponse.quickActions = this.generateSpecializedQuickActions(
+        agentResponse.agent,
+        expertise?.level || 'beginner',
+        content.structured
+      );
+      
+      // Add follow-up suggestions
+      adaptedResponse.followUpSuggestions = this.generateFollowUpSuggestions(
+        agentResponse.agent,
+        content.structured,
+        expertise
+      );
+      
+      // Return in the format expected by CMOChatHandler
+      return {
+        content: adaptedResponse.content,
+        results: [],  // Specialized agents don't return search results
+        queryType: 'specialized',
+        intent: 'specialized_guidance',
+        suggestions: adaptedResponse.followUpSuggestions || [],
+        quickActions: adaptedResponse.quickActions || [],
+        confidence: adaptedResponse.confidence || content.confidence || 'medium',
+        metadata: adaptedResponse.metadata,
+        additionalContext: {
+          agent: agentResponse.agent,
+          structured: adaptedResponse.structured
+        },
+        // Include structured data that formatResponse can use
+        metrics: adaptedResponse.structured?.metrics,
+        benchmarks: adaptedResponse.structured?.benchmarks,
+        recommendations: adaptedResponse.structured?.recommendations,
+        examples: adaptedResponse.structured?.examples,
+        nextSteps: adaptedResponse.structured?.nextSteps
+      };
+      
+    } catch (error) {
+      console.error('Error adapting specialized response:', error);
+      // Return original response formatted for CMO system
+      // Handle both string and object content structures
+      let contentText;
+      if (agentResponse.content && typeof agentResponse.content === 'object') {
+        contentText = agentResponse.content.text || '';
+      } else if (typeof agentResponse.content === 'string') {
+        contentText = agentResponse.content;
+      } else {
+        contentText = 'I apologize, but I encountered an error processing your request.';
+      }
+      
+      return {
+        content: contentText,
+        results: [],
+        queryType: 'specialized',
+        intent: 'specialized_guidance',
+        suggestions: [],
+        quickActions: [],
+        confidence: agentResponse.metadata?.confidence || 'low',
+        metadata: agentResponse.metadata,
+        additionalContext: {
+          agent: agentResponse.agent,
+          error: error.message
+        }
+      };
     }
   }
 
@@ -1200,6 +1597,103 @@ class CMOAssistant {
       console.error('Error getting learning insights:', error);
       return { hasData: false };
     }
+  }
+
+  /**
+   * Simplify metrics for beginners
+   */
+  simplifyMetrics(metrics) {
+    const simplified = {};
+    
+    for (const [key, value] of Object.entries(metrics)) {
+      // Convert technical metric names to user-friendly ones
+      const friendlyKey = key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^expected/, 'Expected')
+        .replace(/ROI/g, 'Return on Investment')
+        .trim();
+      
+      // Add explanations for complex metrics
+      if (key.includes('Response') || key.includes('Rate')) {
+        simplified[friendlyKey] = {
+          value: value,
+          explanation: 'Industry benchmark for similar campaigns'
+        };
+      } else {
+        simplified[friendlyKey] = value;
+      }
+    }
+    
+    return simplified;
+  }
+
+  /**
+   * Get citation explanation based on expertise level
+   */
+  getCitationExplanation(citation, expertiseLevel) {
+    if (expertiseLevel === 'beginner') {
+      return `This information comes from our ${citation.source.replace('.md', '').replace(/-/g, ' ')} guide`;
+    } else if (expertiseLevel === 'intermediate') {
+      return `Source: ${citation.section || 'General guidance'}`;
+    } else {
+      return citation.snippet;
+    }
+  }
+
+  /**
+   * Generate quick actions for specialized agent responses
+   */
+  generateSpecializedQuickActions(agentType, expertiseLevel, structuredData) {
+    const actions = [];
+    
+    if (agentType === 'direct_mail') {
+      if (expertiseLevel === 'beginner') {
+        actions.push(
+          { label: 'Download Campaign Checklist', action: 'download_checklist', data: { type: 'direct_mail' } },
+          { label: 'Calculate My Budget', action: 'budget_calculator', data: { campaign: 'direct_mail' } },
+          { label: 'Find Print Vendors', action: 'vendor_search', data: { type: 'printing' } }
+        );
+      } else {
+        actions.push(
+          { label: 'A/B Test Calculator', action: 'ab_test_calc', data: { type: 'direct_mail' } },
+          { label: 'ROI Predictor', action: 'roi_predict', data: structuredData?.metrics },
+          { label: 'Export Campaign Brief', action: 'export_brief', data: structuredData }
+        );
+      }
+    }
+    
+    // Add more agent-specific actions for SEO, PPC, Meta Ads
+    
+    return actions;
+  }
+
+  /**
+   * Generate follow-up suggestions based on agent response
+   */
+  generateFollowUpSuggestions(agentType, structuredData, expertise) {
+    const suggestions = [];
+    
+    if (agentType === 'direct_mail') {
+      if (structuredData?.recommendations) {
+        suggestions.push('Tell me more about the first recommendation');
+      }
+      
+      if (expertise?.level === 'beginner') {
+        suggestions.push(
+          'What\'s the difference between postcards and letters?',
+          'How do I build a mailing list?',
+          'What\'s a typical budget for my first campaign?'
+        );
+      } else {
+        suggestions.push(
+          'How can I improve response rates?',
+          'What are the latest USPS regulations?',
+          'Show me examples of high-converting offers'
+        );
+      }
+    }
+    
+    return suggestions;
   }
 }
 

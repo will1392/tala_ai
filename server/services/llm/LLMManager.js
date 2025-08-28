@@ -5,9 +5,9 @@
  * Handles service selection, load balancing, fallbacks, and cost tracking.
  */
 
-import OpenAIService from './OpenAIService.js';
-import AnthropicService from './AnthropicService.js';
-import GoogleService from './GoogleService.js';
+import OpenAIService from './providers/OpenAIService.js';
+import AnthropicService from './providers/AnthropicService.js';
+import GoogleService from './providers/GeminiService.js';
 import GrokService from './GrokService.js';
 import MockLLMService from './providers/MockLLMService.js';
 

@@ -349,7 +349,7 @@ export function PremiumDashboard() {
   const [progress, setProgress] = useState(0)
   const [notifications, setNotifications] = useState(5)
   const [activeTab, setActiveTab] = useState("home")
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({})
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
@@ -372,20 +372,36 @@ export function PremiumDashboard() {
       
       try {
         if (process.env.NODE_ENV === 'development') {
-          // Check if user profile exists
-          const storedProfile = localStorage.getItem('tala_user_profile')
-          const profileCompleted = localStorage.getItem('tala_user_profile_completed')
-          const expertiseCompleted = localStorage.getItem('tala_expertise_completed')
+          // Check if onboarding is fully completed
+          const onboardingCompleted = localStorage.getItem('tala_onboarding_completed')
           
-          if (storedProfile) {
-            setUserProfile(JSON.parse(storedProfile))
-          }
-          
-          // Check if we need to show onboarding
-          if (!profileCompleted) {
-            setShowUserProfileOnboarding(true)
-          } else if (!expertiseCompleted) {
-            setShowExpertiseOnboarding(true)
+          // If onboarding is fully done, don't show any modals
+          if (onboardingCompleted === 'true') {
+            setShowUserProfileOnboarding(false)
+            setShowExpertiseOnboarding(false)
+            setShowCompletionScreen(false)
+            
+            // Load profile if it exists
+            const storedProfile = localStorage.getItem('tala_user_profile')
+            if (storedProfile) {
+              setUserProfile(JSON.parse(storedProfile))
+            }
+          } else {
+            // Check individual onboarding steps
+            const storedProfile = localStorage.getItem('tala_user_profile')
+            const profileCompleted = localStorage.getItem('tala_user_profile_completed')
+            const expertiseCompleted = localStorage.getItem('tala_expertise_completed')
+            
+            if (storedProfile) {
+              setUserProfile(JSON.parse(storedProfile))
+            }
+            
+            // Check if we need to show onboarding
+            if (!profileCompleted) {
+              setShowUserProfileOnboarding(true)
+            } else if (!expertiseCompleted) {
+              setShowExpertiseOnboarding(true)
+            }
           }
         }
         setHasCheckedOnboarding(true)
@@ -427,6 +443,15 @@ export function PremiumDashboard() {
 
   const handleOnboardingComplete = () => {
     setShowCompletionScreen(false)
+    setShowUserProfileOnboarding(false)
+    setShowExpertiseOnboarding(false)
+    
+    // Mark onboarding as complete in localStorage
+    if (process.env.NODE_ENV === 'development') {
+      localStorage.setItem('tala_user_profile_completed', 'true')
+      localStorage.setItem('tala_expertise_completed', 'true')
+      localStorage.setItem('tala_onboarding_completed', 'true')
+    }
   }
 
   const handleSkipOnboarding = () => {
@@ -474,89 +499,9 @@ export function PremiumDashboard() {
         )}
       </AnimatePresence>
 
-      <div className="relative min-h-screen overflow-hidden bg-background">
-      {/* Animated gradient background */}
-      <motion.div
-        className="absolute inset-0 -z-10 opacity-20"
-        animate={{
-          background: [
-            "radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.5) 0%, rgba(59, 130, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
-            "radial-gradient(circle at 30% 70%, rgba(236, 72, 153, 0.5) 0%, rgba(139, 92, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
-            "radial-gradient(circle at 70% 30%, rgba(34, 197, 94, 0.5) 0%, rgba(59, 130, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
-            "radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.5) 0%, rgba(59, 130, 246, 0.5) 50%, rgba(0, 0, 0, 0) 100%)",
-          ],
-        }}
-        transition={{ duration: 30, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-      />
-
-      {/* Mobile menu overlay */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setMobileMenuOpen(false)} />
-      )}
-
-      {/* Sidebar - Mobile */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 transform bg-background transition-transform duration-300 ease-in-out md:hidden",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <SidebarContent
-          expandedItems={expandedItems}
-          toggleExpanded={toggleExpanded}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          userProfile={userProfile}
-          onClose={() => setMobileMenuOpen(false)}
-        />
-      </div>
-
-      {/* Sidebar - Desktop */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-30 hidden w-64 transform border-r bg-background transition-transform duration-300 ease-in-out md:block",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
-        <SidebarContent
-          expandedItems={expandedItems}
-          toggleExpanded={toggleExpanded}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          userProfile={userProfile}
-        />
-      </div>
-
-      {/* Main Content */}
-      <div className={cn("min-h-screen transition-all duration-300 ease-in-out", sidebarOpen ? "md:pl-64" : "md:pl-0")}>
-        <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileMenuOpen(true)}>
-            <Menu className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => setSidebarOpen(!sidebarOpen)}>
-            <PanelLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex flex-1 items-center justify-between">
-            <h1 className="text-xl font-semibold">Tala Marketing Suite</h1>
-            <div className="flex items-center gap-3">
-              <GlobalSearch />
-              <Button variant="ghost" size="icon" className="rounded-2xl relative">
-                <Bell className="h-5 w-5" />
-                {notifications > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                    {notifications}
-                  </span>
-                )}
-              </Button>
-
-              <Avatar className="h-9 w-9 border-2 border-primary">
-                <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 md:p-6">
+      <div className="w-full">
+        {/* Main Content - removed duplicate layout wrapper since PremiumLayout provides it */}
+        <main className="flex-1">
           <Tabs defaultValue="home" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               {activeTab === "completed" ? (
@@ -630,7 +575,6 @@ export function PremiumDashboard() {
           </Tabs>
         </main>
       </div>
-    </div>
     </>
   )
 }

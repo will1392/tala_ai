@@ -39,14 +39,14 @@ import { getAuthConfig } from './config/auth.js';
 import { ConversationService } from './services/db/conversationService.js';
 import { DocumentService } from './services/db/documentService.js';
 import { FolderService } from './services/db/folderService.js';
-import QdrantOptimizer from './services/QdrantOptimizer.js';
+// import QdrantOptimizer from './services/QdrantOptimizer.js'; // Commented out - file doesn't exist
 
 // Import credits middleware
 import creditsMiddleware from './middleware/creditsMiddleware.js';
 const { requireCredits, getCreditsStatus, purchaseCredits, getCreditPackages, upgradeTier, getTransactionHistory } = creditsMiddleware;
 
-// Load environment variables from parent directory
-dotenv.config({ path: path.join(dirname(fileURLToPath(import.meta.url)), '../.env') });
+// Load environment variables from server directory
+dotenv.config({ path: path.join(dirname(fileURLToPath(import.meta.url)), '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -848,6 +848,26 @@ app.use('/api/cmo/feedback', cmoFeedbackRoutes);
 // CMO Analysis routes
 import cmoAnalysisRoutes from './routes/api/cmo-analysis.js';
 app.use('/api/cmo/analysis', cmoAnalysisRoutes);
+
+// Marketing Profile routes
+import marketingProfileRoutes from './routes/marketingProfile.js';
+app.use('/api/marketing-profile', marketingProfileRoutes);
+console.log('✅ Marketing profile routes mounted at /api/marketing-profile');
+
+// Agent Debug routes (development only)
+import agentDebugRoutes from './routes/agentDebug.js';
+app.use('/api/agent', agentDebugRoutes);
+console.log('✅ Agent debug routes mounted at /api/agent');
+
+// Direct Mail V2 Test routes
+import directMailV2Routes from './routes/directmail-v2.js';
+app.use('/api/directmail-v2', directMailV2Routes);
+console.log('✅ DirectMail V2 test routes mounted at /api/directmail-v2');
+
+// Direct Mail Campaigns routes
+import directMailCampaigns from './routes/directMailCampaigns.js';
+app.use('/api/direct-mail-campaigns', directMailCampaigns);
+console.log('✅ Direct Mail Campaigns routes mounted at /api/direct-mail-campaigns');
 
 // Database-backed Chat Routes (v2) - DISABLED: Using intelligent chat v2 instead
 // import chatV2Routes from './routes/api/chat-v2.js';

@@ -87,17 +87,19 @@
   },
   "directMail": {
     "keywords": [
-      "direct mail", "postcard", "letter", "flyer", "brochure",
-      "catalog", "mail piece", "postal", "usps", "address",
-      "mailing list", "print", "design", "paper", "envelope",
-      "qr code", "purl", "response rate", "mail merge"
+      "direct mail", "postcard", "postcards", "letter", "flyer", "brochure",
+      "catalog", "mail piece", "postal", "usps", "address", "mailer",
+      "mailing list", "print", "design", "paper", "envelope", "mail",
+      "qr code", "purl", "response rate", "mail merge", "mailing"
     ],
     "phrases": [
+      "postcard campaign", "postcard marketing", "help with postcard",
       "direct mail campaign", "direct mail marketing", "postal marketing",
       "print marketing", "physical mail", "mail design", "variable data printing",
       "every door direct mail", "targeted mailing", "mail tracking",
       "response tracking", "cost per piece", "mail house", "list hygiene",
-      "ncoa update", "cass certification", "postal regulations"
+      "ncoa update", "cass certification", "postal regulations",
+      "send postcards", "create postcard", "design postcard"
     ],
     "entities": [
       "usps", "fedex", "ups", "vistaprint", "moo", "printful",

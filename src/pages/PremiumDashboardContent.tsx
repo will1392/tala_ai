@@ -84,20 +84,26 @@ export function PremiumDashboardContent() {
     setOnboardingStep(null)
   }
 
+  // Function to skip onboarding
+  const handleSkipOnboarding = () => {
+    localStorage.setItem("hasCompletedOnboarding", "true")
+    setOnboardingStep(null)
+  }
+
   // Show onboarding if needed
   if (onboardingStep === "user") {
-    return <UserProfileOnboarding onComplete={handleUserProfileComplete} />
+    return <UserProfileOnboarding onComplete={handleUserProfileComplete} onSkip={handleSkipOnboarding} />
   }
 
   if (onboardingStep === "expertise") {
-    return <ExpertiseOnboarding userProfile={userProfile!} onComplete={handleExpertiseComplete} />
+    return <ExpertiseOnboarding onComplete={handleExpertiseComplete} onSkip={handleSkipOnboarding} />
   }
 
   if (onboardingStep === "complete") {
     return (
       <OnboardingComplete
-        userProfile={userProfile!}
-        expertiseProfile={expertiseProfile!}
+        userProfile={userProfile}
+        expertiseProfile={expertiseProfile}
         onComplete={handleOnboardingComplete}
       />
     )
