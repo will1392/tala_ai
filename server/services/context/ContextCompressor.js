@@ -49,7 +49,7 @@ export class ContextCompressor {
       await this.summaryGenerator.initialize();
       
       // Initialize tokenizers for common models
-      const models = ['gpt-4', 'gpt-3.5-turbo', 'gpt-4-turbo'];
+      const models = ['gpt-4', 'gpt-4o-mini', 'gpt-4-turbo'];
       for (const model of models) {
         try {
           this.tokenizers.set(model, encoding_for_model(model));

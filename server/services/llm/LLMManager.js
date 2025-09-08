@@ -50,8 +50,8 @@ class LLMManager {
     // Test each provider's default model
     for (const [provider, models] of Object.entries({
       [LLM_PROVIDERS.OPENAI]: ['gpt-4o-mini', 'text-embedding-3-small'],
-      [LLM_PROVIDERS.ANTHROPIC]: ['claude-3-5-sonnet-20241022'],
-      [LLM_PROVIDERS.GOOGLE]: ['gemini-1.5-flash'],
+      [LLM_PROVIDERS.ANTHROPIC]: ['claude-sonnet-4-20250514'],
+      [LLM_PROVIDERS.GOOGLE]: ['gemini-2.5-flash'],
       [LLM_PROVIDERS.GROK]: ['grok-beta']
     })) {
       for (const modelId of models) {
@@ -280,7 +280,7 @@ class LLMManager {
    */
   selectFastestModel(models) {
     // Prioritize models known for speed
-    const speedPriority = ['gemini-1.5-flash', 'gpt-4o-mini', 'claude-3-5-haiku-20241022'];
+    const speedPriority = ['gemini-2.5-flash', 'gpt-4o-mini', 'claude-sonnet-4-20250514'];
     
     for (const fastModel of speedPriority) {
       if (models.includes(fastModel)) {

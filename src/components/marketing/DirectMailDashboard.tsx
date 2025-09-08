@@ -23,7 +23,8 @@ import {
   TrendingUp,
   Users,
   Package,
-  Filter
+  Filter,
+  Sparkles
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -32,6 +33,7 @@ import { Badge } from '../shared/Badge';
 import { Select } from '../ui/Select';
 import { useToast } from '../toast/ToastProvider';
 import { DirectMailConsultation } from './DirectMailConsultation';
+import { PostcardAnalysisModal } from './PostcardAnalysisModal';
 import type { MarketingProfile } from '../../types/marketing';
 
 interface Campaign {
@@ -50,6 +52,7 @@ interface Campaign {
     completedSections?: number;
     totalSections?: number;
   };
+  analysis?: any; // Stored postcard analysis
 }
 
 interface DirectMailDashboardProps {
@@ -65,6 +68,11 @@ export function DirectMailDashboard({ brandId, profile }: DirectMailDashboardPro
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'status'>('date');
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+  const [analysisModalData, setAnalysisModalData] = useState<{
+    campaign: Campaign;
+    isGenerating: boolean;
+  } | null>(null);
   const { push: pushToast } = useToast();
 
   // Load campaigns on mount
@@ -134,6 +142,48 @@ export function DirectMailDashboard({ brandId, profile }: DirectMailDashboardPro
   const handleEditCampaign = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setView('edit');
+  };
+
+  const handleSendToTala = async (campaign: Campaign) => {
+    // Open the analysis modal
+    setAnalysisModalData({ campaign, isGenerating: true });
+    setIsAnalysisModalOpen(true);
+  };
+
+  const handleViewAnalysis = (campaign: Campaign) => {
+    // Open the modal with existing analysis
+    setAnalysisModalData({ campaign, isGenerating: false });
+    setIsAnalysisModalOpen(true);
+  };
+
+  const handleSaveAnalysis = async (analysisData: any) => {
+    if (!analysisModalData?.campaign) return;
+    
+    try {
+      // Update the campaign with the analysis
+      const response = await fetch(`/api/direct-mail-campaigns/${analysisModalData.campaign.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': brandId
+        },
+        body: JSON.stringify({
+          ...analysisModalData.campaign,
+          analysis: analysisData
+        })
+      });
+
+      if (response.ok) {
+        pushToast({
+          kind: 'success',
+          message: 'Analysis saved to campaign'
+        });
+        // Reload campaigns to show updated data
+        loadCampaigns();
+      }
+    } catch (error) {
+      console.error('Failed to save analysis:', error);
+    }
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
@@ -481,6 +531,31 @@ export function DirectMailDashboard({ brandId, profile }: DirectMailDashboardPro
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
+                    {campaign.analysis ? (
+                      <Button
+                        onClick={() => handleViewAnalysis(campaign)}
+                        variant="primary"
+                        size="sm"
+                        title="View postcard analysis"
+                        className="gap-1"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View Analysis
+                      </Button>
+                    ) : (
+                      (campaign.status === 'consultation_complete' || campaign.status === 'draft') && (
+                        <Button
+                          onClick={() => handleSendToTala(campaign)}
+                          variant="primary"
+                          size="sm"
+                          title="Generate AI postcard analysis"
+                          className="gap-1"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          Generate Analysis
+                        </Button>
+                      )
+                    )}
                     <Button
                       onClick={() => handleEditCampaign(campaign)}
                       variant="ghost"
@@ -512,6 +587,22 @@ export function DirectMailDashboard({ brandId, profile }: DirectMailDashboardPro
             );
           })}
         </div>
+      )}
+
+      {/* Postcard Analysis Modal */}
+      {analysisModalData && (
+        <PostcardAnalysisModal
+          isOpen={isAnalysisModalOpen}
+          onClose={() => {
+            setIsAnalysisModalOpen(false);
+            setAnalysisModalData(null);
+          }}
+          campaignId={analysisModalData.campaign.id}
+          campaignName={analysisModalData.campaign.name}
+          consultationData={analysisModalData.campaign}
+          brandId={brandId}
+          onSave={handleSaveAnalysis}
+        />
       )}
     </div>
   );

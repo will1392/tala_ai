@@ -1,15 +1,1 @@
-{}  "admin-1": {
-    "taskHistory": [
-      {
-        "taskType": "general",
-        "complexity": 0.2,
-        "timestamp": "2025-08-13T01:47:09.035Z",
-        "success": true
-      }
-    ],
-    "preferredAgents": {},
-    "averageComplexity": 0,
-    "interactionTimes": [],
-    "feedbackHistory": []
-  }
-}
+{}

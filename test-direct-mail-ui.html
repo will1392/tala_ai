@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Direct Mail Campaign Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    .secondary {
+      background: #6b7280;
+    }
+    .secondary:hover {
+      background: #4b5563;
+    }
+    .success {
+      background: #10b981;
+    }
+    .campaign {
+      border: 1px solid #e5e7eb;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 6px;
+      background: #f9fafb;
+    }
+    .campaign h3 {
+      margin: 0 0 10px 0;
+      color: #1f2937;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+    .complete {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .incomplete {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    #log {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 14px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .log-entry {
+      margin: 2px 0;
+    }
+    .error { color: #f87171; }
+    .success { color: #34d399; }
+    .info { color: #60a5fa; }
+  </style>
+</head>
+<body>
+  <h1>Direct Mail Campaign Test</h1>
+  
+  <div class="card">
+    <h2>Test Actions</h2>
+    <button onclick="createCampaign('Test Louis')">Create "Test Louis" Campaign</button>
+    <button onclick="createCampaign('Test Sam')">Create "Test Sam" Campaign</button>
+    <button onclick="loadCampaigns()">Refresh Campaigns</button>
+    <button onclick="clearLog()" class="secondary">Clear Log</button>
+  </div>
+  
+  <div class="card">
+    <h2>Campaigns</h2>
+    <div id="campaigns">Loading...</div>
+  </div>
+  
+  <div class="card">
+    <h2>Debug Log</h2>
+    <div id="log"></div>
+  </div>
+  
+  <script>
+    const API_BASE = 'http://localhost:3001/api';
+    const USER_ID = 'test-brand-1';
+    
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+      log('Log cleared', 'info');
+    }
+    
+    async function createCampaign(name) {
+      log(`Creating campaign: "${name}"...`, 'info');
+      
+      const campaign = {
+        name: name,
+        type: 'direct_mail',
+        status: 'consultation_complete',
+        brandId: USER_ID,
+        sections: {
+          business_objectives: {
+            completed: true,
+            responses: {
+              travel_specialty: 'Luxury Cruises',
+              business_goals: 'Test campaign for ' + name
+            }
+          }
+        },
+        responses: {
+          travel_specialty: 'Luxury Cruises',
+          business_goals: 'Test campaign for ' + name,
+          mail_volume: '1000',
+          campaign_budget: '$5000'
+        },
+        metadata: {
+          mailVolume: '1000',
+          budget: '$5000',
+          targetAudience: 'Test audience',
+          completedSections: Math.random() > 0.5 ? 8 : 3, // Random completeness
+          totalSections: 8
+        }
+      };
+      
+      try {
+        const response = await fetch(`${API_BASE}/direct-mail-campaigns`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': USER_ID
+          },
+          body: JSON.stringify(campaign)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          log(`✓ Campaign "${name}" created successfully! ID: ${data.campaign.id}`, 'success');
+          await loadCampaigns();
+        } else {
+          log(`✗ Failed to create campaign: ${data.error}`, 'error');
+        }
+      } catch (error) {
+        log(`✗ Error creating campaign: ${error.message}`, 'error');
+      }
+    }
+    
+    async function loadCampaigns() {
+      log('Loading campaigns...', 'info');
+      
+      try {
+        const response = await fetch(`${API_BASE}/direct-mail-campaigns?t=${Date.now()}`, {
+          headers: {
+            'x-user-id': USER_ID,
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          log(`✓ Loaded ${data.campaigns.length} campaigns`, 'success');
+          displayCampaigns(data.campaigns);
+        } else {
+          log(`✗ Failed to load campaigns: ${data.error}`, 'error');
+        }
+      } catch (error) {
+        log(`✗ Error loading campaigns: ${error.message}`, 'error');
+      }
+    }
+    
+    function displayCampaigns(campaigns) {
+      const container = document.getElementById('campaigns');
+      
+      if (campaigns.length === 0) {
+        container.innerHTML = '<p>No campaigns found</p>';
+        return;
+      }
+      
+      container.innerHTML = campaigns.map(campaign => `
+        <div class="campaign">
+          <h3>${campaign.name}</h3>
+          <div>
+            <span class="badge">ID: ${campaign.id}</span>
+            <span class="badge ${campaign.status === 'consultation_complete' ? 'complete' : ''}">${campaign.status}</span>
+            ${campaign.metadata?.completedSections ? `
+              <span class="badge ${campaign.metadata.completedSections === campaign.metadata.totalSections ? 'complete' : 'incomplete'}">
+                ${campaign.metadata.completedSections}/${campaign.metadata.totalSections} sections
+                ${campaign.metadata.completedSections < campaign.metadata.totalSections ? ' (incomplete)' : ''}
+              </span>
+            ` : ''}
+            <span class="badge">Created: ${new Date(campaign.created_at).toLocaleString()}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // Load campaigns on page load
+    loadCampaigns();
+  </script>
+</body>
+</html>

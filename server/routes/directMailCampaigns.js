@@ -192,6 +192,47 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * POST /api/direct-mail-campaigns/:campaignId/analysis
+ * Save postcard analysis to a campaign
+ */
+router.post('/:campaignId/analysis', async (req, res) => {
+  try {
+    const { campaignId } = req.params;
+    const userId = req.headers['x-user-id'] || 'anonymous';
+    const analysisData = req.body;
+    
+    console.log('💾 [DirectMail API] Saving analysis for campaign:', campaignId);
+    
+    // Get existing campaign
+    const campaign = await getFallbackCampaign(campaignId, userId);
+    
+    if (!campaign) {
+      return res.status(404).json({
+        success: false,
+        error: 'Campaign not found or unauthorized'
+      });
+    }
+    
+    // Update campaign with analysis
+    const updatedCampaign = await updateFallbackCampaign(campaignId, userId, {
+      analysis: analysisData
+    });
+    
+    return res.json({
+      success: true,
+      campaign: updatedCampaign
+    });
+    
+  } catch (error) {
+    console.error('❌ Error saving analysis:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save analysis'
+    });
+  }
+});
+
+/**
  * PUT /api/direct-mail-campaigns/:campaignId
  * Update a campaign
  */
@@ -228,9 +269,18 @@ router.put('/:campaignId', async (req, res) => {
       });
     } else {
       // Fallback update
-      return res.json({
-        success: true,
-        campaign: { id: campaignId, ...updates }
+      const updated = await updateFallbackCampaign(campaignId, userId, updates);
+      
+      if (updated) {
+        return res.json({
+          success: true,
+          campaign: updated
+        });
+      }
+      
+      return res.status(404).json({
+        success: false,
+        error: 'Campaign not found or unauthorized'
       });
     }
     
@@ -458,6 +508,62 @@ async function getFallbackCampaigns(userId) {
   return userCampaigns.sort((a, b) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+}
+
+async function updateFallbackCampaign(campaignId, userId, updates) {
+  console.log('📝 [DirectMail API] Updating campaign:', campaignId);
+  
+  // Update in memory
+  const userCampaigns = campaignStorage.get(userId) || [];
+  const campaignIndex = userCampaigns.findIndex(c => c.id === campaignId);
+  
+  if (campaignIndex === -1) {
+    // Try loading from file
+    const campaign = await getFallbackCampaign(campaignId, userId);
+    if (!campaign) return null;
+    
+    // Add to memory cache
+    userCampaigns.push(campaign);
+    campaignStorage.set(userId, userCampaigns);
+  }
+  
+  // Update the campaign
+  const updatedCampaign = {
+    ...userCampaigns[campaignIndex >= 0 ? campaignIndex : userCampaigns.length - 1],
+    ...updates,
+    updated_at: new Date().toISOString()
+  };
+  
+  // Save to memory
+  if (campaignIndex >= 0) {
+    userCampaigns[campaignIndex] = updatedCampaign;
+  } else {
+    userCampaigns[userCampaigns.length - 1] = updatedCampaign;
+  }
+  campaignStorage.set(userId, userCampaigns);
+  
+  // Persist to file
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const { dirname } = await import('path');
+    
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    
+    const dataDir = path.join(__dirname, '..', 'data', 'campaigns');
+    await fs.mkdir(dataDir, { recursive: true });
+    
+    const filePath = path.join(dataDir, `${campaignId}.json`);
+    await fs.writeFile(filePath, JSON.stringify(updatedCampaign, null, 2));
+    
+    console.log('💾 [DirectMail API] Campaign updated and persisted:', filePath);
+  } catch (err) {
+    console.error('[DirectMail API] Failed to persist update to file:', err);
+  }
+  
+  return updatedCampaign;
 }
 
 async function deleteFallbackCampaign(campaignId, userId) {

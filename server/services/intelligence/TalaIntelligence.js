@@ -503,6 +503,14 @@ export class TalaIntelligence {
             
             console.log(`💬 Conversation history available: ${conversationHistory.length} messages`);
             
+            console.log('🔍 CMO Request data:', {
+              hasData: !!request.data,
+              dataKeys: request.data ? Object.keys(request.data) : [],
+              subMode: request.data?.subMode,
+              hasFieldContext: !!request.data?.fieldContext,
+              fieldContext: request.data?.fieldContext
+            });
+            
             const cmoResponse = await this.cmoAssistant.processQuery(request.content, {
               conversationId: request.conversationId,
               userId: request.userId,
@@ -546,7 +554,24 @@ export class TalaIntelligence {
             console.error('❌ Error processing CMO request:', error.message);
             console.error('❌ Full error details:', error);
             console.error('❌ Stack trace:', error.stack);
-            // Fall through to default processing
+            
+            // Special handling for field assistance errors - don't fall through to LLM
+            if (request.data?.subMode === 'field_assistance' || request.data?.fieldContext) {
+              const fieldContext = request.data?.fieldContext;
+              return {
+                result: {
+                  response: this.getFieldAssistanceFallback(fieldContext, request.content),
+                  mode: 'cmo',
+                  subMode: 'field_assistance'
+                },
+                metadata: {
+                  source: 'field_assistance_error_handler',
+                  error: error.message,
+                  processingTime: Date.now() - cmoStartTime
+                }
+              };
+            }
+            // Fall through to default processing for non-field-assistance
           }
         }
         // Check if we have knowledge base context in the request
@@ -794,6 +819,30 @@ Current marketing focus: ${subMode === 'seo' ? 'SEO optimization' :
         
         // Check if this is CMO mode for proper fallback
         if (request.data?.mode === 'cmo') {
+          // Special handling for field assistance - provide simple fallback
+          if (request.data?.subMode === 'field_assistance' || request.data?.fieldContext) {
+            const fieldContext = request.data?.fieldContext;
+            return {
+              result: {
+                response: `I'm having trouble accessing my field assistance feature right now.\n\n` +
+                         `For the "${fieldContext?.fieldLabel || 'field'}" you're asking about:\n\n` +
+                         `Think about what makes the most sense for your business. ` +
+                         `There's no wrong answer - just put what feels right to you.\n\n` +
+                         `If you're stuck, try describing it in your own words first, then refine from there.`,
+                type: 'field-assistance-fallback'
+              },
+              metadata: {
+                strategy: 'field-assistance',
+                error: error.message,
+                fallback: true,
+                mode: 'cmo',
+                subMode: 'field_assistance',
+                timestamp: new Date()
+              }
+            };
+          }
+          
+          // Generic CMO fallback (only for non-field-assistance)
           const cleanMessage = request.content.replace(/Marketing Context:.*$/s, '').replace(/Marketing Question:.*$/s, '').trim();
           return {
             result: {
@@ -890,16 +939,30 @@ Would you like specific templates or a step-by-step implementation plan?`,
   async enhanceResponse(agentResponse, context, userProfile) {
     let enhancedContent = agentResponse.result;
     
-    // Handle direct-response format
-    if (enhancedContent && typeof enhancedContent === 'object' && enhancedContent.response) {
-      enhancedContent = enhancedContent.response;
-    }
-    
-    // For CMO responses, we should already have the text
-    // Double-check that we have a string, not the full result object
-    if (enhancedContent && typeof enhancedContent === 'object' && agentResponse.metadata?.source === 'cmo_assistant') {
-      console.log('⚠️ CMO response still an object in enhanceResponse, extracting text');
-      enhancedContent = enhancedContent.response || enhancedContent.content || JSON.stringify(enhancedContent);
+    // Handle direct-response format - extract text FIRST before any other processing
+    if (enhancedContent && typeof enhancedContent === 'object') {
+      // Try various properties where the text might be
+      if (enhancedContent.response && typeof enhancedContent.response === 'string') {
+        enhancedContent = enhancedContent.response;
+      } else if (enhancedContent.content && typeof enhancedContent.content === 'string') {
+        enhancedContent = enhancedContent.content;
+      } else if (enhancedContent.text && typeof enhancedContent.text === 'string') {
+        enhancedContent = enhancedContent.text;
+      } else if (agentResponse.metadata?.source === 'cmo_assistant') {
+        // For CMO responses, ensure we extract just the text
+        console.log('⚠️ CMO response is an object in enhanceResponse, extracting text');
+        console.log('⚠️ Object keys:', Object.keys(enhancedContent));
+        console.log('⚠️ Full object:', enhancedContent);
+        
+        // If all else fails, check if it's our structured result object
+        if (enhancedContent.mode === 'cmo' && 'response' in enhancedContent) {
+          enhancedContent = enhancedContent.response || '';
+        } else {
+          // Last resort fallback
+          console.error('⚠️ Unable to extract text from CMO response object');
+          enhancedContent = 'I apologize, but there was an issue formatting my response. Please try asking your question again.';
+        }
+      }
     }
     
     // Apply user preferences
@@ -1480,7 +1543,9 @@ Would you like specific templates or a step-by-step implementation plan?`,
       case 'markdown':
         return this.formatAsMarkdown(content);
       case 'plain':
-        return typeof content === 'object' ? JSON.stringify(content, null, 2) : content;
+        // Don't stringify objects for plain format - just return the content as is
+        // The extraction should have already happened in enhanceResponse
+        return content;
       default:
         return content;
     }
@@ -1735,6 +1800,21 @@ Would you like specific templates or a step-by-step implementation plan?`,
         taskAnalysis.requiresMultipleDomains ? 'multi-domain requirements' : 'high complexity'
       }`;
     }
+  }
+  
+  /**
+   * Generate field assistance fallback
+   */
+  getFieldAssistanceFallback(fieldContext, message) {
+    if (!fieldContext) {
+      return `I can help you with this field! Just describe what you're trying to accomplish and I'll guide you through it.`;
+    }
+    
+    const { fieldLabel } = fieldContext;
+    return `Let me help you with the "${fieldLabel}" field.\n\n` +
+           `Think about what feels right for your business. There's no wrong answer here!\n\n` +
+           `Just describe in your own words what you'd like to put, and we can refine it together.\n\n` +
+           `What matters most is that it represents YOUR business accurately.`;
   }
   
   /**

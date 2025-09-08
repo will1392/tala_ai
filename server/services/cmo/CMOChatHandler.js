@@ -7,6 +7,7 @@
 
 import { cmoKnowledgeBase } from './CMOKnowledgeBase.js';
 import { cmoAssistant } from './migration/CMOCompatibilityWrapper.js';
+import cmoAssistantV1 from './CMOAssistant.js';
 
 class CMOChatHandler {
   constructor() {
@@ -43,7 +44,90 @@ class CMOChatHandler {
       includeKnowledge = true 
     } = context;
     
+    console.log('🔍 CMOChatHandler.processMessage called with:', {
+      message: message.substring(0, 30),
+      subMode,
+      hasFieldContext: !!context.fieldContext
+    });
+    
     try {
+      // FORCE V1 for field assistance - bypass all migration logic
+      if (subMode === 'field_assistance') {
+        console.log('🎯 CMOChatHandler: FORCING V1 for field assistance!');
+        console.log('🎯 Using cmoAssistantV1 directly, bypassing all wrappers');
+        
+        let assistantResponse;
+        try {
+          // Call V1 directly with processMessage method
+          assistantResponse = await cmoAssistantV1.processMessage(message, userId, {
+            userId,
+            conversationId,
+            category: subMode,
+            subMode: subMode,
+            conversationHistory,
+            ...context
+          });
+          console.log('🎯 V1 direct call completed successfully');
+        } catch (error) {
+          console.error('❌ Error calling V1 directly:', error);
+          // Try processQuery as fallback
+          assistantResponse = await cmoAssistantV1.processQuery(message, {
+            userId,
+            conversationId,
+            category: subMode,
+            subMode: subMode,
+            conversationHistory,
+            ...context
+          });
+        }
+        
+        console.log('🔍 CMOChatHandler: V1 response:', {
+          hasContent: !!assistantResponse?.content,
+          hasResults: !!assistantResponse?.results,
+          keys: assistantResponse ? Object.keys(assistantResponse) : []
+        });
+        
+        // Check if we should skip formatting (for field assistance)
+        if (assistantResponse.skipEnhancement) {
+          console.log('🔍 CMOChatHandler: Skipping response formatting for field assistance');
+          return {
+            response: assistantResponse.response || assistantResponse.content,
+            mode: 'cmo',
+            subMode: subMode,
+            knowledge: [],
+            suggestions: [],
+            quickActions: [],
+            metadata: {
+              queryType: 'field_assistance',
+              confidence: assistantResponse.confidence || 0.9,
+              sources: []
+            }
+          };
+        }
+        
+        // Format and return response
+        const formattedResponse = await this.formatResponse(
+          message,
+          assistantResponse,
+          context
+        );
+        
+        return {
+          response: formattedResponse.response,
+          mode: 'cmo',
+          subMode: subMode,
+          knowledge: assistantResponse.results,
+          suggestions: assistantResponse.suggestions,
+          quickActions: this.getRelevantQuickActions(assistantResponse.queryType, subMode),
+          metadata: {
+            queryType: assistantResponse.queryType,
+            confidence: this.calculateConfidence(assistantResponse),
+            sources: formattedResponse.sources
+          }
+        };
+      }
+      
+      // Normal processing for non-field-assistance requests
       console.log('🔍 CMOChatHandler: Processing message through assistant...');
       console.log('🔍 CMOChatHandler: Assistant initialized?', !!this.assistant);
       console.log('🔍 CMOChatHandler: Assistant has processQuery?', typeof this.assistant?.processQuery);
@@ -53,6 +137,13 @@ class CMOChatHandler {
       let assistantResponse;
       try {
         console.log('🔍 CMOChatHandler: About to call processQuery...');
+        console.log('🔍 CMOChatHandler: Assistant is:', this.assistant.constructor.name);
+        console.log('🔍 CMOChatHandler: subMode is:', subMode);
+        console.log('🔍 CMOChatHandler: context includes:', {
+          hasFieldContext: !!context.fieldContext,
+          fieldContext: context.fieldContext
+        });
+        
         assistantResponse = await this.assistant.processQuery(message, {
           userId,
           conversationId,

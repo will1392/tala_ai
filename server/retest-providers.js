@@ -11,11 +11,8 @@ console.log('=' .repeat(50));
 // Test Anthropic with different models
 console.log('\n🧪 Testing Anthropic Claude...');
 const anthropicModels = [
-  'claude-3-5-sonnet-20241022',
-  'claude-3-5-haiku-20241022', 
-  'claude-3-sonnet-20240229',
-  'claude-3-haiku-20240307',
-  'claude-instant-1.2'
+  'claude-sonnet-4-20250514',
+  'claude-opus-4-20250514'
 ];
 
 for (const model of anthropicModels) {

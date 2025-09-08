@@ -869,6 +869,11 @@ import directMailCampaigns from './routes/directMailCampaigns.js';
 app.use('/api/direct-mail-campaigns', directMailCampaigns);
 console.log('✅ Direct Mail Campaigns routes mounted at /api/direct-mail-campaigns');
 
+// Direct Mail Agent routes (multi-agent system)
+import directMailAgentRoutes from './routes/directmail-agent.js';
+app.use('/api/direct-mail-agent', directMailAgentRoutes);
+console.log('✅ Direct Mail Agent routes mounted at /api/direct-mail-agent');
+
 // Database-backed Chat Routes (v2) - DISABLED: Using intelligent chat v2 instead
 // import chatV2Routes from './routes/api/chat-v2.js';
 // app.use('/api/chat/v2', chatV2Routes);
@@ -1751,7 +1756,7 @@ app.post('/api/documents/extract', upload.array('document', 10), async (req, res
 
           try {
             const completion = await openai.chat.completions.create({
-              model: 'gpt-3.5-turbo',
+              model: 'gpt-4o-mini',
               messages: [{ role: 'user', content: prompt }],
               max_tokens: 1000,
               temperature: 0.3,

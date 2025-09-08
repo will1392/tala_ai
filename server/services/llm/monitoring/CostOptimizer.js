@@ -57,7 +57,7 @@ export class CostOptimizer {
       
       // Real-time queries prioritize speed but can be cost-optimized
       realTime: {
-        primary: ['grok-3-latest', 'gpt-4o-mini'],
+        primary: ['grok-4-latest', 'gpt-4o-mini'],
         fallback: ['gemini-2.5-flash'],
         maxCostPerQuery: 0.005
       },
@@ -107,7 +107,11 @@ export class CostOptimizer {
       outputTokens = 0
     } = costData;
 
-    if (cost <= 0) return;
+    // Validate cost is a number
+    if (typeof cost !== 'number' || isNaN(cost) || cost <= 0) {
+      this.log(`Invalid cost value: ${cost}, skipping cost recording`);
+      return;
+    }
 
     // Update total cost
     this.costs.total += cost;

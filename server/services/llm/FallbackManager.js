@@ -158,7 +158,7 @@ export class FallbackManager {
       ],
       realTime: [
         'gpt-5-nano-2025-08-07',      // GPT-5 Nano for fast responses
-        'grok-3-latest',              // Grok for real-time
+        'grok-4-latest',              // Grok for real-time
         'gemini-2.5-flash',           // Gemini Flash for speed
         'claude-sonnet-4-20250514'    // Claude as backup
       ],
@@ -188,7 +188,7 @@ export class FallbackManager {
         'gpt-5-nano-2025-08-07',      // GPT-5 Nano is cost-effective
         'gemini-2.5-flash',           // Gemini Flash is cheap
         'gpt-4o-mini',                // Legacy GPT-4o Mini
-        'grok-3-latest'               // Grok as final fallback
+        'grok-4-latest'               // Grok as final fallback
       ]
     };
 

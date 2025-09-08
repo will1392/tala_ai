@@ -63,26 +63,41 @@ class CMOKnowledgeBase {
       // Load metadata
       await this.loadMetadata();
       
-      // Create Qdrant collection if it doesn't exist
-      await this.ensureCollection();
+      // Try to create Qdrant collection if it doesn't exist
+      // Don't fail initialization if vector DB is unavailable
+      try {
+        await this.ensureCollection();
+      } catch (error) {
+        console.warn('⚠️ Vector database unavailable, continuing with fallback mode:', error.message);
+      }
       
       // Load knowledge from files
       await this.loadKnowledge();
       
-      // Index knowledge in vector DB
-      await this.indexKnowledge();
+      // Try to index knowledge in vector DB
+      // Don't fail if indexing fails
+      try {
+        await this.indexKnowledge();
+      } catch (error) {
+        console.warn('⚠️ Failed to index knowledge in vector DB, search will use fallback mode:', error.message);
+      }
       
       // Warm up cache if enabled
       if (performanceConfig.knowledgeCache.enabled) {
-        await cmoCache.warmUp(this);
+        try {
+          await cmoCache.warmUp(this);
+        } catch (error) {
+          console.warn('⚠️ Cache warmup failed:', error.message);
+        }
       }
       
       this.initialized = true;
-      console.log('✅ CMO Knowledge Base initialized successfully');
+      console.log('✅ CMO Knowledge Base initialized (with fallback mode if needed)');
       
     } catch (error) {
       console.error('❌ Failed to initialize CMO Knowledge Base:', error);
-      throw error;
+      // Don't throw - allow system to work with fallbacks
+      this.initialized = false;
     }
   }
 
@@ -309,6 +324,12 @@ class CMOKnowledgeBase {
     }
     
     try {
+      // Check if external services are properly initialized
+      if (!this.initialized) {
+        console.warn('⚠️ Knowledge base not fully initialized, returning fallback response');
+        return this.getFallbackSearchResults(query, category);
+      }
+      
       // Generate embedding for query
       const queryEmbedding = await this.generateEmbedding(query);
       
@@ -363,8 +384,16 @@ class CMOKnowledgeBase {
       return formattedResults;
       
     } catch (error) {
-      console.error('Search failed:', error);
-      return [];
+      console.error('Search failed:', error.message);
+      
+      // Return graceful fallback instead of empty array
+      if (error.message?.includes('OPENAI_API_KEY')) {
+        console.warn('⚠️ OpenAI API key not configured, using fallback search');
+      } else if (error.message?.includes('ECONNREFUSED')) {
+        console.warn('⚠️ Vector database not available, using fallback search');
+      }
+      
+      return this.getFallbackSearchResults(query, category);
     }
   }
 
@@ -518,6 +547,81 @@ class CMOKnowledgeBase {
     }
     
     return stats;
+  }
+
+  /**
+   * Get fallback search results when external services are unavailable
+   */
+  getFallbackSearchResults(query, category) {
+    const fallbackResults = [];
+    
+    // For direct mail queries, provide helpful fallback content
+    if (category === 'direct-mail' || query.toLowerCase().includes('direct mail')) {
+      fallbackResults.push({
+        id: 'fallback-1',
+        score: 0.8,
+        category: 'direct-mail',
+        title: 'Direct Mail Field Guidance',
+        content: this.getDirectMailFallbackContent(query),
+        type: 'guide',
+        metadata: {
+          source: 'fallback',
+          reason: 'External services unavailable'
+        }
+      });
+    }
+    
+    // Add general fallback if no specific category match
+    if (fallbackResults.length === 0) {
+      fallbackResults.push({
+        id: 'fallback-general',
+        score: 0.7,
+        category: 'general',
+        title: 'Marketing Guidance',
+        content: 'I can help you with this field. Please provide specific information that aligns with your business goals and target audience. Consider including relevant details that will help create an effective campaign.',
+        type: 'general',
+        metadata: {
+          source: 'fallback'
+        }
+      });
+    }
+    
+    return fallbackResults;
+  }
+
+  /**
+   * Get direct mail specific fallback content
+   */
+  getDirectMailFallbackContent(query) {
+    const queryLower = query.toLowerCase();
+    
+    // Field-specific guidance
+    if (queryLower.includes('specialty') || queryLower.includes('travel')) {
+      return 'For travel specialty, consider focusing on your primary expertise (luxury cruises, adventure travel, all-inclusive resorts, etc.). This helps target the right audience and craft relevant messages.';
+    }
+    
+    if (queryLower.includes('audience') || queryLower.includes('client')) {
+      return 'Define your ideal client by demographics (age, income), psychographics (interests, values), and travel preferences. Consider past successful bookings to identify patterns.';
+    }
+    
+    if (queryLower.includes('budget')) {
+      return 'Direct mail budgets typically range from $0.50-$2.00 per piece including design, printing, and postage. Consider starting with 500-1000 pieces for testing.';
+    }
+    
+    if (queryLower.includes('offer') || queryLower.includes('message')) {
+      return 'Strong offers include exclusive discounts, limited-time deals, value-adds (free upgrades, credits), or early access to new destinations. Make it compelling and time-sensitive.';
+    }
+    
+    if (queryLower.includes('design') || queryLower.includes('format')) {
+      return 'Popular formats include 4x6 or 6x9 postcards. Use high-quality destination imagery, clear headlines, and prominent calls-to-action. Keep text concise and benefits-focused.';
+    }
+    
+    if (queryLower.includes('timing') || queryLower.includes('frequency')) {
+      return 'Time mailings 6-8 weeks before key booking periods. Consider seasonal patterns: January for spring/summer, September for winter holidays. Monthly or quarterly campaigns work well.';
+    }
+    
+    // Default guidance
+    return 'For this field, provide information that best represents your business and campaign goals. Be specific to help create targeted, effective direct mail campaigns that resonate with your ideal travelers.';
   }
 }
 

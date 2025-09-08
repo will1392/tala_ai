@@ -4,6 +4,7 @@ import { AlertTriangle, X, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import taskService from '../../services/taskService';
 import type { Task } from '../../services/taskService';
+import { featureConfig } from '../../config/features';
 
 export const DueTaskBanner = () => {
   const [dueTasks, setDueTasks] = useState<Task[]>([]);
@@ -13,8 +14,13 @@ export const DueTaskBanner = () => {
 
   // Check for due tasks every minute
   useEffect(() => {
+    // Only check tasks if feature is enabled
+    if (!featureConfig.tasks.enabled || !featureConfig.tasks.showBanner) {
+      return;
+    }
+    
     checkDueTasks();
-    const interval = setInterval(checkDueTasks, 60000); // Check every minute
+    const interval = setInterval(checkDueTasks, featureConfig.tasks.checkInterval);
     
     return () => clearInterval(interval);
   }, []);
@@ -36,7 +42,10 @@ export const DueTaskBanner = () => {
       setDueTasks(overdueTasks);
       setIsVisible(overdueTasks.length > 0);
     } catch (error) {
-      console.error('Error checking due tasks:', error);
+      // Silently handle errors - task service may not be running
+      // This is non-critical UI functionality
+      setDueTasks([]);
+      setIsVisible(false);
     }
   };
 
@@ -59,6 +68,9 @@ export const DueTaskBanner = () => {
     setCurrentTaskIndex((prev) => (prev + 1) % dueTasks.length);
   };
 
+  // Don't render if feature is disabled
+  if (!featureConfig.tasks.enabled || !featureConfig.tasks.showBanner) return null;
+  
   if (!isVisible || dueTasks.length === 0) return null;
 
   const currentTask = dueTasks[currentTaskIndex];

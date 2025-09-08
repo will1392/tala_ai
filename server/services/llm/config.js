@@ -81,28 +81,7 @@ const LLM_MODELS = {
       topP: 1.0
     }
   },
-  // Legacy OpenAI Models
-  'gpt-4': {
-    provider: LLM_PROVIDERS.OPENAI,
-    name: 'GPT-4',
-    maxTokens: 8192,
-    contextWindow: 8192,
-    pricing: {
-      input: 0.03,    // per 1K tokens
-      output: 0.06    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 2048,
-      topP: 1.0
-    }
-  },
+  // GPT-4o Model (keeping as requested)
   'gpt-4o-mini': {
     provider: LLM_PROVIDERS.OPENAI,
     name: 'GPT-4o Mini',
@@ -187,69 +166,6 @@ const LLM_MODELS = {
       topP: 1.0
     }
   },
-  'claude-3-opus-20240229': {
-    provider: LLM_PROVIDERS.ANTHROPIC,
-    name: 'Claude 3 Opus',
-    maxTokens: 4096,
-    contextWindow: 200000,
-    pricing: {
-      input: 0.015,    // per 1K tokens
-      output: 0.075    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: true,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'claude-3-5-sonnet-20241022': {
-    provider: LLM_PROVIDERS.ANTHROPIC,
-    name: 'Claude 3.5 Sonnet',
-    maxTokens: 8192,
-    contextWindow: 200000,
-    pricing: {
-      input: 0.003,    // per 1K tokens
-      output: 0.015    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: true,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'claude-3-5-haiku-20241022': {
-    provider: LLM_PROVIDERS.ANTHROPIC,
-    name: 'Claude 3.5 Haiku',
-    maxTokens: 8192,
-    contextWindow: 200000,
-    pricing: {
-      input: 0.0008,   // per 1K tokens
-      output: 0.004    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: true,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
 
   // Google Models
   'gemini-2.5-flash': {
@@ -300,218 +216,8 @@ const LLM_MODELS = {
       topP: 0.95
     }
   },
-  'gemini-1.5-flash': {
-    provider: LLM_PROVIDERS.GOOGLE,
-    name: 'Gemini 1.5 Flash',
-    maxTokens: 8192,
-    contextWindow: 1000000,
-    pricing: {
-      input: 0.000075,  // per 1K tokens
-      output: 0.0003    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: true,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 8192,
-      topP: 0.95
-    }
-  },
-  'gemini-1.5-pro': {
-    provider: LLM_PROVIDERS.GOOGLE,
-    name: 'Gemini 1.5 Pro',
-    maxTokens: 8192,
-    contextWindow: 2000000,
-    pricing: {
-      input: 0.00125,  // per 1K tokens
-      output: 0.005    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: true,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 8192,
-      topP: 0.95
-    }
-  },
 
-  // Grok Models (X.AI) - Actually available models
-  'grok-2-1212': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 2.0 (December 2024)',
-    maxTokens: 4096,
-    contextWindow: 32768,
-    pricing: {
-      input: 0.005,    // per 1K tokens
-      output: 0.005    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-2-latest': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 2.0 Latest',
-    maxTokens: 4096,
-    contextWindow: 32768,
-    pricing: {
-      input: 0.005,    // per 1K tokens
-      output: 0.005    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-2': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 2.0',
-    maxTokens: 4096,
-    contextWindow: 32768,
-    pricing: {
-      input: 0.005,    // per 1K tokens
-      output: 0.005    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-3': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 3.0',
-    maxTokens: 4096,
-    contextWindow: 65536,
-    pricing: {
-      input: 0.005,    // per 1K tokens
-      output: 0.005    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-3-latest': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 3.0 Latest',
-    maxTokens: 4096,
-    contextWindow: 65536,
-    pricing: {
-      input: 0.005,    // per 1K tokens
-      output: 0.005    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-3-fast': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 3.0 Fast',
-    maxTokens: 4096,
-    contextWindow: 65536,
-    pricing: {
-      input: 0.003,    // per 1K tokens (faster, cheaper)
-      output: 0.003    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-3-mini': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 3.0 Mini',
-    maxTokens: 4096,
-    contextWindow: 32768,
-    pricing: {
-      input: 0.002,    // per 1K tokens (mini, cheapest)
-      output: 0.002    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-3-beta': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 3.0 Beta',
-    maxTokens: 4096,
-    contextWindow: 65536,
-    pricing: {
-      input: 0.005,    // per 1K tokens
-      output: 0.005    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
+  // Grok Models (X.AI)
   'grok-4': {
     provider: LLM_PROVIDERS.GROK,
     name: 'Grok 4.0',
@@ -722,7 +428,7 @@ const PROVIDER_CONFIGS = {
   [LLM_PROVIDERS.ANTHROPIC]: {
     baseURL: 'https://api.anthropic.com/v1',
     apiKeyEnv: 'ANTHROPIC_API_KEY',
-    defaultModel: 'claude-3-5-sonnet-20241022',
+    defaultModel: 'claude-sonnet-4-20250514',
     rateLimits: {
       requestsPerMinute: 50,
       tokensPerMinute: 40000
@@ -793,8 +499,8 @@ const LOAD_BALANCING = {
   },
   fallbackChain: [
     'gpt-4o-mini',
-    'claude-3-5-sonnet-20241022',
-    'gemini-1.5-flash',
+    'claude-sonnet-4-20250514',
+    'gemini-2.5-flash',
     'llama-3.1-8b'
   ]
 };

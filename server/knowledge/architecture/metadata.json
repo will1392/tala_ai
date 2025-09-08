@@ -1,0 +1,219 @@
+{
+  "version": "2.0.0",
+  "name": "Tala Layered Knowledge Architecture",
+  "description": "Multi-layered knowledge system with core knowledge, agent-specific knowledge, and retrieval augmentation",
+  "layers": {
+    "core": {
+      "name": "Core Knowledge Layer",
+      "description": "Foundational knowledge shared across all agents and services",
+      "priority": 1,
+      "features": [
+        "Domain-agnostic knowledge",
+        "Business fundamentals",
+        "General marketing principles",
+        "Common patterns and templates"
+      ]
+    },
+    "agent": {
+      "name": "Agent Knowledge Layer",
+      "description": "Specialized knowledge for individual agents",
+      "priority": 2,
+      "features": [
+        "Agent-specific expertise",
+        "Channel-specific strategies",
+        "Specialized templates",
+        "Custom workflows"
+      ]
+    },
+    "retrieval": {
+      "name": "Retrieval Augmentation Layer",
+      "description": "Dynamic knowledge retrieval and augmentation system",
+      "priority": 3,
+      "features": [
+        "Semantic search",
+        "Context-aware retrieval",
+        "Knowledge fusion",
+        "Real-time augmentation"
+      ]
+    },
+    "pipeline": {
+      "name": "Pipeline Integration Layer",
+      "description": "Knowledge processing and enhancement pipeline",
+      "priority": 4,
+      "features": [
+        "Knowledge validation",
+        "Quality scoring",
+        "Relevance filtering",
+        "Response enrichment"
+      ]
+    }
+  },
+  "agents": {
+    "direct-mail": {
+      "name": "Direct Mail Agent",
+      "collections": ["kb_direct_mail", "cmo_knowledge"],
+      "specializations": ["postcards", "letters", "catalogs", "targeting"],
+      "priority_topics": ["travel_agencies", "response_rates", "design_principles"]
+    },
+    "seo": {
+      "name": "SEO Agent",
+      "collections": ["kb_seo", "cmo_knowledge"],
+      "specializations": ["technical", "content", "local", "ecommerce"],
+      "priority_topics": ["keyword_research", "link_building", "page_optimization"]
+    },
+    "email": {
+      "name": "Email Marketing Agent",
+      "collections": ["kb_email", "cmo_knowledge"],
+      "specializations": ["campaigns", "automation", "segmentation", "deliverability"],
+      "priority_topics": ["subject_lines", "email_copy", "a_b_testing"]
+    },
+    "social": {
+      "name": "Social Media Agent",
+      "collections": ["kb_social", "cmo_knowledge"],
+      "specializations": ["content", "engagement", "advertising", "analytics"],
+      "priority_topics": ["platform_strategies", "content_calendar", "community_management"]
+    },
+    "ads": {
+      "name": "Advertising Agent",
+      "collections": ["kb_ads", "cmo_knowledge"],
+      "specializations": ["google_ads", "facebook_ads", "display", "retargeting"],
+      "priority_topics": ["ad_copy", "bidding_strategies", "conversion_optimization"]
+    },
+    "travel": {
+      "name": "Travel Marketing Agent",
+      "collections": ["kb_travel", "cmo_knowledge"],
+      "specializations": ["destinations", "packages", "seasonality", "customer_segments"],
+      "priority_topics": ["itinerary_marketing", "booking_optimization", "loyalty_programs"]
+    }
+  },
+  "retrieval": {
+    "strategies": {
+      "semantic": {
+        "description": "Vector-based semantic search",
+        "embedding_model": "text-embedding-3-small",
+        "dimension": 1536,
+        "distance_metric": "cosine"
+      },
+      "hybrid": {
+        "description": "Combined semantic and keyword search",
+        "weight_semantic": 0.7,
+        "weight_keyword": 0.3
+      },
+      "contextual": {
+        "description": "Context-aware retrieval with user history",
+        "context_window": 5,
+        "personalization": true
+      }
+    },
+    "augmentation": {
+      "knowledge_fusion": {
+        "description": "Combine knowledge from multiple sources",
+        "max_sources": 5,
+        "deduplication": true
+      },
+      "quality_scoring": {
+        "description": "Score and rank retrieved knowledge",
+        "factors": ["relevance", "recency", "authority", "completeness"]
+      },
+      "dynamic_enhancement": {
+        "description": "Enhance responses with real-time data",
+        "sources": ["web_search", "api_integrations", "user_feedback"]
+      }
+    }
+  },
+  "pipeline": {
+    "stages": [
+      {
+        "name": "knowledge_retrieval",
+        "order": 1,
+        "components": ["query_understanding", "multi_source_search", "result_ranking"]
+      },
+      {
+        "name": "knowledge_validation",
+        "order": 2,
+        "components": ["fact_checking", "consistency_verification", "source_validation"]
+      },
+      {
+        "name": "knowledge_augmentation",
+        "order": 3,
+        "components": ["context_injection", "example_generation", "template_application"]
+      },
+      {
+        "name": "response_generation",
+        "order": 4,
+        "components": ["content_synthesis", "structure_formatting", "citation_generation"]
+      }
+    ]
+  },
+  "collections": {
+    "cmo_knowledge": {
+      "description": "General marketing knowledge base",
+      "type": "shared",
+      "access": "all_agents"
+    },
+    "kb_direct_mail": {
+      "description": "Specialized direct mail knowledge",
+      "type": "specialized",
+      "access": "direct_mail_agent"
+    },
+    "kb_seo": {
+      "description": "Specialized SEO knowledge",
+      "type": "specialized",
+      "access": "seo_agent"
+    },
+    "kb_email": {
+      "description": "Specialized email marketing knowledge",
+      "type": "specialized",
+      "access": "email_agent"
+    },
+    "kb_social": {
+      "description": "Specialized social media knowledge",
+      "type": "specialized",
+      "access": "social_agent"
+    },
+    "kb_ads": {
+      "description": "Specialized advertising knowledge",
+      "type": "specialized",
+      "access": "ads_agent"
+    },
+    "kb_travel": {
+      "description": "Specialized travel marketing knowledge",
+      "type": "specialized",
+      "access": "travel_agent"
+    }
+  },
+  "indexSettings": {
+    "qdrant": {
+      "url": "${QDRANT_URL}",
+      "api_key": "${QDRANT_API_KEY}",
+      "default_collection": "tala_knowledge",
+      "vector_config": {
+        "size": 1536,
+        "distance": "Cosine"
+      }
+    },
+    "elasticsearch": {
+      "enabled": false,
+      "url": "${ELASTICSEARCH_URL}",
+      "index_prefix": "tala_knowledge_"
+    }
+  },
+  "performance": {
+    "caching": {
+      "enabled": true,
+      "ttl": 3600,
+      "max_entries": 1000
+    },
+    "batching": {
+      "enabled": true,
+      "size": 100,
+      "timeout": 5000
+    },
+    "preloading": {
+      "enabled": true,
+      "priority_knowledge": true,
+      "warm_cache": true
+    }
+  },
+  "lastUpdated": "2024-08-20T00:00:00Z"
+}

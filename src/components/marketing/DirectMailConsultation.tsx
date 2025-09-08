@@ -20,7 +20,8 @@ import {
   Package,
   Check,
   AlertCircle,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -31,7 +32,8 @@ import { Select } from '../ui/Select';
 import { Progress } from '../ui/Progress';
 import { useToast } from '../toast/ToastProvider';
 import type { MarketingProfile } from '../../types/marketing';
-import { TalaFieldAssistant } from './TalaFieldAssistant';
+import { FieldHelpButton } from './FieldHelpButton';
+import { PostcardAnalysisModal } from './PostcardAnalysisModal';
 
 // Section definitions
 const CONSULTATION_SECTIONS = [
@@ -563,6 +565,10 @@ export function DirectMailConsultation({
   const [isSaving, setIsSaving] = useState(false);
   const [showOptionalSections, setShowOptionalSections] = useState(false);
   const [campaignName, setCampaignName] = useState('');
+  const [showSendToTala, setShowSendToTala] = useState(false);
+  const [savedCampaign, setSavedCampaign] = useState<Campaign | null>(null);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [analysisData, setAnalysisData] = useState<any>(null);
   const { push: pushToast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -600,6 +606,16 @@ export function DirectMailConsultation({
       }
     }
   }, [brandId, existingCampaign]);
+  
+  // Debug modal state changes
+  useEffect(() => {
+    console.log('[DirectMailConsultation] Modal state changed:', {
+      showAnalysisModal,
+      hasSavedCampaign: !!savedCampaign,
+      savedCampaignId: savedCampaign?.id,
+      modalShouldRender: showAnalysisModal && !!savedCampaign
+    });
+  }, [showAnalysisModal, savedCampaign]);
 
   // Save progress to localStorage (silent)
   const autoSaveProgress = () => {
@@ -801,6 +817,34 @@ export function DirectMailConsultation({
     }
   };
 
+  // Send consultation to Tala for AI-powered insights
+  const sendConsultationToTala = async (campaign?: Campaign) => {
+    console.log('[DirectMailConsultation] sendConsultationToTala called with:', campaign);
+    const campaignToSend = campaign || savedCampaign;
+    console.log('[DirectMailConsultation] campaignToSend:', campaignToSend);
+    console.log('[DirectMailConsultation] savedCampaign from state:', savedCampaign);
+    
+    if (!campaignToSend) {
+      console.error('[DirectMailConsultation] No campaign to send!');
+      pushToast({
+        kind: 'error',
+        message: 'No campaign data found',
+        description: 'Please save the consultation first.'
+      });
+      return;
+    }
+
+    // Show loading state on button
+    setIsSaving(true);
+    
+    // Small delay to show the button is working
+    setTimeout(() => {
+      console.log('[DirectMailConsultation] Setting showAnalysisModal to true');
+      setShowAnalysisModal(true);
+      setIsSaving(false);
+    }, 300);
+  };
+
   // Submit consultation
   const submitConsultation = async () => {
     if (!validateSection()) {
@@ -904,13 +948,9 @@ export function DirectMailConsultation({
       // Clear local storage
       localStorage.removeItem(`dm_consultation_${brandId}`);
       
-      // Notify parent
-      if (onComplete) {
-        console.error('[SAVE DEBUG] Calling onComplete with:', savedCampaign);
-        onComplete(savedCampaign);
-      } else {
-        console.error('[SAVE DEBUG] No onComplete callback provided!');
-      }
+      // Save the campaign for send to Tala (extract campaign from response)
+      setSavedCampaign(savedCampaign.campaign || savedCampaign);
+      setShowSendToTala(true);
       
       pushToast({
         kind: 'success',
@@ -933,10 +973,110 @@ export function DirectMailConsultation({
   const isLastSection = currentSection === CONSULTATION_SECTIONS.length - 1;
   const progress = calculateProgress();
 
+  // Show success screen after completion
+  if (showSendToTala && savedCampaign) {
+    return (
+      <>
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <Card className="max-w-2xl w-full p-8 text-center">
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-10 h-10 text-green-600" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Consultation Complete!</h2>
+              <p className="text-gray-600 mb-6">
+                Your direct mail campaign consultation has been saved successfully.
+              </p>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-6 mb-6">
+              <Sparkles className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold mb-2">Get AI-Powered Insights</h3>
+              <p className="text-gray-700 mb-4">
+                Send your consultation to Tala for personalized recommendations, creative ideas, and strategic insights tailored to your campaign.
+              </p>
+              <Button
+                onClick={() => sendConsultationToTala(savedCampaign)}
+                variant="primary"
+                disabled={isSaving}
+                className="w-full"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending to Tala...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Send to Tala for Insights
+                  </>
+                )}
+              </Button>
+            </div>
+          
+          <div className="flex gap-3">
+            <Button
+              onClick={() => {
+                if (onComplete) {
+                  onComplete(savedCampaign);
+                }
+              }}
+              variant="outline"
+              className="flex-1"
+            >
+              Back to Campaigns
+            </Button>
+            <Button
+              onClick={() => {
+                setShowSendToTala(false);
+                setCurrentSection(0);
+                // Allow editing
+              }}
+              variant="outline"
+              className="flex-1"
+            >
+              Edit Consultation
+            </Button>
+          </div>
+        </Card>
+      </div>
+      
+      {/* Postcard Analysis Modal */}
+      {console.log('[DirectMailConsultation] Success view - Modal should render?', showAnalysisModal && !!savedCampaign, { showAnalysisModal, savedCampaign })}
+      {showAnalysisModal && savedCampaign && (
+        <PostcardAnalysisModal
+          isOpen={showAnalysisModal}
+          onClose={() => {
+            setShowAnalysisModal(false);
+            setAnalysisData(null);
+          }}
+          consultationData={savedCampaign}
+          campaignId={savedCampaign.id}
+          campaignName={savedCampaign.name}
+          brandId={brandId}
+          onSave={(analysisData) => {
+            // Update the saved campaign with analysis
+            setSavedCampaign({
+              ...savedCampaign,
+              analysis: analysisData
+            });
+            pushToast({
+              kind: 'success',
+              message: 'Analysis saved to campaign!'
+            });
+          }}
+        />
+      )}
+      </>
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
+    <div className="h-screen flex flex-col">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 bg-white dark:bg-gray-900 border-b shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
@@ -984,10 +1124,14 @@ export function DirectMailConsultation({
           </div>
           <Progress value={progress} className="h-2" />
         </div>
+        </div>
       </div>
 
-      {/* Section Navigation */}
-      <div className="mb-6 overflow-x-auto">
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Section Navigation */}
+          <div className="mb-6 overflow-x-auto">
         <div className="flex gap-2 min-w-max pb-2">
           {CONSULTATION_SECTIONS.map((section, index) => {
             const Icon = section.icon;
@@ -1038,21 +1182,9 @@ export function DirectMailConsultation({
                   placeholder="e.g., Spring 2024 Luxury Cruise Promotion"
                   className={errors.campaignName ? 'border-red-500' : 'flex-1'}
                 />
-                <TalaFieldAssistant
+                <FieldHelpButton
                   fieldId="campaign_name"
-                  fieldLabel="Campaign Name"
-                  fieldType="text"
-                  currentValue={campaignName}
-                  context={{
-                    sectionTitle: "Campaign Setup",
-                    previousResponses: responses,
-                    businessInfo: profile
-                  }}
-                  onApplySuggestion={(value) => {
-                    setCampaignName(value);
-                    autoSaveProgress();
-                  }}
-                  brandId={brandId}
+                  position="inline"
                 />
               </div>
             </div>
@@ -1076,7 +1208,7 @@ export function DirectMailConsultation({
           <p className="text-gray-600">{currentSectionData.description}</p>
         </CardHeader>
         <CardContent>
-          <div ref={formRef} className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+          <div ref={formRef} className="space-y-6">
             {currentSectionData.questions.map((question) => {
               // Check conditional display
               if (question.conditional) {
@@ -1087,25 +1219,15 @@ export function DirectMailConsultation({
               }
               
               return (
-                <div key={question.id} className="space-y-2">
+                <div key={question.id} className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                   <div className="flex items-center justify-between">
                     <label className="block text-sm font-medium">
                       {question.label}
                       {question.required && <span className="text-red-500 ml-1">*</span>}
                     </label>
-                    <TalaFieldAssistant
+                    <FieldHelpButton
                       fieldId={question.id}
-                      fieldLabel={question.label}
-                      fieldType={question.type as any}
-                      fieldOptions={question.options}
-                      currentValue={responses[question.id]}
-                      context={{
-                        sectionTitle: currentSectionData.title,
-                        previousResponses: responses,
-                        businessInfo: profile
-                      }}
-                      onApplySuggestion={(value) => updateResponse(question.id, value)}
-                      brandId={brandId}
+                      position="inline"
                     />
                   </div>
                   
@@ -1158,8 +1280,8 @@ export function DirectMailConsultation({
                       value={responses[question.id] || ''}
                       onChange={(e) => updateResponse(question.id, e.target.value)}
                       placeholder={question.placeholder}
-                      rows={3}
-                      className={errors[question.id] ? 'border-red-500' : ''}
+                      rows={4}
+                      className={`${errors[question.id] ? 'border-red-500' : ''} resize-none`}
                     />
                   )}
                   
@@ -1231,19 +1353,9 @@ export function DirectMailConsultation({
                                 {field.label}
                                 {field.required && <span className="text-red-500 ml-1">*</span>}
                               </label>
-                              <TalaFieldAssistant
-                                fieldId={fieldKey}
-                                fieldLabel={field.label}
-                                fieldType={field.type as any}
-                                fieldOptions={field.options}
-                                currentValue={responses[fieldKey]}
-                                context={{
-                                  sectionTitle: currentSectionData.title,
-                                  previousResponses: responses,
-                                  businessInfo: profile
-                                }}
-                                onApplySuggestion={(value) => updateResponse(fieldKey, value)}
-                                brandId={brandId}
+                              <FieldHelpButton
+                                fieldId={field.id}
+                                position="inline"
                               />
                             </div>
                             {field.type === 'select' ? (
@@ -1333,6 +1445,8 @@ export function DirectMailConsultation({
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
           )}
+        </div>
+      </div>
         </div>
       </div>
     </div>

@@ -65,7 +65,11 @@ class TaskService {
       const data = await response.json();
       return data.tasks || [];
     } catch (error) {
-      console.error('Error fetching tasks:', error);
+      // Don't log errors if server is simply not available
+      // This is a non-critical service
+      if (!error.message?.includes('Failed to fetch')) {
+        console.error('Error fetching tasks:', error);
+      }
       return [];
     }
   }

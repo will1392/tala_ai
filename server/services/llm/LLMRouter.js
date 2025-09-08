@@ -45,7 +45,7 @@ class LLMRouter {
         'gpt-4o-mini',
         'claude-sonnet-4-20250514',
         'gemini-2.5-flash',
-        'grok-3-latest',
+        'grok-4-latest',
         'mock-model'
       ],
       ...options
@@ -256,7 +256,7 @@ class LLMRouter {
       }
       
       this.updateRoutingStats(queryAnalysis.type, finalModel);
-      this.log(`Query routed successfully in ${routingTime}ms with ${response.routing.fallbacksUsed} fallbacks - Cost: $${response.usage.cost.toFixed(6)}`);
+      this.log(`Query routed successfully in ${routingTime}ms with ${response.routing.fallbacksUsed} fallbacks - Cost: $${(response.usage.cost || 0).toFixed(6)}`);
       
       return response;
       
@@ -423,7 +423,7 @@ class LLMRouter {
     // Model selection rules based on query type
     const routingRules = {
       realTime: [
-        'grok-3-latest',    // Best for real-time/current info
+        'grok-4-latest',    // Best for real-time/current info
         'gpt-4o-mini',      // Fast and reliable
         'gemini-2.5-flash'  // Ultra-fast backup
       ],

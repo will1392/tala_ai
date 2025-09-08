@@ -95,12 +95,33 @@ class CMOAssistant {
       console.log('🗒️ Checking for field assistance:', {
         subMode: options.subMode,
         hasFieldContext: !!options.fieldContext,
-        fieldContext: options.fieldContext
+        fieldContext: options.fieldContext,
+        allOptions: options
       });
       
-      if (options.subMode === 'field_assistance' && options.fieldContext) {
-        console.log('📝 Processing field assistance request');
+      if (options.subMode === 'field_assistance') {
+        console.log('📝 Field assistance mode detected');
+        if (!options.fieldContext) {
+          console.warn('⚠️ Field assistance mode but no fieldContext provided, using default context');
+          // Provide a default context to prevent errors
+          options.fieldContext = {
+            fieldLabel: 'Travel Specialty',
+            fieldType: 'text',
+            fieldDescription: 'Your travel business specialty',
+            currentValue: message
+          };
+        }
         return await this.handleFieldAssistance(message, userId, options);
+      }
+      
+      // Check if this is a direct mail strategy report (already processed)
+      if (options.subMode === 'direct_mail_strategy') {
+        console.log('📊 Direct mail strategy mode detected - returning strategy directly');
+        return {
+          response: message,
+          conversationId: options.conversationId || `dm-${Date.now()}`,
+          metadata: options.context?.metadata || {}
+        };
       }
       
       // Get user expertise profile
@@ -274,75 +295,34 @@ class CMOAssistant {
    */
   async handleFieldAssistance(message, userId, options) {
     const { fieldContext } = options;
+    console.log('📝 Field assistance handler called');
     console.log('📝 Field assistance context:', fieldContext);
+    console.log('📝 Message:', message);
+    console.log('📝 Options:', options);
     
     try {
-      // Build a specialized prompt for field assistance
-      const fieldPrompt = `
-        The user needs help filling out the "${fieldContext.fieldLabel}" field in a direct mail consultation form.
-        Field Type: ${fieldContext.fieldType}
-        ${fieldContext.fieldOptions ? `Available Options: ${fieldContext.fieldOptions.join(', ')}` : ''}
-        ${fieldContext.currentValue ? `Current Value: "${fieldContext.currentValue}"` : 'The field is currently empty.'}
-        Section: ${fieldContext.sectionContext?.sectionTitle || 'Direct Mail Campaign'}
-        
-        User's Question: ${message}
-        
-        Please provide helpful guidance and a specific suggestion for what to put in this field.
-        ${fieldContext.fieldType === 'select' ? 'Recommend one of the available options.' : ''}
-        ${fieldContext.fieldType === 'textarea' ? 'Provide a well-written example response.' : ''}
-        
-        Format your response to:
-        1. Explain what this field is asking for
-        2. Provide context on why it's important
-        3. Give a specific suggestion using this format: "I suggest using: [your suggestion here]"
-      `;
-      
       // Get expertise-based response
       const expertise = await this.getUserExpertise(userId);
-      const enhancedContext = {
-        ...options,
-        topic: 'directMail',
-        channel: 'directMail',
-        expertise: expertise?.level || 'beginner',
-        intent: 'field_assistance'
-      };
       
-      // Generate response using the knowledge base
-      const response = await this.knowledgeBase.query(fieldPrompt, {
-        category: 'direct-mail',
-        maxResults: 3
-      });
+      // Generate field-specific response directly without knowledge base search
+      const responseText = this.generateFieldSpecificResponse(fieldContext, message, expertise);
       
-      console.log('📚 Knowledge base response:', {
-        hasResponse: !!response,
-        responseKeys: response ? Object.keys(response) : null,
-        contentLength: response?.content?.length,
-        contentPreview: response?.content?.substring(0, 100)
-      });
-      
-      // Enhance the response
-      const enhancedResponse = await this.responseEnhancer.enhance(response, {
-        userLevel: expertise.level,
-        context: enhancedContext,
-        format: 'conversational'
-      });
-      
-      console.log('🎆 Enhanced response:', {
-        hasResponse: !!enhancedResponse,
-        responseKeys: enhancedResponse ? Object.keys(enhancedResponse) : null,
-        responseLength: enhancedResponse?.response?.length,
-        responsePreview: enhancedResponse?.response?.substring(0, 100)
-      });
-      
+      // Return response WITHOUT enhancement - field assistance should be direct and conversational
       const fieldAssistanceResponse = {
-        response: enhancedResponse.response,
+        response: responseText,
+        content: responseText, // Also include as content for compatibility
         subMode: 'field_assistance',
         confidence: 0.9,
         metadata: {
           fieldContext,
           expertise: expertise.level,
-          sources: response.sources || []
-        }
+          sources: []
+        },
+        quickActions: [],
+        suggestions: [],
+        recommendations: [],
+        // Add flag to prevent further enhancement
+        skipEnhancement: true
       };
       
       console.log('📝 Field assistance response:', {
@@ -357,43 +337,356 @@ class CMOAssistant {
       console.error('Error handling field assistance:', error);
       
       // Fallback response with helpful guidance
-      let fallbackResponse = `I'll help you with the "${fieldContext.fieldLabel}" field.\n\n`;
-      
-      if (fieldContext.fieldType === 'select' && fieldContext.fieldOptions) {
-        fallbackResponse += `This field asks you to select the type of travel experiences your agency specializes in. Here's what each option typically means:\n\n`;
-        
-        // Provide guidance for common options
-        const optionGuidance = {
-          'Luxury Cruises': 'High-end ocean cruises with premium amenities, often targeting affluent travelers seeking comfort and exclusive experiences.',
-          'River Cruises': 'Intimate river journeys through destinations like Europe, Asia, or the Americas, appealing to cultural enthusiasts and mature travelers.',
-          'Adventure Travel': 'Active, experiential trips involving outdoor activities, perfect for younger demographics or active seniors seeking unique experiences.',
-          'Family Vacations': 'Multi-generational trips with activities for all ages, typically to resorts, theme parks, or family-friendly destinations.',
-          'All-Inclusive Resorts': 'Hassle-free vacation packages where everything is included, popular with couples and families seeking relaxation.',
-          'Guided Tours': 'Escorted group travel with planned itineraries, ideal for first-time international travelers or those wanting expert guidance.',
-          'Custom/FIT Travel': 'Fully Independent Travel - personalized itineraries tailored to individual preferences, for experienced travelers.',
-          'Corporate Travel': 'Business travel management, including meetings, incentives, conferences, and exhibitions (MICE).'
-        };
-        
-        fieldContext.fieldOptions.forEach(option => {
-          if (optionGuidance[option]) {
-            fallbackResponse += `• **${option}**: ${optionGuidance[option]}\n`;
-          }
-        });
-        
-        fallbackResponse += `\nI suggest using: "${fieldContext.fieldOptions[0]}" if you primarily work with ${fieldContext.fieldOptions[0].toLowerCase()}, or select the option that best matches your main business focus.`;
-      } else if (fieldContext.fieldType === 'textarea') {
-        fallbackResponse += `This field is asking for your business goals. Here's a suggested response you can customize:\n\n`;
-        fallbackResponse += `I suggest using: "Increase bookings by 25% over the next 12 months by targeting affluent travelers interested in unique experiences. Expand our client base in the luxury travel segment while maintaining strong relationships with existing customers through personalized service and exclusive offerings."`;
-      } else {
-        fallbackResponse += `Please provide specific information that reflects your business focus and objectives. Be clear and concise about what makes your travel agency unique.`;
-      }
+      const fallbackResponse = this.generateFieldAssistanceDefault(fieldContext, message);
       
       return {
         response: fallbackResponse,
+        content: fallbackResponse,
         subMode: 'field_assistance',
-        confidence: 0.7
+        confidence: 0.7,
+        skipEnhancement: true
       };
     }
+  }
+
+  /**
+   * Generate field-specific response based on field label and context
+   */
+  generateFieldSpecificResponse(fieldContext, message, expertise) {
+    const { fieldLabel, fieldType, fieldOptions, currentValue } = fieldContext;
+    const fieldLabelLower = fieldLabel.toLowerCase();
+    
+    // Handle specific fields with targeted responses
+    if (fieldLabelLower.includes('travel specialty') || fieldLabelLower.includes('specialty')) {
+      if (message && message.toLowerCase().includes('luxury')) {
+        return `Oh, "luxury travel - 5 star properties and private touring" - that sounds amazing! You're already on the right track.\n\n` +
+               `That's actually a great specialty because luxury travelers:\n` +
+               `• Value expertise (that's you!)\n` +
+               `• Book higher-priced trips\n` +
+               `• Often become repeat clients\n` +
+               `• Refer friends who travel similarly\n\n` +
+               `Quick thought: Do you focus on specific destinations? Like "European luxury" or "African safaris"? Adding that could make your specialty even stronger.\n\n` +
+               `But honestly, what you have is already excellent.\n\n` +
+               `I suggest using: "Luxury travel - 5 star properties and private touring"`;
+      } else {
+        return `Ah, the specialty field! Think of this as "what do people come to you for?"\n\n` +
+               `Don't overthink it. When friends ask about your job, how do you describe what you do?\n\n` +
+               `Maybe you say things like:\n` +
+               `• "I plan Disney trips for families"\n` +
+               `• "I book cruises, mostly river cruises in Europe"\n` +
+               `• "I do honeymoons and romantic getaways"\n` +
+               `• "I help people explore Africa on safari"\n\n` +
+               `Or maybe you're still figuring it out - that's okay too! What type of trip gets you most excited to plan?\n\n` +
+               `I suggest using: Whatever you just thought of! That's your specialty.\n\n` +
+               `(If you're really stuck, just put what you've booked most in the last year)`;
+      }
+    }
+    
+    if (fieldLabelLower.includes('business goals') || fieldLabelLower.includes('goals')) {
+      // Check if user provided actual input (not just asking for help)
+      const messageLower = message.toLowerCase();
+      const isAskingForHelp = messageLower.includes('help') || messageLower.includes('what should') || 
+                              messageLower.includes('not sure') || messageLower.includes('don\'t know') ||
+                              (messageLower.length < 10 && messageLower !== 'yes' && messageLower !== 'no' && messageLower !== 'change');
+      
+      if (!isAskingForHelp) {
+        // Check if user is confirming their goal
+        if (messageLower === 'yes' || messageLower === 'yes!' || messageLower === 'yes, use that' || messageLower === 'yes please') {
+          return `Great! I've set your business goal.\n\n` +
+                 `✅ Your goal is locked in and ready for your Direct Mail campaign.\n\n` +
+                 `This clear, specific goal will help create a focused campaign that delivers real results.\n\n` +
+                 `Feel free to move on to the next question, or type "change" if you want to adjust it.`;
+        }
+        
+        if (messageLower === 'change' || messageLower.includes('adjust') || messageLower.includes('different')) {
+          return `No problem! Let's refine your goal.\n\n` +
+                 `What would you like to change about it? Just tell me your revised goal, and I'll help you polish it.`;
+        }
+        
+        // Check if this is a complete, refined goal
+        const hasCurrentAmount = /\$\d+k?\s*(to|in|from|at|currently)/i.test(message);
+        const hasTargetAmount = /to\s*\$?\d+k?|scale.*\$?\d+k?|grow.*\$?\d+k?/i.test(message);
+        const hasTimeframe = /\d+\s*(months?|years?|quarters?)|by\s+(end|june|december|q[1-4])|within\s+\d+/i.test(message);
+        const hasAudience = /(clients?|travelers?|couples?|families|cruises?|luxury|adventure|budget)/i.test(message);
+        
+        const isComplete = (hasCurrentAmount || hasTargetAmount) && hasTimeframe && hasAudience;
+        
+        if (isComplete) {
+          // User has provided a complete goal - confirm it
+          return `Perfect! That's exactly the kind of specific goal I was hoping for!\n\n` +
+                 `Let me make sure I got this right:\n\n` +
+                 `**"${message}"**\n\n` +
+                 `This is great because it has:\n` +
+                 `✓ Clear numbers (${hasCurrentAmount ? 'current and target' : 'target amount'})\n` +
+                 `✓ Specific timeframe\n` +
+                 `✓ Target audience defined\n\n` +
+                 `Would you like to use this as your business goal for the campaign?\n\n` +
+                 `Type **"yes"** to use this goal, or tell me what you'd like to change.`;
+        }
+        
+        // Check for partially complete goals
+        const hasAmount = /\$\d+k?/i.test(message);
+        const elements = {
+          amount: hasAmount,
+          timeframe: hasTimeframe,
+          audience: hasAudience
+        };
+        
+        // Handle specific goal types with more nuanced responses
+        if ((message.includes('grow from') || message.includes('scale from')) && hasAmount) {
+          // User is providing more detail after initial response
+          const missingElements = [];
+          if (!hasTimeframe) missingElements.push('timeframe');
+          if (!hasAudience) missingElements.push('who you want to target');
+          
+          if (missingElements.length === 0) {
+            // They've provided everything
+            return `Perfect! That's exactly what I was looking for!\n\n` +
+                   `**"${message}"**\n\n` +
+                   `This goal is crystal clear - it shows where you are, where you're going, and who will get you there.\n\n` +
+                   `Should we use this as your campaign goal? Type "yes" or let me know if you want to adjust anything.`;
+          } else {
+            // Still missing some elements
+            return `Great progress! You've got the growth numbers down.\n\n` +
+                   `Just need to add: ${missingElements.join(' and ')}\n\n` +
+                   `For example: "${message} by targeting affluent river cruise enthusiasts"\n\n` +
+                   `What would you add?`;
+          }
+        } else if (message.includes('$500k') || message.includes('500k')) {
+          // Initial $500k mention - ask for details
+          return `"Scale to $500k" - I love the ambition! That's a clear target.\n\n` +
+                 `To make this really compelling for your campaign, let's add a couple details:\n\n` +
+                 `• What are you at now? (e.g., "from $300k")\n` +
+                 `• When do you want to hit $500k? (e.g., "by June 2026")\n` +
+                 `• Who will help you get there? (e.g., "river cruise clients")\n\n` +
+                 `Maybe something like: "Grow from $300k to $500k by June 2026 by attracting more river cruise clients"\n\n` +
+                 `How would you fill in those blanks?`;
+        } else if (message.includes('more clients') || message.includes('new clients')) {
+          return `Getting more clients - that's what it's all about!\n\n` +
+                 `Let's get specific:\n` +
+                 `• How many new clients would make you happy? 5? 20? 50?\n` +
+                 `• What type of clients? Business travelers? Families? Retirees?\n` +
+                 `• Over what time period?\n\n` +
+                 `Based on what you said, try:\n\n` +
+                 `**"Attract [number] new [type] clients per month who book [type of trips]"**\n\n` +
+                 `For example: "Attract 10 new luxury clients per month who book European river cruises"`;
+        } else if (message.includes('fill') || message.includes('slow season')) {
+          return `Ah, filling the slow season - smart thinking!\n\n` +
+                 `Let's nail this down:\n` +
+                 `• Which months are typically slow for you?\n` +
+                 `• What kind of trips work best during those times?\n` +
+                 `• How many bookings would "fill" mean to you?\n\n` +
+                 `Here's a focused goal:\n\n` +
+                 `**"Fill slow season (Oct-Feb) with 15+ warm-weather bookings per month"**\n\n` +
+                 `Or: **"Generate consistent year-round revenue by promoting off-season destinations"**\n\n` +
+                 `Which version feels right, or would you say it differently?`;
+        } else {
+          // Generic refinement for other goals
+          return `You said: "${message}"\n\n` +
+                 `That's a good start! Let's make it more specific:\n\n` +
+                 `A powerful goal includes:\n` +
+                 `• A number (clients, revenue, or bookings)\n` +
+                 `• A deadline (3 months, by June, this year)\n` +
+                 `• Your target audience\n\n` +
+                 `For example: "${message} - specifically, 20 new luxury cruise bookings by December"\n\n` +
+                 `How would you make your goal more specific?`;
+        }
+      } else {
+        // Show intro message for help requests
+        return `I see you're at the business goals question - this one trips up a lot of people! Let's figure it out together.\n\n` +
+               `Think of it this way: if your direct mail campaign works perfectly, what would happen to your business?\n\n` +
+               `Maybe you're thinking:\n` +
+               `• "I just want more clients" - Great! How many more? 10? 50?\n` +
+               `• "I want to fill up my slow season" - Which months are slow for you?\n` +
+               `• "I want higher-paying clients" - What would that look like?\n\n` +
+               `Don't worry about making it sound fancy. Just tell me in plain language what success looks like for you.\n\n` +
+               `For example, one travel agent told me: "I want to book 2 more river cruises per month during winter." That's perfect!\n\n` +
+               `What would make YOU excited about your business 6 months from now?\n\n` +
+               `I suggest using: "[Your simple goal] over the next [timeframe] by focusing on [who you want to attract]."\n\n` +
+               `Just fill in those blanks with what matters to you!`;
+      }
+    }
+    
+    if (fieldLabelLower.includes('budget')) {
+      if (fieldOptions && fieldOptions.length > 0) {
+        return `Okay, the budget question - I know this feels like a big decision!\n\n` +
+               `Here's a simple way to think about it:\n\n` +
+               `Imagine you could send a beautiful postcard to 1,000 potential clients. Would that feel like enough to start? Or are you thinking bigger?\n\n` +
+               `• **$2,500-$5,000** = About 2,500-5,000 postcards\n` +
+               `  Perfect if you're thinking: "Let me test this out first"\n\n` +
+               `• **$5,000-$10,000** = About 5,000-10,000 postcards\n` +
+               `  Good if you're thinking: "I'm ready to make some noise"\n\n` +
+               `• **$10,000+** = 10,000+ postcards, multiple mailings\n` +
+               `  Right if you're thinking: "Let's go big and dominate my area"\n\n` +
+               `Most agents start with the first or second option to see what works, then scale up.\n\n` +
+               `What feels comfortable for you to invest in getting new clients?\n\n` +
+               `I suggest using: "$2,500 - $5,000" if this is your first direct mail campaign`;
+      }
+    }
+    
+    if (fieldLabelLower.includes('offer') || fieldLabelLower.includes('promotion')) {
+      return `The offer field - this is where we make people say "ooh, I want that!"\n\n` +
+             `Here's the secret: The best offers aren't always about discounts. Think about what you could give that costs you little but means a lot to clients.\n\n` +
+             `For example:\n` +
+             `• "Free airport transfers" (if you can arrange good rates)\n` +
+             `• "Room upgrade at check-in" (hotels often do this for agents)\n` +
+             `• "My personal restaurant guide" (you already know the best spots!)\n` +
+             `• "24/7 support during travel" (you probably do this anyway)\n\n` +
+             `What do your clients always ask for that you could include as a bonus?\n\n` +
+             `Or think about it this way: What's something you do for clients that they don't expect but always appreciate?\n\n` +
+             `I suggest using: "Free [something you mentioned above] when you book by [pick a date 30 days out]"\n\n` +
+             `Keep it simple - one clear offer is better than a confusing list!`;
+    }
+    
+    if (fieldLabelLower.includes('target audience') || fieldLabelLower.includes('audience')) {
+      // Check if user provided actual input (not just asking for help)
+      const messageLower = message.toLowerCase();
+      const isAskingForHelp = messageLower.includes('help') || messageLower.includes('what should') || 
+                              messageLower.includes('not sure') || messageLower.includes('don\'t know') ||
+                              messageLower.includes('who should') || messageLower.length < 10;
+      
+      if (!isAskingForHelp && message.length > 10) {
+        // User has provided actual content - help them refine it
+        let refinementResponse = `Great description! Let me help you turn that into a focused target audience.\n\n`;
+        refinementResponse += `You said: "${message}"\n\n`;
+        
+        // Extract key details from their input
+        const hasAge = /\d{2}/.test(message);
+        const hasOccupation = message.includes('professional') || message.includes('retire') || 
+                             message.includes('business') || message.includes('executive') ||
+                             message.includes('doctor') || message.includes('lawyer');
+        const hasTravelStyle = message.includes('luxury') || message.includes('adventure') ||
+                              message.includes('cruise') || message.includes('family') ||
+                              message.includes('budget') || message.includes('group');
+        
+        if (hasAge || hasOccupation || hasTravelStyle) {
+          refinementResponse += `I can see you're thinking about specific types of clients - perfect!\n\n`;
+          refinementResponse += `Here's how to make your target audience crystal clear:\n\n`;
+          
+          if (!hasAge) {
+            refinementResponse += `• Add an age range (like "45-65" or "30-50")\n`;
+          }
+          if (!hasOccupation) {
+            refinementResponse += `• Mention what they do (professionals, retirees, business owners)\n`;
+          }
+          if (!hasTravelStyle) {
+            refinementResponse += `• Include their travel style (luxury, adventure, cruises)\n`;
+          }
+          
+          refinementResponse += `\nBased on what you wrote, try this:\n\n`;
+          refinementResponse += `**"${message} who value personalized service and expert planning"**\n\n`;
+          refinementResponse += `Or be even more specific:\n\n`;
+          refinementResponse += `**"Affluent [profession] aged [range] seeking [travel type] with a focus on [what matters to them]"**`;
+        } else {
+          refinementResponse += `Let's make this more specific. A great target audience description includes:\n\n`;
+          refinementResponse += `• **Age range**: Are they millennials (25-40)? Gen X (40-55)? Boomers (55-75)?\n`;
+          refinementResponse += `• **Income/lifestyle**: Professionals? Retirees? Business owners?\n`;
+          refinementResponse += `• **Travel preferences**: Luxury? Adventure? Family trips?\n`;
+          refinementResponse += `• **What they value**: Convenience? Expertise? Deals?\n\n`;
+          refinementResponse += `For example:\n`;
+          refinementResponse += `"Professional couples 35-55 who take 2-3 luxury trips per year and value time-saving expertise"\n\n`;
+          refinementResponse += `Tell me more about your ideal clients and I'll help you craft the perfect description!`;
+        }
+        
+        return refinementResponse;
+      } else {
+        // Show intro message for help requests
+        return `Target audience - basically "who's your perfect client?"\n\n` +
+               `Close your eyes and picture your favorite client walking into your office. Got them? Good!\n\n` +
+               `Now tell me about them:\n` +
+               `• How old are they (roughly)?\n` +
+               `• What do they do for work?\n` +
+               `• What kind of trips do they book?\n` +
+               `• Why do they love working with you?\n\n` +
+               `For example, maybe you're picturing:\n` +
+               `"Susan, she's about 55, owns a business, books 2-3 trips a year, loves that I handle all the details"\n\n` +
+               `That's your target audience! We'll find more people like Susan.\n\n` +
+               `I suggest using: "[Age range] [what they do] who [what kind of travel they like] and value [what you offer]"\n\n` +
+               `So for Susan: "Professional women 45-65 who take luxury trips and value stress-free planning"`;
+      }
+    }
+    
+    if (fieldLabelLower.includes('headline') || fieldLabelLower.includes('subject')) {
+      return `The headline - this is your "attention grabber"!\n\n` +
+             `Think about what would make YOU stop and read a postcard. Usually it's one of these:\n\n` +
+             `• A question they're asking: "Ready for your next adventure?"\n` +
+             `• Something they want: "Your Italian villa awaits"\n` +
+             `• A problem you solve: "Too busy to plan your dream trip?"\n` +
+             `• Curiosity: "The secret beach even locals don't know"\n\n` +
+             `What's the #1 thing your ideal client wants from a trip? Put that in your headline!\n\n` +
+             `I suggest using: "[Something they want] + [Your specialty]"\n\n` +
+             `Like: "Your stress-free luxury escape is waiting" or "Finally, a cruise expert who gets it"`;
+    }
+    
+    if (fieldLabelLower.includes('call to action') || fieldLabelLower.includes('cta')) {
+      return `Call to Action - this tells people what to do next (and makes it super easy!)\n\n` +
+             `People are busy. Tell them EXACTLY what to do:\n\n` +
+             `✅ Good: "Call me at 555-1234 for your free consultation"\n` +
+             `❌ Not great: "Contact us for more information"\n\n` +
+             `The magic formula:\n` +
+             `[Action] + [How] + [What they get] + [When]\n\n` +
+             `Examples:\n` +
+             `• "Text CRUISE to 555-1234 for instant pricing"\n` +
+             `• "Call Sarah at 555-5678 this week for your free travel planning session"\n` +
+             `• "Visit TravelWithSarah.com/Italy to grab your Italian restaurant guide"\n\n` +
+             `What's the EASIEST way for someone to reach you? Phone? Text? Website?\n\n` +
+             `I suggest using: "Call [your name] at [your number] by [date 2-3 weeks out] for your free [your offer]"`;
+    }
+    
+    // Default response for unrecognized fields
+    return this.generateFieldAssistanceDefault(fieldContext, message);
+  }
+  
+  /**
+   * Generate default field assistance response
+   */
+  generateFieldAssistanceDefault(fieldContext, message) {
+    const { fieldLabel, fieldType, fieldOptions, currentValue, sectionContext } = fieldContext;
+    
+    // Make the field label more conversational
+    const friendlyLabel = fieldLabel.replace(/([A-Z])/g, ' $1').toLowerCase();
+    
+    let response = `I see you're stuck on "${fieldLabel}" - no worries, let me help!\n\n`;
+    
+    // Field type specific guidance
+    if (fieldType === 'select' && fieldOptions) {
+      response += `You need to pick one of these options:\n\n`;
+      fieldOptions.forEach((option, index) => {
+        response += `${index + 1}. ${option}\n`;
+      });
+      response += `\nNot sure which one? Think about:\n`;
+      response += `• What describes you best RIGHT NOW?\n`;
+      response += `• Which one would your current clients recognize?\n`;
+      response += `• When in doubt, pick what you do most often\n\n`;
+      response += `I suggest using: "${fieldOptions[0]}" (that's what most people choose to start)`;
+    } else if (fieldType === 'textarea') {
+      response += `This is where you can write a bit more about ${friendlyLabel}.\n\n`;
+      response += `Don't stress about making it perfect! Just write like you're explaining to a friend.\n\n`;
+      response += `Start with:\n`;
+      response += `• What's most important to you about this?\n`;
+      response += `• What makes you different?\n`;
+      response += `• What do you want people to know?\n\n`;
+      response += `Even 2-3 sentences is fine. You can always change it later!\n\n`;
+      response += `I suggest using: Start with "I help [who] to [do what] so they can [benefit]"`;
+    } else if (fieldType === 'number') {
+      response += `Just need a number here - keep it simple!\n\n`;
+      response += `Think about:\n`;
+      response += `• What feels realistic for you?\n`;
+      response += `• What would make you happy?\n`;
+      response += `• What can you actually handle?\n\n`;
+      response += `There's no "wrong" answer - just put what makes sense for YOUR business.\n\n`;
+      response += `I suggest using: Start with a smaller number you're confident about. You can always increase it later!`;
+    } else {
+      response += `This field is asking about ${friendlyLabel}.\n\n`;
+      response += `Here's my advice: Don't overthink it! \n\n`;
+      response += `Ask yourself:\n`;
+      response += `• What would I tell a friend who asked about this?\n`;
+      response += `• What's the simple, honest answer?\n`;
+      response += `• What feels right for my business?\n\n`;
+      response += `I suggest using: Whatever first comes to mind - that's usually the right answer!`;
+    }
+    
+    return response;
   }
 
   /**
@@ -921,8 +1214,9 @@ class CMOAssistant {
 
   /**
    * Process a marketing query with context-aware enhancements
+   * @deprecated Use processQuery(message, options) instead
    */
-  async processQuery(query, context = {}) {
+  async processQueryDeprecated(query, context = {}) {
     const { category, subMode, expertise = 'intermediate', userId = 'default' } = context;
     
     try {

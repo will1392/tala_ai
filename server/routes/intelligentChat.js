@@ -273,11 +273,32 @@ router.post('/v2', authenticate, async (req, res) => {
           // This is the enhanced content from TalaIntelligence
           const content = intelligentResponse.response.content;
           if (typeof content === 'string') {
-            responseText = content;
+            // Check if this is a JSON string that needs parsing
+            if (content.startsWith('{') && content.includes('"response":')) {
+              try {
+                const parsed = JSON.parse(content);
+                responseText = parsed.response || parsed.content || '';
+                console.log('📦 Parsed JSON response:', responseText);
+              } catch (e) {
+                // Not valid JSON, use as is
+                responseText = content;
+              }
+            } else {
+              responseText = content;
+            }
           } else if (content && typeof content === 'object') {
-            // This shouldn't happen for CMO responses after our fix
-            console.error('⚠️ Unexpected object content in CMO response:', content);
-            responseText = JSON.stringify(content);
+            // Check if it's already a serialized JSON string that got parsed
+            if (content.response && typeof content.response === 'string') {
+              // Extract the actual response text from nested structure
+              responseText = content.response;
+            } else if (content.content && typeof content.content === 'string') {
+              // Another possible nested structure
+              responseText = content.content;
+            } else {
+              // Last resort - this shouldn't happen
+              console.error('⚠️ Unexpected object content in CMO response:', content);
+              responseText = 'I apologize, but I encountered an error processing your request.';
+            }
           }
         } else if (intelligentResponse.response?.result?.response) {
           // Fallback: direct access to result

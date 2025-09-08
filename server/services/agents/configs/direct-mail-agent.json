@@ -1,0 +1,44 @@
+{
+  "id": "direct-mail",
+  "name": "Direct Mail Marketing Agent",
+  "description": "Expert guidance on direct mail campaigns including postcards, letters, offers, and targeting strategies",
+  "type": "specialized",
+  "channel": "direct_mail",
+  "capabilities": [
+    "campaign_strategy",
+    "creative_guidance",
+    "offer_optimization",
+    "list_targeting",
+    "cost_estimation",
+    "roi_calculation"
+  ],
+  "supportedModes": ["marketing", "cmo"],
+  "requiredContext": {
+    "optional": ["businessType", "campaignGoal", "targetAudience", "budget", "timeline"],
+    "enhanced": ["userExpertise", "industryVertical", "previousCampaigns"]
+  },
+  "integrations": {
+    "knowledgeBase": {
+      "collection": "kb_direct_mail",
+      "requiredMinDocs": 100
+    },
+    "llm": {
+      "model": "gpt-4-turbo-preview",
+      "temperature": 0.7,
+      "maxTokens": 1500
+    }
+  },
+  "triggers": {
+    "keywords": ["direct mail", "postcard", "mailer", "postal", "mailing list", "print marketing"],
+    "intents": ["create_direct_mail", "optimize_mailer", "target_audience", "postal_campaign"]
+  },
+  "outputFormat": {
+    "type": "structured",
+    "sections": ["summary", "recommendations", "actionItems", "metrics", "citations"]
+  },
+  "performance": {
+    "maxExecutionTime": 15000,
+    "cacheResults": true,
+    "cacheTTL": 3600
+  }
+}

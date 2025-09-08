@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tala Field Assistance Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #1a202c;
+      margin-bottom: 30px;
+    }
+    .field-group {
+      margin-bottom: 25px;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #2d3748;
+    }
+    .field-wrapper {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    input, textarea, select {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    .ask-tala-btn {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    .ask-tala-btn:hover {
+      background: #2563eb;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.active {
+      display: flex;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-body {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .modal-footer {
+      padding: 20px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .chat-messages {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 200px;
+    }
+    .message {
+      padding: 12px 16px;
+      border-radius: 8px;
+      max-width: 80%;
+    }
+    .message.user {
+      background: #3b82f6;
+      color: white;
+      align-self: flex-end;
+    }
+    .message.assistant {
+      background: #f3f4f6;
+      align-self: flex-start;
+    }
+    .suggestion-card {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 12px;
+    }
+    .suggestion-header {
+      font-weight: 500;
+      color: #166534;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .suggestion-text {
+      color: #374151;
+      font-style: italic;
+      margin-bottom: 12px;
+    }
+    .suggestion-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .sparkles-icon {
+      width: 20px;
+      height: 20px;
+    }
+    #log {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Tala Field Assistance Demo</h1>
+    
+    <div class="field-group">
+      <label>Campaign Name</label>
+      <div class="field-wrapper">
+        <input type="text" id="campaign-name" placeholder="e.g., Spring 2024 Luxury Cruise Promotion">
+        <button class="ask-tala-btn" onclick="openFieldAssistant('campaign-name', 'Campaign Name', 'text')">
+          <svg class="sparkles-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L13.09 8.26L19 9L14 12L15.45 18.22L12 15L8.55 18.22L10 12L5 9L10.91 8.26L12 2Z"/>
+          </svg>
+          Ask Tala
+        </button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>What type of travel experiences do you specialize in?</label>
+      <div class="field-wrapper">
+        <select id="travel-specialty">
+          <option value="">Select an option</option>
+          <option value="Luxury Cruises">Luxury Cruises</option>
+          <option value="River Cruises">River Cruises</option>
+          <option value="Adventure Travel">Adventure Travel</option>
+          <option value="Family Vacations">Family Vacations</option>
+          <option value="All-Inclusive Resorts">All-Inclusive Resorts</option>
+          <option value="Guided Tours">Guided Tours</option>
+          <option value="Custom/FIT Travel">Custom/FIT Travel</option>
+          <option value="Corporate Travel">Corporate Travel</option>
+          <option value="Other">Other</option>
+        </select>
+        <button class="ask-tala-btn" onclick="openFieldAssistant('travel-specialty', 'Travel Specialty', 'select', ['Luxury Cruises', 'River Cruises', 'Adventure Travel', 'Family Vacations', 'All-Inclusive Resorts', 'Guided Tours', 'Custom/FIT Travel', 'Corporate Travel', 'Other'])">
+          <svg class="sparkles-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L13.09 8.26L19 9L14 12L15.45 18.22L12 15L8.55 18.22L10 12L5 9L10.91 8.26L12 2Z"/>
+          </svg>
+          Ask Tala
+        </button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>What are your primary business goals for the next 6-12 months?</label>
+      <div class="field-wrapper">
+        <textarea id="business-goals" placeholder="e.g., Increase bookings by 20%, expand into luxury market, etc."></textarea>
+        <button class="ask-tala-btn" onclick="openFieldAssistant('business-goals', 'Business Goals', 'textarea')">
+          <svg class="sparkles-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L13.09 8.26L19 9L14 12L15.45 18.22L12 15L8.55 18.22L10 12L5 9L10.91 8.26L12 2Z"/>
+          </svg>
+          Ask Tala
+        </button>
+      </div>
+    </div>
+
+    <div id="log"></div>
+  </div>
+
+  <!-- Field Assistant Modal -->
+  <div id="assistant-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h3 style="margin: 0;">Tala Marketing Assistant</h3>
+          <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 14px;">Help with: <span id="field-label"></span></p>
+        </div>
+        <button class="btn btn-secondary" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="chat-messages" class="chat-messages"></div>
+        <div id="suggestion-card" style="display: none;" class="suggestion-card">
+          <div class="suggestion-header">
+            ✓ Suggested Response:
+          </div>
+          <div id="suggestion-text" class="suggestion-text"></div>
+          <div class="suggestion-actions">
+            <button class="btn btn-primary" onclick="applySuggestion()">Use This</button>
+            <button class="btn btn-secondary" onclick="copySuggestion()">Copy</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="field-wrapper">
+          <textarea id="chat-input" placeholder="Ask Tala for help..." style="min-height: 60px;"></textarea>
+          <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentField = null;
+    let currentFieldId = null;
+    let conversationId = null;
+    let suggestion = null;
+    
+    function log(message, type = 'info') {
+      const logEl = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      const color = type === 'error' ? '#f87171' : type === 'success' ? '#34d399' : '#60a5fa';
+      logEl.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+    
+    function openFieldAssistant(fieldId, fieldLabel, fieldType, fieldOptions) {
+      currentFieldId = fieldId;
+      currentField = {
+        fieldId,
+        fieldLabel,
+        fieldType,
+        fieldOptions,
+        currentValue: document.getElementById(fieldId).value
+      };
+      
+      document.getElementById('field-label').textContent = fieldLabel;
+      document.getElementById('assistant-modal').classList.add('active');
+      
+      // Send initial context
+      sendInitialContext();
+    }
+    
+    function closeModal() {
+      document.getElementById('assistant-modal').classList.remove('active');
+      document.getElementById('chat-messages').innerHTML = '';
+      document.getElementById('suggestion-card').style.display = 'none';
+      conversationId = null;
+      suggestion = null;
+    }
+    
+    async function sendInitialContext() {
+      const contextMessage = `I need help filling out the "${currentField.fieldLabel}" field in my direct mail consultation. ${
+        currentField.fieldType === 'select' ? `The available options are: ${currentField.fieldOptions.join(', ')}` : ''
+      } ${
+        currentField.currentValue ? `Current value: "${currentField.currentValue}"` : 'The field is currently empty.'
+      } Please help me understand what to put in this field and suggest an appropriate response.`;
+      
+      await sendMessageToTala(contextMessage, true);
+    }
+    
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+      if (!message) return;
+      
+      input.value = '';
+      await sendMessageToTala(message);
+    }
+    
+    async function sendMessageToTala(message, isInitial = false) {
+      if (!isInitial) {
+        addMessage(message, 'user');
+      }
+      
+      log(`Sending to Tala: "${message.substring(0, 50)}..."`, 'info');
+      
+      try {
+        const response = await fetch('http://localhost:3001/api/chat/v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-brand-id': 'test-brand-1'
+          },
+          body: JSON.stringify({
+            message: message,
+            mode: 'marketing',
+            context: {
+              task: 'field_assistance',
+              ...currentField,
+              sectionContext: {
+                sectionTitle: 'Business & Marketing Objectives'
+              }
+            },
+            conversationId: conversationId
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get response');
+        }
+        
+        log(`Response received: ${data.response.substring(0, 50)}...`, 'success');
+        
+        if (data.conversationId && !conversationId) {
+          conversationId = data.conversationId;
+        }
+        
+        addMessage(data.response, 'assistant');
+        
+        // Check for suggestion
+        extractSuggestion(data.response);
+        
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+        addMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+      }
+    }
+    
+    function addMessage(content, role) {
+      const messagesEl = document.getElementById('chat-messages');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${role}`;
+      messageDiv.textContent = content;
+      messagesEl.appendChild(messageDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    
+    function extractSuggestion(response) {
+      const patterns = [
+        /I suggest using: "([^"]+)"/i,
+        /suggested response: "([^"]+)"/i,
+        /Try: "([^"]+)"/i,
+        /Consider using: "([^"]+)"/i
+      ];
+      
+      for (const pattern of patterns) {
+        const match = response.match(pattern);
+        if (match && match[1]) {
+          suggestion = match[1];
+          showSuggestion(suggestion);
+          return;
+        }
+      }
+      
+      // For select fields, look for option recommendations
+      if (currentField.fieldType === 'select' && currentField.fieldOptions) {
+        const optionPattern = new RegExp(`(${currentField.fieldOptions.join('|')})`, 'i');
+        const match = response.match(new RegExp(`(?:suggest|recommend|choose).*?(${optionPattern.source})`, 'i'));
+        if (match && match[1]) {
+          suggestion = match[1];
+          showSuggestion(suggestion);
+        }
+      }
+    }
+    
+    function showSuggestion(text) {
+      document.getElementById('suggestion-text').textContent = `"${text}"`;
+      document.getElementById('suggestion-card').style.display = 'block';
+    }
+    
+    function applySuggestion() {
+      if (suggestion && currentFieldId) {
+        document.getElementById(currentFieldId).value = suggestion;
+        log(`Applied suggestion to ${currentField.fieldLabel}: "${suggestion}"`, 'success');
+        closeModal();
+      }
+    }
+    
+    function copySuggestion() {
+      if (suggestion) {
+        navigator.clipboard.writeText(suggestion);
+        log('Suggestion copied to clipboard', 'success');
+      }
+    }
+    
+    // Enter key to send
+    document.getElementById('chat-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
