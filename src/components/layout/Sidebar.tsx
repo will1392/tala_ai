@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -7,9 +8,12 @@ import {
   Mail,
   Settings,
   Sparkles,
-  Target
+  Target,
+  CreditCard
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { useTheme } from '../../context/ThemeContext';
+import { useCredits } from '../../hooks/useCredits';
 
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -21,6 +25,39 @@ const navItems = [
 ];
 
 export const Sidebar = () => {
+  const { resolvedTheme } = useTheme();
+  const { creditInfo, loading: creditsLoading } = useCredits();
+  const [userRole, setUserRole] = useState<string>('agent');
+
+  useEffect(() => {
+    // Get user role from localStorage
+    const role = localStorage.getItem('userRole') || 'agent';
+    setUserRole(role);
+  }, []);
+
+  const formatCredits = (credits: number): string => {
+    if (credits >= 10000) {
+      // For 10k+, show one decimal
+      return `${(credits / 1000).toFixed(1)}k`;
+    } else if (credits >= 1000) {
+      // For 1k-9.9k, show two decimals to avoid rounding issues
+      const value = credits / 1000;
+      return `${value.toFixed(2)}k`;
+    }
+    return credits.toString();
+  };
+
+  const getPlanLabel = () => {
+    if (!creditInfo) return 'Loading...';
+    
+    // Only show "Agency" for agency owners/admins
+    if (creditInfo.plan_type === 'agency' && (userRole === 'admin' || userRole === 'owner')) {
+      return 'Agency';
+    }
+    
+    return 'Agent';
+  };
+  
   return (
     <motion.aside
       initial={{ x: -100, opacity: 0 }}
@@ -32,12 +69,28 @@ export const Sidebar = () => {
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center glow" aria-hidden="true">
-            <Sparkles className="text-secondary-900" size={20} aria-hidden="true" />
-          </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-light bg-clip-text text-transparent">
-            Tala AI
-          </h1>
+          <img 
+            src="/assets/tala-logo-white.png"
+            alt="Tala AI"
+            className="h-10 w-auto dark:block hidden"
+            onError={(e) => {
+              console.error('Logo failed to load:', e);
+              // Fallback to text
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.insertAdjacentHTML('afterend', '<div class="text-2xl font-bold text-white">TALA</div>');
+            }}
+          />
+          <img 
+            src="/assets/tala-logo-dark.png"
+            alt="Tala AI"
+            className="h-10 w-auto dark:hidden block"
+            onError={(e) => {
+              console.error('Logo failed to load:', e);
+              // Fallback to text
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.insertAdjacentHTML('afterend', '<div class="text-2xl font-bold text-gray-900">TALA</div>');
+            }}
+          />
         </div>
       </div>
 
@@ -78,13 +131,35 @@ export const Sidebar = () => {
       </nav>
 
       {/* User Profile */}
-      <div className="absolute bottom-0 left-0 right-0 p-4">
+      <div className="absolute bottom-0 left-0 right-0 p-4 space-y-3">
+        {/* Credit Display */}
+        <NavLink
+          to="/credits"
+          className="glass rounded-xl p-3 flex items-center justify-between hover:bg-white/10 transition-all cursor-pointer group"
+          role="region"
+          aria-label="Credit balance"
+        >
+            <div className="flex items-center gap-2">
+              <CreditCard size={18} className="text-cyan-400" />
+              <span className="text-sm font-medium">Credits</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-lg font-bold text-cyan-400">
+                {creditsLoading ? '...' : formatCredits(creditInfo?.available_credits || 0)}
+              </span>
+              {creditInfo?.is_organization_pool && (
+                <span className="text-xs text-white/40">(shared)</span>
+              )}
+            </div>
+          </NavLink>
+
+        {/* User Info */}
         <div className="glass rounded-xl p-4" role="region" aria-label="User profile">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full" aria-hidden="true" />
             <div>
               <p className="font-medium">Agency Name</p>
-              <p className="text-sm text-white/60">Pro Plan</p>
+              <p className="text-sm text-white/60">{getPlanLabel()} Plan</p>
             </div>
           </div>
         </div>

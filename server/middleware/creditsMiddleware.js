@@ -3,7 +3,9 @@
  * Integrates credits checking and deduction with existing routes
  */
 
-import creditsService from '../services/db/creditsService.js';
+import CreditSystem from '../services/creditSystem.js';
+
+const creditSystem = new CreditSystem();
 
 // Operation cost configuration
 const OPERATION_COSTS = {
@@ -49,8 +51,17 @@ export function requireCredits(operation, customCost = null) {
   const cost = customCost !== null ? customCost : (OPERATION_COSTS[operation] || 1);
   
   return async (req, res, next) => {
+    console.log('🎫 requireCredits middleware called:', {
+      operation,
+      cost,
+      creditsEnabled: process.env.CREDITS_ENABLED,
+      path: req.path,
+      method: req.method
+    });
+    
     // Skip credits check for certain conditions
     if (process.env.CREDITS_ENABLED === 'false') {
+      console.log('⚠️ Credits disabled via environment variable');
       return next();
     }
     
@@ -65,20 +76,16 @@ export function requireCredits(operation, customCost = null) {
     }
     
     // Check if user has sufficient credits
-    const creditCheck = await creditsService.checkCredits(userId, operation, cost);
+    const creditCheck = await creditSystem.checkCredits(userId, operation, { cost });
     
-    if (!creditCheck.allowed) {
-      // Set appropriate status code
-      const statusCode = creditCheck.reason === 'daily_limit_exceeded' ? 429 : 402;
-      
-      return res.status(statusCode).json({
+    if (!creditCheck.success || !creditCheck.hasEnoughCredits) {
+      return res.status(402).json({
         error: 'Insufficient credits',
-        reason: creditCheck.reason,
-        details: creditCheck,
-        message: creditCheck.reason === 'daily_limit_exceeded' 
-          ? `Daily limit of ${creditCheck.dailyLimit} credits exceeded. Resets at midnight.`
-          : `This operation requires ${cost} credits. You have ${creditCheck.balance} credits remaining.`,
-        upgradeUrl: '/settings/billing'
+        message: `This operation requires ${creditCheck.creditCost || cost} credits. You have ${creditCheck.availableCredits} credits remaining.`,
+        creditCost: creditCheck.creditCost,
+        availableCredits: creditCheck.availableCredits,
+        shortfall: creditCheck.shortfall,
+        upgradeUrl: '/credits'
       });
     }
     
@@ -87,7 +94,7 @@ export function requireCredits(operation, customCost = null) {
       userId,
       operation,
       cost,
-      balance: creditCheck.balance
+      balance: creditCheck.availableCredits
     };
     
     // Deduct credits after successful response
@@ -97,6 +104,12 @@ export function requireCredits(operation, customCost = null) {
     let creditsDeducted = false;
     
     const deductCreditsOnce = async () => {
+      console.log('🎯 deductCreditsOnce called:', {
+        creditsDeducted,
+        statusCode: res.statusCode,
+        shouldDeduct: !creditsDeducted && res.statusCode < 400
+      });
+      
       if (!creditsDeducted && res.statusCode < 400) {
         creditsDeducted = true;
         
@@ -111,29 +124,41 @@ export function requireCredits(operation, customCost = null) {
           metadata.messagePreview = req.body.message.substring(0, 100);
         }
         
-        const result = await creditsService.deductCredits(
-          userId, 
-          operation, 
+        console.log('💳 Attempting to consume credits:', {
+          userId,
+          operation,
           cost,
           metadata
-        );
+        });
         
-        if (!result.success) {
-          console.error(`Failed to deduct credits for ${userId}:`, result.error);
-        } else {
-          console.log(`Deducted ${cost} credits from ${userId} for ${operation}. New balance: ${result.newBalance}`);
+        try {
+          const result = await creditSystem.consumeCredits(
+            userId, 
+            operation, 
+            { cost, ...metadata }
+          );
+          
+          console.log('💳 Credit consumption result:', result);
+          
+          if (!result.success) {
+            console.error(`❌ Failed to deduct credits for ${userId}:`, result.error);
+          } else {
+            console.log(`✅ Deducted ${result.creditsConsumed} credits from ${userId} for ${operation}. Remaining: ${result.remainingCredits}`);
+          }
+        } catch (error) {
+          console.error('❌ Exception during credit deduction:', error);
         }
       }
     };
     
     // Override response methods to deduct credits
-    res.send = function(data) {
-      deductCreditsOnce();
+    res.send = async function(data) {
+      await deductCreditsOnce();
       return originalSend.call(this, data);
     };
     
-    res.json = function(data) {
-      deductCreditsOnce();
+    res.json = async function(data) {
+      await deductCreditsOnce();
       
       // Add credits info to response if successful
       if (res.statusCode < 400 && typeof data === 'object') {
@@ -164,7 +189,7 @@ export async function getCreditsStatus(req, res) {
       });
     }
     
-    const result = await creditsService.getUserCredits(userId);
+    const result = await creditSystem.getUserCredits(userId);
     
     if (!result.success) {
       return res.status(500).json({
@@ -173,12 +198,13 @@ export async function getCreditsStatus(req, res) {
       });
     }
     
-    // Get usage statistics
-    const stats = await creditsService.getUsageStats(userId, '7d');
+    // Get usage history
+    const history = await creditSystem.getCreditHistory(userId, 7);
     
     res.json({
       credits: result.data,
-      usage: stats.data,
+      usage: history.success ? history.summary : {},
+      transactions: history.success ? history.transactions : [],
       costs: OPERATION_COSTS
     });
   } catch (error) {
@@ -209,9 +235,20 @@ export async function purchaseCredits(req, res) {
       });
     }
     
-    const result = await creditsService.purchaseCredits(userId, packageId, {
+    // Find the package details
+    const packages = creditSystem.getCreditPricingTiers();
+    const selectedPackage = packages.find(p => p.id === packageId);
+    
+    if (!selectedPackage) {
+      return res.status(400).json({
+        error: 'Invalid package ID'
+      });
+    }
+    
+    const result = await creditSystem.purchaseCredits(userId, selectedPackage.credits, {
       method: paymentMethod,
-      paymentId
+      paymentId,
+      packageId
     });
     
     if (!result.success) {
@@ -223,8 +260,8 @@ export async function purchaseCredits(req, res) {
     
     res.json({
       success: true,
-      purchase: result.purchase,
-      newBalance: result.newBalance
+      creditsPurchased: result.creditsPurchased,
+      newTotalCredits: result.newTotalCredits
     });
   } catch (error) {
     console.error('Error purchasing credits:', error);
@@ -239,17 +276,10 @@ export async function purchaseCredits(req, res) {
  */
 export async function getCreditPackages(req, res) {
   try {
-    const result = await creditsService.getCreditPackages();
-    
-    if (!result.success) {
-      return res.status(500).json({
-        error: 'Failed to get packages',
-        message: result.error
-      });
-    }
+    const packages = creditSystem.getCreditPricingTiers();
     
     res.json({
-      packages: result.data
+      packages: packages
     });
   } catch (error) {
     console.error('Error getting credit packages:', error);
@@ -265,7 +295,7 @@ export async function getCreditPackages(req, res) {
 export async function upgradeTier(req, res) {
   try {
     const userId = req.headers['x-user-id'] || req.session?.userId || req.user?.id;
-    const { tier } = req.body;
+    const { planType } = req.body;
     
     if (!userId) {
       return res.status(401).json({
@@ -273,13 +303,13 @@ export async function upgradeTier(req, res) {
       });
     }
     
-    if (!tier || !['free', 'premium', 'enterprise', 'payAsYouGo'].includes(tier)) {
+    if (!planType || !['agent', 'agency'].includes(planType)) {
       return res.status(400).json({
-        error: 'Invalid tier'
+        error: 'Invalid plan type. Must be "agent" or "agency"'
       });
     }
     
-    const result = await creditsService.upgradeTier(userId, tier);
+    const result = await creditSystem.changePlan(userId, planType);
     
     if (!result.success) {
       return res.status(500).json({
@@ -288,13 +318,9 @@ export async function upgradeTier(req, res) {
       });
     }
     
-    res.json({
-      success: true,
-      data: result.data,
-      proRatedCredits: result.proRatedCredits
-    });
+    res.json(result);
   } catch (error) {
-    console.error('Error upgrading tier:', error);
+    console.error('Error upgrading plan:', error);
     res.status(500).json({
       error: 'Internal server error'
     });
@@ -307,7 +333,7 @@ export async function upgradeTier(req, res) {
 export async function getTransactionHistory(req, res) {
   try {
     const userId = req.headers['x-user-id'] || req.session?.userId || req.user?.id;
-    const limit = parseInt(req.query.limit) || 50;
+    const days = parseInt(req.query.days) || 30;
     
     if (!userId) {
       return res.status(401).json({
@@ -315,7 +341,7 @@ export async function getTransactionHistory(req, res) {
       });
     }
     
-    const result = await creditsService.getTransactionHistory(userId, limit);
+    const result = await creditSystem.getCreditHistory(userId, days);
     
     if (!result.success) {
       return res.status(500).json({
@@ -325,7 +351,9 @@ export async function getTransactionHistory(req, res) {
     }
     
     res.json({
-      transactions: result.data
+      transactions: result.transactions,
+      summary: result.summary,
+      totalSpent: result.totalSpent
     });
   } catch (error) {
     console.error('Error getting transaction history:', error);
@@ -338,9 +366,9 @@ export async function getTransactionHistory(req, res) {
 /**
  * Initialize user credits (for new users)
  */
-export async function initializeCredits(userId, tier = 'free') {
+export async function initializeCredits(userId, organizationId = null, planType = 'agent') {
   try {
-    const result = await creditsService.initializeUserCredits(userId, tier);
+    const result = await creditSystem.initializeUserCredits(userId, organizationId, planType);
     return result;
   } catch (error) {
     console.error('Error initializing credits:', error);

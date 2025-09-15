@@ -20,11 +20,14 @@ import {
   Wand2,
   Bell,
   Sun,
-  Moon
+  Moon,
+  CreditCard
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { GlobalSearch } from './GlobalSearch';
 import { useTheme } from '../../context/ThemeContextNew';
+import { useCredits } from '../../hooks/useCredits';
+import { CreditDebug } from '../debug/CreditDebug';
 
 // UI Components
 const Input = ({ className = '', ...props }: { className?: string; [key: string]: any }) => (
@@ -199,21 +202,24 @@ const sidebarItems: SidebarItem[] = [
 ];
 
 // Sidebar Content Component
-const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, userProfile, onClose }: any) => {
+const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, userProfile, creditInfo, creditsLoading, formatCredits, onClose }: any) => {
   const navigate = useNavigate();
   const location = useLocation();
   
   return (
     <div className="flex h-full flex-col border-r">
       <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex aspect-square size-10 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 text-white">
-            <Wand2 className="size-5" />
-          </div>
-          <div>
-            <h2 className="font-semibold">Tala AI</h2>
-            <p className="text-xs text-muted-foreground">Marketing Suite</p>
-          </div>
+        <div className="flex items-center">
+          <img 
+            src="/assets/tala-logo-white.png"
+            alt="Tala AI"
+            className="h-14 w-auto object-contain dark:block hidden"
+          />
+          <img 
+            src="/assets/tala-logo-dark.png"
+            alt="Tala AI"
+            className="h-14 w-auto object-contain dark:hidden block"
+          />
         </div>
         {onClose && (
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -310,6 +316,31 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
 
       <div className="border-t p-3">
         <div className="space-y-1">
+          {/* Credits Display */}
+          <button 
+            onClick={() => navigate('/credits')}
+            className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium hover:bg-muted bg-muted/50"
+          >
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-5 w-5 text-cyan-500" />
+              <span>Credits</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {creditsLoading ? (
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              ) : (
+                <>
+                  <span className="font-bold text-cyan-500">
+                    {creditInfo ? formatCredits(creditInfo.available_credits) : '0'}
+                  </span>
+                  <Badge variant="outline" className="text-xs">
+                    {creditInfo?.plan_type === 'agency' ? 'Agency' : 'Agent'}
+                  </Badge>
+                </>
+              )}
+            </div>
+          </button>
+          
           <button 
             onClick={() => navigate('/settings')}
             className={cn(
@@ -327,9 +358,6 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
               </Avatar>
               <span>{userProfile?.name || 'User'}</span>
             </div>
-            <Badge variant="outline" className="ml-auto">
-              Pro
-            </Badge>
           </button>
         </div>
       </div>
@@ -345,6 +373,23 @@ export const PremiumLayout = () => {
   const [notifications] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
   const location = useLocation();
+  
+  // Use the credits hook
+  const { creditInfo, loading: creditsLoading, refetch } = useCredits();
+  
+  // Log for debugging and force refresh on mount
+  useEffect(() => {
+    console.log('💰 PremiumLayout creditInfo:', creditInfo);
+    console.log('💰 Credits loading:', creditsLoading);
+    
+    // Force a refresh when component mounts
+    refetch();
+  }, []);
+  
+  // Log when creditInfo changes
+  useEffect(() => {
+    console.log('💰 Credit info updated:', creditInfo);
+  }, [creditInfo]);
 
   // Load user profile
   useEffect(() => {
@@ -362,6 +407,23 @@ export const PremiumLayout = () => {
     };
     loadUserProfile();
   }, []);
+
+  const formatCredits = (credits: number): string => {
+    console.log('💰 formatCredits called with:', credits);
+    if (credits >= 10000) {
+      // For 10k+, show one decimal
+      const formatted = `${(credits / 1000).toFixed(1)}k`;
+      console.log('💰 formatCredits returning:', formatted);
+      return formatted;
+    } else if (credits >= 1000) {
+      // For 1k-9.9k, show two decimals to avoid rounding issues
+      const value = credits / 1000;
+      const formatted = `${value.toFixed(2)}k`;
+      console.log('💰 formatCredits returning:', formatted);
+      return formatted;
+    }
+    return credits.toString();
+  };
 
   const toggleExpanded = (id: string) => {
     setExpandedItems((prev) => ({
@@ -418,6 +480,9 @@ export const PremiumLayout = () => {
           toggleExpanded={toggleExpanded}
           activeTab={activeTab}
           userProfile={userProfile}
+          creditInfo={creditInfo}
+          creditsLoading={creditsLoading}
+          formatCredits={formatCredits}
           onClose={() => setMobileMenuOpen(false)}
         />
       </div>
@@ -434,6 +499,9 @@ export const PremiumLayout = () => {
           toggleExpanded={toggleExpanded}
           activeTab={activeTab}
           userProfile={userProfile}
+          creditInfo={creditInfo}
+          creditsLoading={creditsLoading}
+          formatCredits={formatCredits}
         />
       </div>
 
@@ -473,6 +541,9 @@ export const PremiumLayout = () => {
           </motion.div>
         </main>
       </div>
+      
+      {/* Debug panel - remove in production */}
+      <CreditDebug />
     </div>
   );
 };

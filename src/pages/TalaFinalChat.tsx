@@ -122,7 +122,7 @@ export const TalaFinalChat: React.FC = () => {
     switchConversation,
     loadConversationList
   } = useConversation({ 
-    userId: 'admin-1',
+    userId: localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f',
     autoLoad: false  // Don't auto-load last conversation (but still load the list)
   });
   
@@ -514,7 +514,7 @@ Let's begin with understanding your business. What type of travel experiences do
               type: 'direct_mail_consultation',
               subType: 'campaign_questionnaire',
               consultationType: 'new_campaign',
-              userId: 'admin-1',
+              userId: localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f',
               brandId: 'test-brand-1'
             };
           }
@@ -546,7 +546,7 @@ Let's begin with understanding your business. What type of travel experiences do
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': 'admin-1'
+            'x-user-id': '59b70373-ba68-4d89-8420-5c3723aef01f' // Your Supabase user
           },
           body: JSON.stringify(requestBody)
         });
@@ -558,6 +558,9 @@ Let's begin with understanding your business. What type of travel experiences do
 
         return response.json();
       });
+      
+      // Dispatch credit update event after successful response
+      window.dispatchEvent(new Event('creditUpdate'));
       
       // Store the raw response (we'll render markdown in the component)
       console.log('📚 Response data sources:', data.sources); // Debug log
@@ -738,7 +741,7 @@ Let's begin with understanding your business. What type of travel experiences do
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': 'admin-1'
+            'x-user-id': '59b70373-ba68-4d89-8420-5c3723aef01f' // Your Supabase user
           },
           body: JSON.stringify({
             message: message.content,
@@ -752,6 +755,9 @@ Let's begin with understanding your business. What type of travel experiences do
         if (!response.ok) throw new Error('Failed to get response');
         return response.json();
       });
+      
+      // Dispatch credit update event after successful response
+      window.dispatchEvent(new Event('creditUpdate'));
       
       // Update message as successful
       setMessages(prev => prev.map(m => 
@@ -1120,23 +1126,16 @@ Let's begin with understanding your business. What type of travel experiences do
               <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-center max-w-3xl">
                   {/* Tala Icon with Primary Teal Color */}
-                  <div className="mb-8">
-                    <div className={cn(
-                      "inline-flex items-center justify-center w-16 h-16 rounded-2xl",
-                      isMarketingMode 
-                        ? "bg-white" 
-                        : "bg-gradient-to-br from-primary to-primary-dark"
-                    )}>
-                      {isMarketingMode ? (
-                        <Sparkles className="w-8 h-8 text-gray-900" />
-                      ) : (
-                        <Plane className="w-8 h-8 text-gray-900 dark:text-white" />
-                      )}
-                    </div>
+                  <div className="mb-8 flex justify-center">
+                    <img 
+                      src="/assets/tala-emblem.png"
+                      alt="Tala AI"
+                      className="h-16 w-16 object-contain"
+                    />
                   </div>
                   
                   {/* Large Welcome Text */}
-                  <h1 className="text-4xl font-light mb-3 text-gray-900 dark:text-white">
+                  <h1 className="text-4xl font-semibold mb-3 text-gray-900 dark:text-white">
                     {isMarketingMode 
                       ? `How can I help with marketing today, ${userName}?`
                       : `Hey, ${userName}!`
@@ -1177,18 +1176,11 @@ Let's begin with understanding your business. What type of travel experiences do
                             {userName[0]}
                           </div>
                         ) : (
-                          <div className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center",
-                            message.mode === 'marketing'
-                              ? "bg-white"
-                              : "bg-gradient-to-br from-primary to-primary-dark"
-                          )}>
-                            {message.mode === 'marketing' ? (
-                              <Sparkles className="w-4 h-4 text-gray-900" />
-                            ) : (
-                              <Plane className="w-4 h-4 text-white" />
-                            )}
-                          </div>
+                          <img 
+                            src="/assets/tala-emblem.png"
+                            alt="Tala AI"
+                            className="h-8 w-8 object-contain rounded-lg"
+                          />
                         )}
                       </div>
                       
@@ -1275,18 +1267,11 @@ Let's begin with understanding your business. What type of travel experiences do
                   <div className="max-w-[48rem] mx-auto py-6 px-4">
                     <div className="flex gap-6">
                       <div className="flex-shrink-0">
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center",
-                          isMarketingMode
-                            ? "bg-white"
-                            : "bg-gradient-to-br from-primary to-primary-dark"
-                        )}>
-                          {isMarketingMode ? (
-                            <Sparkles className="w-4 h-4 text-gray-900" />
-                          ) : (
-                            <Plane className="w-4 h-4 text-white" />
-                          )}
-                        </div>
+                        <img 
+                          src="/assets/tala-emblem.png"
+                          alt="Tala AI"
+                          className="h-8 w-8 object-contain rounded-lg"
+                        />
                       </div>
                       <div className="flex-1">
                         <TypingDots />

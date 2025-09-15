@@ -11,7 +11,8 @@ export const authenticate = (req, res, next) => {
     const userId = req.headers['x-user-id'] || 
                    req.headers['x-mock-user-id'] || 
                    req.headers.authorization?.replace('Bearer ', '') || 
-                   'test_user_123';
+                   process.env.DEFAULT_USER_ID ||
+                   '59b70373-ba68-4d89-8420-5c3723aef01f'; // Your Supabase user
     
     console.log('🔐 Auth middleware:', {
         'x-user-id': req.headers['x-user-id'],

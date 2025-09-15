@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
 import { Layout } from './components/layout/Layout';
 import { PremiumLayout } from './components/layout/PremiumLayout';
 import { LoginPage } from './components/auth/LoginPage';
@@ -37,10 +38,17 @@ import { TourProvider } from './components/tour/TourProvider';
 import { DEFAULT_TOUR_STEPS } from './tour/steps';
 import { srOnly } from './utils/accessibility';
 import { LiveRegionManager } from './components/accessibility';
+import Credits from './pages/Credits';
+import { ensureUserId } from './utils/ensureUserId';
 import './styles/globals.css';
 
 function App() {
   const { isAuthenticated } = useAuthStore();
+  
+  // Ensure userId is set on app load
+  useEffect(() => {
+    ensureUserId();
+  }, []);
   
   return (
     <ErrorBoundary
@@ -99,6 +107,7 @@ function App() {
                     <Route path="ui-components" element={<UIComponentShowcase />} />
                     <Route path="markdown-test" element={<MarkdownTest />} />
                     <Route path="marketing" element={<MarketingDashboard />} />
+                    <Route path="credits" element={<Credits />} />
                   </Route>
                   <Route path="/" element={<Layout />}>
                     <Route path="dashboard-old" element={<Dashboard />} />
