@@ -16,7 +16,6 @@ import {
   Menu,
   PanelLeft,
   X,
-  Search,
   Wand2,
   Bell,
   Sun,
@@ -29,20 +28,9 @@ import { useTheme } from '../../context/ThemeContextNew';
 import { useCredits } from '../../hooks/useCredits';
 import { CreditDebug } from '../debug/CreditDebug';
 
-// UI Components
-const Input = ({ className = '', ...props }: { className?: string; [key: string]: any }) => (
-  <input
-    className={cn(
-      'flex h-10 w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary',
-      className
-    )}
-    {...props}
-  />
-);
-
-const Button = ({ 
-  children, 
-  variant = 'default', 
+const Button = ({
+  children,
+  variant = 'default',
   size = 'default',
   className = '',
   ...props 
@@ -210,7 +198,7 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
     <div className="flex h-full flex-col border-r">
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center">
-          <img 
+          <img
             src="/assets/tala-logo-white.png"
             alt="Tala AI"
             className="h-14 w-auto object-contain dark:block hidden"
@@ -226,13 +214,6 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
             <X className="h-5 w-5" />
           </Button>
         )}
-      </div>
-
-      <div className="px-3 py-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input type="search" placeholder="Search..." className="w-full rounded-2xl bg-muted pl-9 pr-4 py-2" />
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-2">

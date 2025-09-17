@@ -59,6 +59,18 @@ export default function DocList({ docs, activeDocId, onSelect }: Props) {
     return () => container.removeEventListener('keydown', onKey);
   }, [docs, activeDocId, onSelect]);
 
+  // Ensure the active document is visible when selected programmatically
+  useEffect(() => {
+    if (!activeDocId) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const activeElement = container.querySelector<HTMLButtonElement>(`[data-doc="${activeDocId}"]`);
+    if (activeElement) {
+      activeElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [activeDocId, docs]);
+
   if (docs.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500 dark:text-gray-400">

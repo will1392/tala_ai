@@ -12,7 +12,7 @@ import { primaryFolderService } from '../services/primaryFolderService';
 import { folderService } from '../services/folderService';
 import { ApiSearchService } from '../services/apiSearchService';
 import { useSearchService } from '../hooks/useSearchService';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Skeleton from '../components/shared/Skeleton';
 import Spinner from '../components/shared/Spinner';
 import InlineNotice from '../components/shared/InlineNotice';
@@ -90,6 +90,7 @@ function getDescendantIds(node: FolderNode): string[] {
 
 export const KnowledgeFinal = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const apiService = new ApiSearchService();
   
   // State
@@ -114,7 +115,7 @@ export const KnowledgeFinal = () => {
   // Mobile state
   const isMobile = useIsMobile();
   const [showSidebar, setShowSidebar] = useState(false);
-  
+
   // Tour
   const { start: startTour } = useTour();
   
@@ -167,7 +168,7 @@ export const KnowledgeFinal = () => {
   useEffect(() => {
     const loadAllDocuments = async () => {
       if (!isInitialized) return;
-      
+
       setLoadingDocuments(true);
       try {
         // Load documents from all folders
@@ -191,6 +192,35 @@ export const KnowledgeFinal = () => {
 
     loadAllDocuments();
   }, [isInitialized]);
+
+  // Handle deep linking to a specific document from search
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const docIdFromParams = params.get('docId');
+    const folderIdFromParams = params.get('folderId') || params.get('primaryFolderId');
+
+    if (!docIdFromParams || !allDocuments.length) {
+      return;
+    }
+
+    const matchedDoc = allDocuments.find(doc => doc.id === docIdFromParams);
+    if (!matchedDoc) {
+      return;
+    }
+
+    if (activeDocId !== matchedDoc.id) {
+      setActiveDocId(matchedDoc.id);
+    }
+
+    const resolvedFolderId = folderIdFromParams || matchedDoc.folderId || matchedDoc.primaryFolderId || null;
+    if ((resolvedFolderId ?? null) !== (activeFolderId ?? null)) {
+      setActiveFolderId(resolvedFolderId);
+    }
+
+    if (searchQuery) {
+      setSearchQuery('');
+    }
+  }, [location.search, allDocuments, activeDocId, activeFolderId, searchQuery]);
 
   // Check Qdrant health on mount (disabled for now as the endpoint doesn't exist)
   useEffect(() => {
