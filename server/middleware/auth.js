@@ -2,11 +2,12 @@
  * Authentication Middleware
  * Simple auth middleware for the email-tasks routes
  */
+import roleService from '../services/roleService.js';
 
 /**
  * Authenticate user (mock implementation for testing)
  */
-export const authenticate = (req, res, next) => {
+export const authenticate = async (req, res, next) => {
     // Get user ID from headers - support both x-user-id and x-mock-user-id
     const userId = req.headers['x-user-id'] || 
                    req.headers['x-mock-user-id'] || 
@@ -30,30 +31,76 @@ export const authenticate = (req, res, next) => {
     req.userId = userId;
     req.organizationId = req.headers['x-organization-id'] || '00000000-0000-0000-0000-000000000001';
     
-    next();
-};
-
-/**
- * Optional authentication - doesn't fail if no auth provided
- */
-export const optionalAuth = (req, res, next) => {
-    const userId = req.headers['x-user-id'] || req.headers.authorization?.replace('Bearer ', '');
-    
-    if (userId) {
-        req.userId = userId;
-        req.organizationId = req.headers['x-organization-id'] || '00000000-0000-0000-0000-000000000001';
+    // Fetch user role
+    try {
+        const userRole = await roleService.getUserRole(userId);
+        req.userRole = userRole;
+        console.log('🔐 User role:', userRole);
+    } catch (error) {
+        console.error('Error fetching user role:', error);
+        req.userRole = 'agent'; // Default role if fetch fails
     }
     
     next();
 };
 
 /**
- * Require specific role (mock implementation)
+ * Optional authentication - doesn't fail if no auth provided
  */
-export const requireRole = (role) => {
-    return (req, res, next) => {
-        // In production, check user's role from database
-        // For testing, we'll allow all roles
+export const optionalAuth = async (req, res, next) => {
+    const userId = req.headers['x-user-id'] || req.headers.authorization?.replace('Bearer ', '');
+    
+    if (userId) {
+        req.userId = userId;
+        req.organizationId = req.headers['x-organization-id'] || '00000000-0000-0000-0000-000000000001';
+        
+        // Fetch user role
+        try {
+            const userRole = await roleService.getUserRole(userId);
+            req.userRole = userRole;
+        } catch (error) {
+            console.error('Error fetching user role:', error);
+            req.userRole = 'agent'; // Default role if fetch fails
+        }
+    }
+    
+    next();
+};
+
+/**
+ * Require specific role
+ */
+export const requireRole = (requiredRoles) => {
+    // Accept single role or array of roles
+    const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+    
+    return async (req, res, next) => {
+        // Ensure user is authenticated first
+        if (!req.userId) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+        
+        // Get user role if not already set
+        if (!req.userRole) {
+            try {
+                req.userRole = await roleService.getUserRole(req.userId);
+            } catch (error) {
+                console.error('Error fetching user role:', error);
+                return res.status(500).json({ error: 'Failed to verify permissions' });
+            }
+        }
+        
+        // Check if user has required role
+        const hasRequiredRole = roles.includes(req.userRole) || req.userRole === 'super_admin';
+        
+        if (!hasRequiredRole) {
+            return res.status(403).json({ 
+                error: 'Insufficient permissions',
+                required: roles,
+                actual: req.userRole
+            });
+        }
+        
         next();
     };
 };

@@ -5,8 +5,12 @@
 
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";  -- For text search performance
-CREATE EXTENSION IF NOT EXISTS "unaccent"; -- For accent-insensitive search
+
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS "pg_trgm" WITH SCHEMA extensions;  -- For text search performance
+CREATE EXTENSION IF NOT EXISTS "unaccent" WITH SCHEMA extensions; -- For accent-insensitive search
+ALTER EXTENSION "pg_trgm" SET SCHEMA extensions;
+ALTER EXTENSION "unaccent" SET SCHEMA extensions;
 
 -- =============================================================================
 -- ORGANIZATIONS TABLE
@@ -523,46 +527,55 @@ CREATE INDEX idx_documents_metadata ON documents USING gin(metadata);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$;
 
 -- Function to update conversation message count
 CREATE OR REPLACE FUNCTION update_conversation_message_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        UPDATE conversations 
+        UPDATE conversations
         SET message_count = message_count + 1,
             last_message_at = NEW.created_at,
             last_activity_at = NEW.created_at
         WHERE id = NEW.conversation_id;
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
-        UPDATE conversations 
+        UPDATE conversations
         SET message_count = message_count - 1
         WHERE id = OLD.conversation_id;
         RETURN OLD;
     END IF;
     RETURN NULL;
 END;
-$$ language 'plpgsql';
+$$;
 
 -- Function to update folder document count
 CREATE OR REPLACE FUNCTION update_folder_document_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        UPDATE folders 
+        UPDATE folders
         SET document_count = document_count + 1,
             total_size_bytes = total_size_bytes + COALESCE(NEW.file_size_bytes, 0)
         WHERE id = NEW.folder_id;
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
-        UPDATE folders 
+        UPDATE folders
         SET document_count = document_count - 1,
             total_size_bytes = total_size_bytes - COALESCE(OLD.file_size_bytes, 0)
         WHERE id = OLD.folder_id;
@@ -572,14 +585,14 @@ BEGIN
         IF OLD.folder_id != NEW.folder_id THEN
             -- Remove from old folder
             IF OLD.folder_id IS NOT NULL THEN
-                UPDATE folders 
+                UPDATE folders
                 SET document_count = document_count - 1,
                     total_size_bytes = total_size_bytes - COALESCE(OLD.file_size_bytes, 0)
                 WHERE id = OLD.folder_id;
             END IF;
             -- Add to new folder
             IF NEW.folder_id IS NOT NULL THEN
-                UPDATE folders 
+                UPDATE folders
                 SET document_count = document_count + 1,
                     total_size_bytes = total_size_bytes + COALESCE(NEW.file_size_bytes, 0)
                 WHERE id = NEW.folder_id;
@@ -589,11 +602,14 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ language 'plpgsql';
+$$;
 
 -- Function to update tag usage count
 CREATE OR REPLACE FUNCTION update_tag_usage_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
         UPDATE tags SET usage_count = usage_count + 1 WHERE id = NEW.tag_id;
@@ -604,7 +620,7 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ language 'plpgsql';
+$$;
 
 -- =============================================================================
 -- TRIGGERS
@@ -640,6 +656,9 @@ ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE document_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE primary_folders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE migrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schema_version ENABLE ROW LEVEL SECURITY;
 
 -- Organizations: Users can only see their own organization
 CREATE POLICY "Users can view own organization" ON organizations FOR SELECT USING (
@@ -675,7 +694,154 @@ CREATE POLICY "Users can access organization documents" ON documents FOR SELECT 
     )
 );
 
--- Similar policies for other tables...
+-- Folders: Restrict access to authorized members of the organization
+CREATE POLICY "Users can view accessible folders" ON folders FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.organization_id = folders.organization_id
+          AND (
+              folders.visibility IN ('organization', 'public')
+              OR folders.user_id = current_user.id
+              OR (folders.allowed_user_ids IS NOT NULL AND current_user.id = ANY(folders.allowed_user_ids))
+          )
+    )
+);
+
+CREATE POLICY "Users can manage own folders" ON folders FOR INSERT WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.id = folders.user_id
+          AND current_user.organization_id = folders.organization_id
+    )
+);
+
+CREATE POLICY "Users can update own folders" ON folders FOR UPDATE USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.id = folders.user_id
+          AND current_user.organization_id = folders.organization_id
+    )
+) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.id = folders.user_id
+          AND current_user.organization_id = folders.organization_id
+    )
+);
+
+CREATE POLICY "Users can delete own folders" ON folders FOR DELETE USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.id = folders.user_id
+          AND current_user.organization_id = folders.organization_id
+    )
+);
+
+-- Tags: Organization-level access with admin controls for writes
+CREATE POLICY "Users can view organization tags" ON tags FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1 FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.organization_id = tags.organization_id
+    )
+);
+
+CREATE POLICY "Admins manage organization tags" ON tags FOR ALL USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1 FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.organization_id = tags.organization_id
+          AND current_user.role IN ('owner', 'admin')
+    )
+) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1 FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.organization_id = tags.organization_id
+          AND current_user.role IN ('owner', 'admin')
+    )
+);
+
+-- Document tags: Allow viewing and management based on document access
+CREATE POLICY "Users can view document tags" ON document_tags FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        JOIN documents d ON d.id = document_tags.document_id
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.organization_id = d.organization_id
+          AND (
+              d.visibility IN ('organization', 'public')
+              OR d.user_id = current_user.id
+              OR (d.is_shared AND d.shared_with_user_ids IS NOT NULL AND current_user.id = ANY(d.shared_with_user_ids))
+          )
+    )
+);
+
+CREATE POLICY "Users can modify owned document tags" ON document_tags FOR ALL USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        JOIN documents d ON d.id = document_tags.document_id
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.id = d.user_id
+    )
+) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        JOIN documents d ON d.id = document_tags.document_id
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.id = d.user_id
+    )
+);
+
+-- Primary folders: readable by authenticated users, managed by service role
+CREATE POLICY "Authenticated users can read primary folders" ON primary_folders FOR SELECT USING (
+    auth.role() IN ('authenticated', 'service_role')
+);
+
+CREATE POLICY "Service role manages primary folders" ON primary_folders FOR ALL USING (
+    auth.role() = 'service_role'
+) WITH CHECK (auth.role() = 'service_role');
+
+-- Migration tables restricted to service role
+CREATE POLICY "Service role reads migrations" ON migrations FOR SELECT USING (
+    auth.role() = 'service_role'
+);
+
+CREATE POLICY "Service role manages migrations" ON migrations FOR ALL USING (
+    auth.role() = 'service_role'
+) WITH CHECK (auth.role() = 'service_role');
+
+CREATE POLICY "Service role reads schema version" ON schema_version FOR SELECT USING (
+    auth.role() = 'service_role'
+);
+
+CREATE POLICY "Service role manages schema version" ON schema_version FOR ALL USING (
+    auth.role() = 'service_role'
+) WITH CHECK (auth.role() = 'service_role');
 
 -- =============================================================================
 -- INITIAL DATA
@@ -694,41 +860,127 @@ INSERT INTO primary_folders (name, description, icon, category, sort_order, is_d
 -- VIEWS FOR COMMON QUERIES
 -- =============================================================================
 
--- View for conversation summaries with latest message
-CREATE VIEW conversation_summaries AS
-SELECT 
+-- View for conversation summaries with latest message scoped to the caller
+CREATE OR REPLACE VIEW conversation_summaries AS
+SELECT
     c.*,
-    u.display_name as user_name,
-    u.email as user_email,
-    latest_msg.content as latest_message,
-    latest_msg.created_at as latest_message_at,
-    latest_msg.sender as latest_message_sender
+    owner.display_name AS owner_display_name,
+    latest_msg.content AS latest_message,
+    latest_msg.created_at AS latest_message_at,
+    latest_msg.sender AS latest_message_sender
 FROM conversations c
-JOIN users u ON c.user_id = u.id
+JOIN users owner ON owner.id = c.user_id
 LEFT JOIN LATERAL (
-    SELECT content, created_at, sender 
-    FROM messages 
-    WHERE conversation_id = c.id 
-    ORDER BY created_at DESC 
+    SELECT content, created_at, sender
+    FROM messages
+    WHERE conversation_id = c.id
+    ORDER BY created_at DESC
     LIMIT 1
-) latest_msg ON true
-WHERE c.deleted_at IS NULL;
+) latest_msg ON TRUE
+WHERE c.deleted_at IS NULL
+  AND (
+      auth.role() = 'service_role'
+      OR EXISTS (
+          SELECT 1
+          FROM users current_user
+          WHERE current_user.auth_user_id = auth.uid()
+            AND current_user.id = c.user_id
+      )
+  );
+ALTER VIEW conversation_summaries SET (security_invoker = true);
 
--- View for document search with folder information
-CREATE VIEW document_search AS
-SELECT 
-    d.*,
-    f.name as folder_name,
-    f.path as folder_path,
-    u.display_name as uploader_name,
-    ARRAY_AGG(t.name) FILTER (WHERE t.name IS NOT NULL) as tag_names
+-- View of documents the caller is allowed to access
+CREATE OR REPLACE VIEW accessible_documents AS
+SELECT
+    d.*
 FROM documents d
+WHERE d.deleted_at IS NULL
+  AND (
+      auth.role() = 'service_role'
+      OR EXISTS (
+          SELECT 1
+          FROM users current_user
+          WHERE current_user.auth_user_id = auth.uid()
+            AND current_user.organization_id = d.organization_id
+            AND (
+                d.visibility IN ('organization', 'public')
+                OR d.user_id = current_user.id
+                OR (d.is_shared AND d.shared_with_user_ids IS NOT NULL AND current_user.id = ANY(d.shared_with_user_ids))
+            )
+      )
+  );
+ALTER VIEW accessible_documents SET (security_invoker = true);
+
+-- View for document search with folder information limited by access rules
+CREATE OR REPLACE VIEW document_search AS
+SELECT
+    d.*,
+    f.name AS folder_name,
+    f.path AS folder_path,
+    owner.display_name AS uploader_name,
+    ARRAY_AGG(t.name) FILTER (WHERE t.name IS NOT NULL) AS tag_names
+FROM accessible_documents d
 LEFT JOIN folders f ON d.folder_id = f.id
-LEFT JOIN users u ON d.user_id = u.id
+LEFT JOIN users owner ON d.user_id = owner.id
 LEFT JOIN document_tags dt ON d.id = dt.document_id
 LEFT JOIN tags t ON dt.tag_id = t.id
-WHERE d.deleted_at IS NULL
-GROUP BY d.id, f.name, f.path, u.display_name;
+GROUP BY d.id, f.name, f.path, owner.display_name;
+ALTER VIEW document_search SET (security_invoker = true);
+
+-- View exposing details about the current user only
+CREATE OR REPLACE VIEW user_details AS
+SELECT
+    u.id,
+    u.organization_id,
+    u.auth_user_id,
+    u.email,
+    u.first_name,
+    u.last_name,
+    u.display_name,
+    u.avatar_url,
+    u.role,
+    u.status,
+    u.preferences,
+    u.metadata,
+    u.created_at,
+    u.updated_at
+FROM users u
+WHERE
+    auth.role() = 'service_role'
+    OR u.auth_user_id = auth.uid();
+ALTER VIEW user_details SET (security_invoker = true);
+
+-- View for organization usage scoped to the requesting tenant
+CREATE OR REPLACE VIEW agency_usage_summary AS
+SELECT
+    u.organization_id,
+    u.id AS user_id,
+    u.display_name,
+    u.email,
+    u.role,
+    u.status,
+    u.plan_type,
+    COALESCE(uc.monthly_allocation, 0) AS total_credits,
+    GREATEST(COALESCE(uc.monthly_allocation, 0) - COALESCE(uc.balance, 0), 0) AS used_credits,
+    0::INTEGER AS bonus_credits,
+    COALESCE(uc.balance, 0) AS available_credits,
+    (u.status = 'active') AS active,
+    u.updated_at AS last_activity_at
+FROM users u
+LEFT JOIN user_credits uc ON uc.user_id = u.id::text
+WHERE
+    auth.role() = 'service_role'
+    OR EXISTS (
+        SELECT 1
+        FROM users current_user
+        WHERE current_user.auth_user_id = auth.uid()
+          AND current_user.organization_id = u.organization_id
+          AND (
+              current_user.role IN ('owner', 'admin')
+              OR current_user.id = u.id
+          )
+    );
+ALTER VIEW agency_usage_summary SET (security_invoker = true);
 
 -- =============================================================================
 -- COMMENTS
@@ -765,7 +1017,10 @@ CREATE INDEX IF NOT EXISTS idx_migrations_applied_at ON migrations(applied_at);
 
 -- Helper functions for migrations
 CREATE OR REPLACE FUNCTION create_migration_table()
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     CREATE TABLE IF NOT EXISTS migrations (
         id SERIAL PRIMARY KEY,
@@ -773,21 +1028,27 @@ BEGIN
         applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE OR REPLACE FUNCTION drop_table_if_exists(table_name text)
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     EXECUTE format('DROP TABLE IF EXISTS %I CASCADE', table_name);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE OR REPLACE FUNCTION drop_type_if_exists(type_name text)
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     EXECUTE format('DROP TYPE IF EXISTS %I CASCADE', type_name);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- =============================================================================
 -- SCHEMA VERSION

@@ -183,7 +183,7 @@ class CreditSystem {
       // For solo agents or if no org pool exists, get individual credits
       const { data, error } = await this.supabase
         .from('user_credits')
-        .select('*')
+        .select('*, role')
         .eq('user_id', userId)
         .single();
 
@@ -205,7 +205,8 @@ class CreditSystem {
           available_credits: availableCredits,
           percentage_used: (data.used_credits / data.total_credits) * 100,
           is_organization_pool: false,
-          plan_type: data.plan_type || 'agent'
+          plan_type: data.plan_type || 'agent',
+          role: data.role || 'agent'
         }
       };
     } catch (error) {
@@ -245,6 +246,18 @@ class CreditSystem {
       return { success: false, error: 'Failed to check credits' };
     }
 
+    // Super admin bypass: always allow operations for super_admin users
+    if (userCredits.data.role === 'super_admin') {
+      return {
+        success: true,
+        hasEnoughCredits: true,
+        creditCost,
+        availableCredits: userCredits.data.available_credits,
+        shortfall: 0,
+        bypassReason: 'super_admin_unlimited_access'
+      };
+    }
+
     const hasEnoughCredits = userCredits.data.available_credits >= creditCost;
     
     return {
@@ -276,6 +289,22 @@ class CreditSystem {
           creditCost: creditCheck.creditCost,
           availableCredits: creditCheck.availableCredits,
           shortfall: creditCheck.shortfall
+        };
+      }
+
+      // Super admin bypass: don't actually deduct credits but still log and return success
+      if (creditCheck.bypassReason === 'super_admin_unlimited_access') {
+        await this.logCreditTransaction(userId, operation, 0, {
+          ...additionalParams,
+          bypass_reason: 'super_admin_unlimited_access',
+          would_have_cost: creditCheck.creditCost
+        });
+
+        return {
+          success: true,
+          creditsConsumed: 0,
+          remainingCredits: creditCheck.availableCredits,
+          bypassReason: 'super_admin_unlimited_access'
         };
       }
 
@@ -608,11 +637,11 @@ class CreditSystem {
    */
   getCreditPricingTiers() {
     return [
-      { id: 'tier_1', credits: 5000, price: 5, perCredit: 0.001, name: 'Starter Pack' },
-      { id: 'tier_2', credits: 10000, price: 10, perCredit: 0.001, name: 'Basic Pack' },
-      { id: 'tier_3', credits: 25000, price: 24, perCredit: 0.00096, name: 'Pro Pack', discount: '4% off' },
-      { id: 'tier_4', credits: 50000, price: 45, perCredit: 0.0009, name: 'Business Pack', discount: '10% off' },
-      { id: 'tier_5', credits: 100000, price: 85, perCredit: 0.00085, name: 'Enterprise Pack', discount: '15% off' }
+      { id: 'starter', credits: 5000, price: 10, name: 'Starter Pack' },
+      { id: 'growth', credits: 10000, price: 20, name: 'Growth Pack' },
+      { id: 'pro', credits: 25000, price: 40, name: 'Pro Pack', popular: true },
+      { id: 'business', credits: 50000, price: 65, name: 'Business Pack' },
+      { id: 'enterprise', credits: 100000, price: 100, name: 'Enterprise Pack' }
     ];
   }
 

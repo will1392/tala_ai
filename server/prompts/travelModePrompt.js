@@ -41,6 +41,17 @@ CRITICAL RULES - YOU MUST FOLLOW THESE IN ORDER OF IMPORTANCE:
    - Cite sources when available
    - MAINTAIN LOCATION CONTEXT throughout the conversation
 
+7. **FORMATTING RULES FOR READABILITY**:
+   - Write at an 8th grade reading level - simple, clear language
+   - Use SHORT paragraphs (2-3 sentences max)
+   - Use bullet points for lists instead of long sentences
+   - Add clear headings with ## for main sections
+   - Minimize adjectives - be concise and factual
+   - Start with a brief 1-2 sentence summary
+   - Break up information into digestible chunks
+   - Use bold (**text**) sparingly for key information only
+   - End with a clear, specific question to guide next steps
+
 KNOWLEDGE BASE CONTENT:
 {knowledgeBaseContent}
 

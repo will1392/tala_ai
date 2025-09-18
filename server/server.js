@@ -22,8 +22,9 @@ import multilingualProcessor from './services/documents/MultilingualProcessor.js
 import LLMRouter from './services/llm/LLMRouter.js';
 import metricsRoutes from './api-metrics-endpoint.js';
 import ChatService from './services/chatService.js';
-import { getSupabaseHealth } from './db/supabaseClient.js';
+import { getSupabaseHealth, getSupabaseService } from './db/supabaseClient.js';
 import { logDatabaseStatus } from './config/database.js';
+import { createFolderHandlers } from './routes/folderHandlers.js';
 
 // Import new database and middleware components
 import { initializeRedis } from './config/redis.js';
@@ -39,7 +40,10 @@ import { getAuthConfig } from './config/auth.js';
 import { ConversationService } from './services/db/conversationService.js';
 import { DocumentService } from './services/db/documentService.js';
 import { FolderService } from './services/db/folderService.js';
-// import QdrantOptimizer from './services/QdrantOptimizer.js'; // Commented out - file doesn't exist
+import QdrantOptimizer from './services/QdrantOptimizer.js';
+
+// Import role service
+import roleService from './services/roleService.js';
 
 // Import credits middleware
 import creditsMiddleware from './middleware/creditsMiddleware.js';
@@ -75,6 +79,7 @@ if (process.env.STORAGE_TYPE !== 's3') {
 // Initialize LLM Router with feature flag
 let llmRouter = null;
 const enableMultiLLM = process.env.ENABLE_MULTI_LLM === 'true';
+const enableQdrantOptimizer = process.env.ENABLE_QDRANT_OPTIMIZER !== 'false';
 
 if (enableMultiLLM) {
   console.log('🤖 Initializing Multi-LLM Router...');
@@ -103,6 +108,11 @@ const chatService = new ChatService({
 const conversationService = new ConversationService();
 const documentService = new DocumentService();
 const folderService = new FolderService();
+let qdrantOptimizer = null;
+
+if (enableQdrantOptimizer) {
+  qdrantOptimizer = new QdrantOptimizer(qdrant, { logger: console });
+}
 
 // Initialize database connection and supporting services
 (async () => {
@@ -141,29 +151,30 @@ const folderService = new FolderService();
       console.log('💡 Run: node test-database-setup.js to configure database');
     }
     
-    // Optimize Qdrant collections for better performance
-    console.log('🚀 Optimizing Qdrant collections...');
-    try {
-      const qdrantOptimizer = new QdrantOptimizer(qdrant);
-      
-      // Optimize the main knowledge collection
-      const optimizationResult = await qdrantOptimizer.optimizeCollection('tala_admin_knowledge');
-      if (optimizationResult.success) {
-        console.log('✅ Qdrant collection optimized:', optimizationResult);
-      } else {
-        console.log('⚠️ Qdrant optimization skipped:', optimizationResult.error);
-      }
-      
-      // Also optimize user knowledge collection if it exists
+    if (qdrantOptimizer) {
+      console.log('🚀 Optimizing Qdrant collections...');
       try {
-        await qdrantOptimizer.optimizeCollection('tala_knowledge');
-      } catch (err) {
-        // Collection might not exist yet
-        console.log('ℹ️ User knowledge collection not found - will optimize when created');
+        // Optimize the main knowledge collection
+        const optimizationResult = await qdrantOptimizer.optimizeCollection('tala_admin_knowledge');
+        if (optimizationResult.success) {
+          console.log('✅ Qdrant collection optimized:', optimizationResult);
+        } else {
+          console.log('⚠️ Qdrant optimization skipped:', optimizationResult.error);
+        }
+
+        // Also optimize user knowledge collection if it exists
+        try {
+          await qdrantOptimizer.optimizeCollection('tala_knowledge');
+        } catch (err) {
+          // Collection might not exist yet
+          console.log('ℹ️ User knowledge collection not found - will optimize when created');
+        }
+      } catch (error) {
+        console.error('⚠️ Qdrant optimization failed:', error.message);
+        // Non-fatal - continue server startup
       }
-    } catch (error) {
-      console.error('⚠️ Qdrant optimization failed:', error.message);
-      // Non-fatal - continue server startup
+    } else {
+      console.log('⏭️  Skipping Qdrant optimization (ENABLE_QDRANT_OPTIMIZER=false)');
     }
   } catch (error) {
     console.log('⚠️  Database health check failed - using JSON fallback mode');
@@ -787,6 +798,10 @@ app.use('/api/keys', apiKeysRouter);
 import profilesRouter from './routes/profiles.js';
 app.use('/api/profiles', profilesRouter);
 
+// Credit Management Routes
+import creditRoutes from './routes/credits.js';
+app.use('/api/credits', creditRoutes);
+
 // Conversation Threading Routes
 import conversationsRouter from './routes/conversations.js';
 app.use('/api/conversations', conversationsRouter);
@@ -849,6 +864,14 @@ app.use('/api/cmo/feedback', cmoFeedbackRoutes);
 import cmoAnalysisRoutes from './routes/api/cmo-analysis.js';
 app.use('/api/cmo/analysis', cmoAnalysisRoutes);
 
+// Role Management routes
+import roleRoutes from './routes/roleRoutes.js';
+app.use('/api/roles', roleRoutes);
+
+// Admin routes (super admin only)
+import adminRoutes from './routes/adminRoutes.js';
+app.use('/api/admin', adminRoutes);
+
 // Marketing Profile routes
 import marketingProfileRoutes from './routes/marketingProfile.js';
 app.use('/api/marketing-profile', marketingProfileRoutes);
@@ -878,9 +901,9 @@ console.log('✅ Direct Mail Agent routes mounted at /api/direct-mail-agent');
 // import chatV2Routes from './routes/api/chat-v2.js';
 // app.use('/api/chat/v2', chatV2Routes);
 
-// Documents Routes
+// Documents Routes - DISABLED to use original Qdrant endpoint
 // import documentsRouter from './routes/documents.js';
-// app.use('/api/documents', documentsRouter); // Temporarily disabled due to database policy issues
+// app.use('/api/documents', documentsRouter);
 
 // Email Connection Routes
 // import emailConnectRoutes from './routes/email-connect.js';
@@ -1034,150 +1057,25 @@ app.get('/api/folders', authenticate, asyncHandler(async (req, res) => {
   res.json(userFolders);
 }));
 
-// Update folder
-app.put('/api/folders/:folderId', async (req, res) => {
-  try {
-    const { folderId } = req.params;
-    const { name, description, userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-
-    const folder = folders.get(folderId);
-    if (!folder) {
-      return res.status(404).json({ error: 'Folder not found' });
-    }
-
-    if (folder.userId !== userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    if (name) folder.name = name.trim();
-    if (description !== undefined) folder.description = description?.trim();
-    
-    folders.set(folderId, folder);
-    saveFolders(folders);
-    
-    console.log(`📁 Updated folder: ${folder.name} (ID: ${folderId})`);
-    res.json(folder);
-  } catch (error) {
-    console.error('📁 Folder update error:', error);
-    res.status(500).json({ error: 'Failed to update folder' });
-  }
+const {
+  updateFolderHandler,
+  deleteFolderHandler,
+  moveFolderHandler
+} = createFolderHandlers({
+  folders,
+  saveFolders,
+  updatePrimaryFolderCounts,
+  getPrimaryFolders: () => primaryFolders
 });
+
+// Update folder
+app.put('/api/folders/:folderId', authenticate, updateFolderHandler);
 
 // Delete folder
-app.delete('/api/folders/:folderId', async (req, res) => {
-  try {
-    const { folderId } = req.params;
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-
-    const folder = folders.get(folderId);
-    if (!folder) {
-      return res.status(404).json({ error: 'Folder not found' });
-    }
-
-    if (folder.userId !== userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    // Store primaryFolderId before deleting
-    const deletedFolderPrimaryId = folder.primaryFolderId;
-    
-    folders.delete(folderId);
-    saveFolders(folders);
-    
-    // Update primary folder counts if this folder belonged to a primary folder
-    if (deletedFolderPrimaryId) {
-      updatePrimaryFolderCounts();
-    }
-    
-    console.log(`📁 Deleted folder: ${folder.name} (ID: ${folderId})`);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('📁 Folder deletion error:', error);
-    res.status(500).json({ error: 'Failed to delete folder' });
-  }
-});
+app.delete('/api/folders/:folderId', authenticate, deleteFolderHandler);
 
 // Move folder to new parent
-app.put('/api/folders/:folderId/move', async (req, res) => {
-  try {
-    const { folderId } = req.params;
-    const { newParentId, newParentType, userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-    
-    if (!newParentId || !newParentType) {
-      return res.status(400).json({ error: 'newParentId and newParentType are required' });
-    }
-    
-    if (!['primary', 'subfolder'].includes(newParentType)) {
-      return res.status(400).json({ error: 'newParentType must be "primary" or "subfolder"' });
-    }
-
-    const folder = folders.get(folderId);
-    if (!folder) {
-      return res.status(404).json({ error: 'Folder not found' });
-    }
-
-    if (folder.userId !== userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    // Store old primary folder ID for count updates
-    const oldPrimaryFolderId = folder.primaryFolderId;
-    
-    // Validate new parent exists
-    if (newParentType === 'primary') {
-      const primaryFolder = primaryFolders.get(newParentId);
-      if (!primaryFolder) {
-        return res.status(404).json({ error: 'Target primary folder not found' });
-      }
-      
-      // Check if user can create in this primary folder
-      if (!primaryFolder.permissions.canCreate) {
-        return res.status(403).json({ error: 'Cannot create folders in this primary folder' });
-      }
-      
-      // Update folder's primary folder ID
-      folder.primaryFolderId = newParentId;
-    } else if (newParentType === 'subfolder') {
-      const parentFolder = folders.get(newParentId);
-      if (!parentFolder) {
-        return res.status(404).json({ error: 'Target parent folder not found' });
-      }
-      
-      // Prevent circular references
-      if (newParentId === folderId) {
-        return res.status(400).json({ error: 'Cannot move folder into itself' });
-      }
-      
-      // Update folder's primary folder to match parent's primary folder
-      folder.primaryFolderId = parentFolder.primaryFolderId;
-    }
-    
-    folder.updatedAt = new Date().toISOString();
-    folders.set(folderId, folder);
-    saveFolders(folders);
-    
-    // Update primary folder counts for both old and new primary folders
-    updatePrimaryFolderCounts();
-    
-    console.log(`📁 Moved folder: ${folder.name} (ID: ${folderId}) to ${newParentType} ${newParentId}`);
-    res.json(folder);
-  } catch (error) {
-    console.error('📁 Folder move error:', error);
-    res.status(500).json({ error: 'Failed to move folder' });
-  }
-});
+app.put('/api/folders/:folderId/move', authenticate, moveFolderHandler);
 
 // Primary Folder Management System
 const primaryFoldersFilePath = path.join(__dirname, 'primaryFolders.json');
@@ -1894,13 +1792,37 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { userId, isAdmin = 'false', folderId, primaryFolderId, category, tags } = req.body;
+    const { userId, isAdmin = 'false', folderId, primaryFolderId, category, tags, visibility } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    console.log(`📄 Processing upload for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}, primaryFolder: ${primaryFolderId || 'none'}`);
+    // Get user role for permission checking
+    const userRole = await roleService.getUserRole(userId);
+    console.log(`📄 Processing upload for user ${userId} (role: ${userRole}, admin: ${isAdmin}) to folder: ${folderId || 'none'}, primaryFolder: ${primaryFolderId || 'none'}`);
+    
+    // Check upload permissions based on role
+    if (userRole === 'agent' && !isAdmin) {
+      return res.status(403).json({ 
+        error: 'Insufficient permissions',
+        message: 'Only agency owners and super admins can upload documents'
+      });
+    }
+    
+    // Determine document visibility
+    let documentVisibility = visibility || 'agency'; // Default to agency visibility
+    if (userRole === 'super_admin' && !visibility) {
+      documentVisibility = 'global'; // Super admins default to global
+    }
+    
+    // Validate visibility permissions
+    if (documentVisibility === 'global' && userRole !== 'super_admin') {
+      return res.status(403).json({ 
+        error: 'Insufficient permissions',
+        message: 'Only super admins can create global documents'
+      });
+    }
     
     // Validate primary folder if provided
     let primaryFolder = null;
@@ -1925,6 +1847,31 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
       
       if (!folder) {
         return res.status(400).json({ error: 'Sub-folder not found' });
+      }
+    }
+    
+    // Get organization ID for agency documents
+    let organizationId = null;
+    if (documentVisibility === 'agency') {
+      try {
+        const supabase = getSupabaseService();
+        const { data: userCredits } = await supabase
+          .from('user_credits')
+          .select('organization_id')
+          .eq('user_id', userId)
+          .single();
+          
+        organizationId = userCredits?.organization_id;
+        
+        if (!organizationId) {
+          return res.status(400).json({
+            error: 'Organization required',
+            message: 'Agency documents require user to belong to an organization'
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching organization:', error);
+        return res.status(500).json({ error: 'Failed to fetch user organization' });
       }
     }
     
@@ -2092,6 +2039,9 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
               primaryFolderName: primaryFolder?.name || null,
               primaryFolderSlug: primaryFolder?.slug || null,
               tags: tags ? JSON.parse(tags) : [],
+              // Role-based visibility
+              visibility: documentVisibility,
+              userRole: userRole,
               // Visual document metadata
               documentType: processedDoc.type,
               visualElements: processedDoc.visualContent?.elements || [],
@@ -2108,7 +2058,9 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
               isAdminDocument: isAdmin === 'true',
               fileUrl: fileUrl,
               storageProvider: storageProvider,
-              storageKey: storageKey
+              storageKey: storageKey,
+              visibility: documentVisibility,
+              organizationId: organizationId
             }
           }
         });
@@ -2149,6 +2101,10 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
       folderId: folderId || null,
       primaryFolderId: primaryFolderId || null,
       primaryFolderName: primaryFolder?.name || null,
+      // Role-based visibility
+      visibility: documentVisibility,
+      organizationId: organizationId,
+      uploadedByRole: userRole,
       // Include visual analysis results
       documentType: processedDoc.type,
       hasVisualContent: processedDoc.type === 'visual' || processedDoc.type === 'hybrid',
@@ -2210,7 +2166,7 @@ function buildConversationState(messages) {
 }
 
 // Tala AI Chat endpoint
-app.post('/api/chat', authenticate, asyncHandler(async (req, res) => {
+app.post('/api/chat', authenticate, requireCredits('chat_ai'), asyncHandler(async (req, res) => {
   const { message, conversationId, maxResults = 5 } = req.body;
     
     if (!message?.trim()) {
@@ -2637,7 +2593,7 @@ ${context || 'No relevant documents found in the knowledge base.'}`;
 }));
 
 // Entity extraction endpoint for conversation context
-app.post('/api/chat/extract-context', async (req, res) => {
+app.post('/api/chat/extract-context', authenticate, requireCredits('chat_generate'), async (req, res) => {
   try {
     const { message, contextSummary, existingEntities } = req.body;
     
@@ -3358,7 +3314,7 @@ app.post('/api/voice/store', async (req, res) => {
 });
 
 // Search documents
-app.post('/api/documents/search', async (req, res) => {
+app.post('/api/documents/search', authenticate, requireCredits('search_documents'), async (req, res) => {
   req.startTime = Date.now();
   try {
     const { query, userId, isAdmin = false, limit = 10, scoreThreshold = 0.2, folderId, primaryFolderId, category, fileType } = req.body;
@@ -3367,9 +3323,29 @@ app.post('/api/documents/search', async (req, res) => {
       return res.status(400).json({ error: 'Query and userId are required' });
     }
     
+    // Get user role and organization for visibility filtering
+    const userRole = await roleService.getUserRole(userId);
+    let userOrganizationId = null;
+    
+    if (userRole !== 'super_admin') {
+      try {
+        const supabase = getSupabaseService();
+        const { data: userCredits } = await supabase
+          .from('user_credits')
+          .select('organization_id')
+          .eq('user_id', userId)
+          .single();
+        userOrganizationId = userCredits?.organization_id;
+      } catch (error) {
+        console.error('Error fetching user organization:', error);
+      }
+    }
+    
     console.log(`🔍 Enhanced search request:`, {
       query: query.substring(0, 50),
       userId: userId.substring(0, 8),
+      userRole,
+      userOrganizationId,
       folderId,
       primaryFolderId,
       category,
@@ -3404,7 +3380,68 @@ app.post('/api/documents/search', async (req, res) => {
         }
         
         // Build search filters
-        const searchFilter = { must: [] };
+        const searchFilter = { must: [], should: [] };
+        
+        // Add visibility filters based on user role
+        if (userRole === 'super_admin') {
+          // Super admins can see all documents
+          console.log('🔍 Super admin - no visibility filters applied');
+        } else {
+          // For non-super admins, add visibility filters
+          const visibilityFilter = { should: [] };
+          
+          // Can always see global documents
+          visibilityFilter.should.push({
+            key: 'metadata.visibility',
+            match: { value: 'global' }
+          });
+          
+          // Can see agency documents if they belong to the same organization
+          if (userOrganizationId) {
+            searchFilter.must.push({
+              should: [
+                // Global documents
+                {
+                  key: 'metadata.visibility',
+                  match: { value: 'global' }
+                },
+                // Agency documents from their organization
+                {
+                  must: [
+                    {
+                      key: 'metadata.visibility',
+                      match: { value: 'agency' }
+                    },
+                    {
+                      key: 'document.organizationId',
+                      match: { value: userOrganizationId }
+                    }
+                  ]
+                },
+                // Documents without visibility (legacy support)
+                {
+                  key: 'metadata.visibility',
+                  match: { value: null }
+                }
+              ]
+            });
+          } else {
+            // Users without organization can only see global documents
+            searchFilter.must.push({
+              should: [
+                {
+                  key: 'metadata.visibility',
+                  match: { value: 'global' }
+                },
+                // Documents without visibility (legacy support)
+                {
+                  key: 'metadata.visibility',
+                  match: { value: null }
+                }
+              ]
+            });
+          }
+        }
         
         // IMPORTANT: When folder filtering is active, we need to ensure
         // we ONLY get documents from the specified folders
@@ -3529,6 +3566,8 @@ app.post('/api/documents/search', async (req, res) => {
       uploadDate: result.document?.uploadedAt || new Date().toISOString(),
       folderId: result.metadata?.folderId || null,
       primaryFolderId: result.metadata?.primaryFolderId || null,
+      visibility: result.metadata?.visibility || 'legacy',
+      organizationId: result.document?.organizationId || null,
       metadata: {
         fileName: result.document?.originalName || result.metadata?.title,
         fileSize: result.document?.fileSize,
@@ -3536,6 +3575,7 @@ app.post('/api/documents/search', async (req, res) => {
         wordCount: result.metadata?.wordCount,
         folderName: result.metadata?.folderName,
         primaryFolderName: result.metadata?.primaryFolderName,
+        visibility: result.metadata?.visibility || 'legacy',
         ...result.metadata
       }
     }));

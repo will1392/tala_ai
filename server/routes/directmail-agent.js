@@ -6,14 +6,17 @@
 import express from 'express';
 import { directMailOrchestrator } from '../services/agents/specialized/DirectMailOrchestrator.js';
 import { cmoAssistant } from '../services/cmo/CMOAssistant.js';
+import { authenticate } from '../middleware/auth.js';
+import creditsMiddleware from '../middleware/creditsMiddleware.js';
 
 const router = express.Router();
+const { requireCredits } = creditsMiddleware;
 
 /**
  * POST /api/direct-mail-agent/process
  * Process consultation through specialized agents and return to Tala
  */
-router.post('/process', async (req, res) => {
+router.post('/process', authenticate, requireCredits('cmo_generate'), async (req, res) => {
   console.log('🚀 Direct Mail Agent: Processing consultation request');
   
   try {
@@ -132,7 +135,7 @@ router.post('/copywrite', async (req, res) => {
  * POST /api/direct-mail-agent/analyze-postcards
  * Generate postcard-specific analysis for multiple sizes
  */
-router.post('/analyze-postcards', async (req, res) => {
+router.post('/analyze-postcards', authenticate, requireCredits('cmo_analyze'), async (req, res) => {
   console.log('📐 Direct Mail Agent: Generating postcard analysis');
   
   try {

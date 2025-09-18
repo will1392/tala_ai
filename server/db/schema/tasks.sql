@@ -137,19 +137,25 @@ CREATE TABLE task_reminders (
 
 -- Create updated_at trigger
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$;
 
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON tasks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Create function to get task with all relations
 CREATE OR REPLACE FUNCTION get_task_with_relations(p_task_id UUID)
-RETURNS JSON AS $$
+RETURNS JSON
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   result JSON;
 BEGIN
@@ -168,10 +174,10 @@ BEGIN
   LEFT JOIN task_reminders r ON t.id = r.task_id
   WHERE t.id = p_task_id
   GROUP BY t.id;
-  
+
   RETURN result;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Grant permissions (adjust based on your Supabase setup)
 GRANT ALL ON tasks TO authenticated;
@@ -202,7 +208,149 @@ CREATE POLICY "Users can update own tasks" ON tasks
 CREATE POLICY "Users can delete own tasks" ON tasks
   FOR DELETE USING (created_by = auth.uid()::text OR created_by = current_setting('app.current_user_id', true));
 
--- Similar policies for related tables...
+-- Task assignments: accessible to task owners, assigned users, or service role
+CREATE POLICY "Users can view related assignments" ON task_assignments
+  FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR user_id = auth.uid()::text
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_assignments.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+CREATE POLICY "Users manage assignments on owned tasks" ON task_assignments
+  FOR ALL USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_assignments.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  ) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_assignments.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+-- Dependencies: limited to task owners or service role
+CREATE POLICY "Users can access task dependencies" ON task_dependencies
+  FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_dependencies.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+CREATE POLICY "Users manage task dependencies" ON task_dependencies
+  FOR ALL USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_dependencies.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  ) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_dependencies.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+-- History: visible to task owners or the user who performed the action
+CREATE POLICY "Users can read task history" ON task_history
+  FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR user_id = auth.uid()::text
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_history.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+CREATE POLICY "Users manage task history on owned tasks" ON task_history
+  FOR ALL USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_history.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  ) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_history.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+-- Attachments: visible to task owners, uploaders, or service role
+CREATE POLICY "Users can view task attachments" ON task_attachments
+  FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR uploaded_by = auth.uid()::text
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_attachments.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+CREATE POLICY "Users manage task attachments on owned tasks" ON task_attachments
+  FOR ALL USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_attachments.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  ) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_attachments.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+-- Reminders: visible to recipients or task owners
+CREATE POLICY "Users can view task reminders" ON task_reminders
+  FOR SELECT USING (
+    auth.role() = 'service_role'
+    OR user_id = auth.uid()::text
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_reminders.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
+
+CREATE POLICY "Users manage task reminders on owned tasks" ON task_reminders
+  FOR ALL USING (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_reminders.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  ) WITH CHECK (
+    auth.role() = 'service_role'
+    OR EXISTS (
+      SELECT 1 FROM tasks t
+      WHERE t.id = task_reminders.task_id
+        AND (t.created_by = auth.uid()::text OR t.created_by = current_setting('app.current_user_id', true))
+    )
+  );
 
 -- Create indexes for better performance
 CREATE INDEX idx_tasks_full_text ON tasks USING gin(to_tsvector('english', title || ' ' || COALESCE(description, '')));
