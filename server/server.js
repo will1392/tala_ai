@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import path from 'path';
 import fs from 'fs';
+import { Readable } from 'stream';
 const require = createRequire(import.meta.url);
 const PDFParse = require('pdf-parse');
 import mammoth from 'mammoth';
@@ -287,7 +288,7 @@ app.use(rateLimiter.middleware('api'));
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit for document uploads
+    fileSize: 50 * 1024 * 1024, // 50MB limit for uploads
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
@@ -296,13 +297,19 @@ const upload = multer({
       'application/msword',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
-      'text/plain'
+      'application/json',
+      'text/plain',
     ];
-    
-    if (allowedTypes.includes(file.mimetype)) {
+
+    const allowedPrefixes = ['image/', 'audio/'];
+
+    if (
+      allowedTypes.includes(file.mimetype) ||
+      allowedPrefixes.some(prefix => file.mimetype.startsWith(prefix))
+    ) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only PDF, Word, Excel, and text files are allowed.'));
+      cb(new Error('Invalid file type. Supported types include documents, images, and audio.'));
     }
   }
 });
@@ -1706,6 +1713,187 @@ app.post('/api/documents/extract', upload.array('document', 10), async (req, res
       data: {},
       error: 'Failed to extract document data',
       details: error.message
+    });
+  }
+});
+
+app.post('/api/media/analyze-images', upload.array('file', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        analyses: [],
+        error: 'NO_FILES',
+        message: 'No files were uploaded for analysis'
+      });
+    }
+
+    const analyses = [];
+
+    for (const file of req.files) {
+      if (!file.mimetype.startsWith('image/')) {
+        analyses.push({
+          fileName: file.originalname,
+          success: false,
+          error: 'UNSUPPORTED_FILE_TYPE'
+        });
+        continue;
+      }
+
+      if (file.size > 15 * 1024 * 1024) {
+        analyses.push({
+          fileName: file.originalname,
+          success: false,
+          error: 'FILE_TOO_LARGE'
+        });
+        continue;
+      }
+
+      const base64Image = file.buffer.toString('base64');
+      const dataUrl = `data:${file.mimetype};base64,${base64Image}`;
+
+      try {
+        const prompt = 'Provide a concise description of the key details in this image. Focus on any text, numbers, or travel/marketing relevant elements. Return a JSON object with keys "summary" (string), "tags" (array of up to 5 keywords), and "detectedText" (array of notable text snippets).';
+
+        const response = await openai.responses.create({
+          model: 'gpt-4.1-mini',
+          temperature: 0.2,
+          max_output_tokens: 800,
+          input: [
+            {
+              role: 'user',
+              content: [
+                { type: 'input_text', text: prompt },
+                { type: 'input_image', image_url: dataUrl }
+              ]
+            }
+          ]
+        });
+
+        const outputText = response.output_text?.trim() || '';
+        let parsed;
+        try {
+          parsed = JSON.parse(outputText);
+        } catch (jsonError) {
+          parsed = { summary: outputText };
+        }
+
+        analyses.push({
+          fileName: file.originalname,
+          success: true,
+          description: parsed.summary || parsed.description || outputText,
+          detectedText: Array.isArray(parsed.detectedText) ? parsed.detectedText : [],
+          tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+          mimeType: file.mimetype,
+          size: file.size
+        });
+      } catch (analysisError) {
+        console.error('Image analysis failed:', analysisError);
+        analyses.push({
+          fileName: file.originalname,
+          success: false,
+          error: analysisError instanceof Error ? analysisError.message : 'UNKNOWN_ERROR'
+        });
+      }
+    }
+
+    res.json({
+      success: analyses.some(item => item.success),
+      analyses
+    });
+  } catch (error) {
+    console.error('Image analysis error:', error);
+    res.status(500).json({
+      success: false,
+      analyses: [],
+      error: 'IMAGE_ANALYSIS_ERROR',
+      message: 'Failed to analyze uploaded images'
+    });
+  }
+});
+
+app.post('/api/media/transcribe', upload.array('file', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        transcriptions: [],
+        error: 'NO_FILES',
+        message: 'No audio files were uploaded'
+      });
+    }
+
+    const transcriptions = [];
+
+    for (const file of req.files) {
+      if (!file.mimetype.startsWith('audio/')) {
+        transcriptions.push({
+          fileName: file.originalname,
+          success: false,
+          error: 'UNSUPPORTED_FILE_TYPE'
+        });
+        continue;
+      }
+
+      if (file.size > 25 * 1024 * 1024) {
+        transcriptions.push({
+          fileName: file.originalname,
+          success: false,
+          error: 'FILE_TOO_LARGE'
+        });
+        continue;
+      }
+
+      try {
+        const audioStream = Readable.from(file.buffer);
+        (audioStream).path = file.originalname;
+
+        const transcription = await openai.audio.transcriptions.create({
+          file: audioStream,
+          model: 'gpt-4o-mini-transcribe',
+          response_format: 'verbose_json'
+        });
+
+        let averageConfidence;
+        if (Array.isArray(transcription.segments) && transcription.segments.length > 0) {
+          const confidences = transcription.segments
+            .map(segment => segment.confidence)
+            .filter(value => typeof value === 'number');
+
+          if (confidences.length > 0) {
+            averageConfidence = confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+          }
+        }
+
+        transcriptions.push({
+          fileName: file.originalname,
+          success: true,
+          transcript: transcription.text || '',
+          language: transcription.language,
+          duration: transcription.duration,
+          confidence: averageConfidence
+        });
+      } catch (transcriptionError) {
+        console.error('Audio transcription failed:', transcriptionError);
+        transcriptions.push({
+          fileName: file.originalname,
+          success: false,
+          error: transcriptionError instanceof Error ? transcriptionError.message : 'UNKNOWN_ERROR'
+        });
+      }
+    }
+
+    res.json({
+      success: transcriptions.some(item => item.success),
+      transcriptions
+    });
+  } catch (error) {
+    console.error('Audio transcription error:', error);
+    res.status(500).json({
+      success: false,
+      transcriptions: [],
+      error: 'AUDIO_TRANSCRIPTION_ERROR',
+      message: 'Failed to transcribe uploaded audio files'
     });
   }
 });

@@ -1,13 +1,31 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
-import { Send, Paperclip, Mic, MicOff, Sparkles, AlertCircle, Database, X, FileText } from 'lucide-react';
+import {
+  Send,
+  Paperclip,
+  Mic,
+  MicOff,
+  Sparkles,
+  AlertCircle,
+  Database,
+  X,
+  FileText,
+  FileImage,
+  FileAudio,
+  FileWarning
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../ui/Button';
 import { cn } from '../../utils/cn';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { VoiceCategorySelector } from './VoiceCategorySelector';
 import { CategoryDetectionService, type Category } from '../../services/categoryDetectionService';
-import { DocumentUploadOptions, type DocumentUploadDecision } from './DocumentUploadOptions';
+import {
+  DocumentUploadOptions,
+  type DocumentUploadDecision,
+  type UploadableFile
+} from './DocumentUploadOptions';
 import { DocumentExtractionService, type ExtractionResult } from '../../services/documentExtractionService';
+import { MediaProcessingService } from '../../services/mediaProcessingService';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: File[], wasVoiceInput?: boolean) => void;
@@ -17,7 +35,7 @@ interface ChatInputProps {
 
 export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your message..." }: ChatInputProps) => {
   const [message, setMessage] = useState('');
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<UploadableFile[]>([]);
   const [showVoiceError, setShowVoiceError] = useState(false);
   const [wasVoiceInput, setWasVoiceInput] = useState(false);
   const [showKnowledgePrompt, setShowKnowledgePrompt] = useState(false);
@@ -28,6 +46,48 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
   const [isProcessingDocuments, setIsProcessingDocuments] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  type AttachmentType = UploadableFile['type'];
+
+  const classifyFileType = (file: File): AttachmentType => {
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type.startsWith('audio/')) return 'audio';
+
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const documentExtensions = new Set([
+      'pdf', 'doc', 'docx', 'txt', 'rtf', 'md', 'markdown', 'ppt', 'pptx', 'csv', 'xls', 'xlsx', 'json'
+    ]);
+
+    if (documentExtensions.has(extension)) {
+      return 'document';
+    }
+
+    if (file.type === 'application/pdf' || file.type.includes('wordprocessingml')) {
+      return 'document';
+    }
+
+    return 'other';
+  };
+
+  const createAttachment = (file: File): UploadableFile => ({
+    file,
+    type: classifyFileType(file),
+    previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+  });
+
+  const cleanupAttachment = (attachment: UploadableFile) => {
+    if (attachment.previewUrl) {
+      URL.revokeObjectURL(attachment.previewUrl);
+    }
+  };
+
+  const clearAttachments = () => {
+    attachments.forEach(cleanupAttachment);
+    setAttachments([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
   
   // Speech recognition integration
   const {
@@ -154,13 +214,24 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      setAttachments(files);
+      const prepared = files.map(createAttachment);
+      setAttachments(prev => [...prev, ...prepared]);
       setShowDocumentOptions(true);
     }
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
+    setAttachments(prev => {
+      const next = [...prev];
+      const [removed] = next.splice(index, 1);
+      if (removed) {
+        cleanupAttachment(removed);
+      }
+      if (next.length === 0) {
+        setShowDocumentOptions(false);
+      }
+      return next;
+    });
   };
 
   const handleDocumentUploadDecision = async (decision: DocumentUploadDecision) => {
@@ -170,31 +241,60 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
     try {
       let extractionResult: ExtractionResult | null = null;
       let storageResult: any = null;
+      let imageAnalysisResult: Awaited<ReturnType<typeof MediaProcessingService.analyzeImages>> | null = null;
+      let audioTranscriptionResult: Awaited<ReturnType<typeof MediaProcessingService.transcribeAudio>> | null = null;
 
       // Handle extraction
-      if (decision.action === 'extract' || decision.action === 'both') {
+      const documents = attachments.filter(file => file.type === 'document');
+      const images = attachments.filter(file => file.type === 'image');
+      const audio = attachments.filter(file => file.type === 'audio');
+      const others = attachments.filter(file => file.type === 'other');
+
+      if ((decision.action === 'extract' || decision.action === 'both') && documents.length > 0) {
         extractionResult = await DocumentExtractionService.extractData(
-          attachments, 
+          documents.map(item => item.file),
           decision.extractOptions?.extractType || 'summary'
         );
+      }
+
+      if ((decision.action === 'extract' || decision.action === 'both') && images.length > 0) {
+        imageAnalysisResult = await MediaProcessingService.analyzeImages(images.map(item => item.file));
+      }
+
+      if ((decision.action === 'extract' || decision.action === 'both') && audio.length > 0) {
+        audioTranscriptionResult = await MediaProcessingService.transcribeAudio(audio.map(item => item.file));
       }
 
       // Handle storage
       if (decision.action === 'store' || decision.action === 'both') {
         storageResult = await DocumentExtractionService.uploadAndStore(
-          attachments,
+          attachments.map(item => item.file),
           decision.storeOptions || {}
         );
       }
 
       // Send results as a message
       let resultMessage = '';
-      
+
       if (extractionResult) {
-        resultMessage += DocumentExtractionService.formatExtractionForDisplay(
-          extractionResult, 
+        const documentMessage = DocumentExtractionService.formatExtractionForDisplay(
+          extractionResult,
           decision.extractOptions?.extractType || 'summary'
         );
+
+        if (documentMessage) {
+          resultMessage += `## 📄 Document Insights\n\n${documentMessage}`;
+        }
+      }
+
+      if (imageAnalysisResult && imageAnalysisResult.analyses?.length) {
+        if (resultMessage) resultMessage += '\n\n---\n\n';
+        resultMessage += MediaProcessingService.formatImageAnalysisForDisplay(imageAnalysisResult);
+      }
+
+      if (audioTranscriptionResult && audioTranscriptionResult.transcriptions?.length) {
+        if (resultMessage) resultMessage += '\n\n---\n\n';
+        resultMessage += MediaProcessingService.formatAudioTranscriptionsForDisplay(audioTranscriptionResult);
       }
 
       if (storageResult) {
@@ -209,18 +309,25 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
         }
       }
 
+      if (others.length > 0) {
+        if (resultMessage) resultMessage += '\n\n---\n\n';
+        resultMessage += `⚠️ The following file${others.length > 1 ? 's are' : ' is'} not yet supported for automated processing: ${others
+          .map(item => `**${item.file.name}**`)
+          .join(', ')}.`;
+      }
+
       // Send the formatted results as a message
       if (resultMessage) {
         onSend(resultMessage);
       }
 
       // Clear attachments
-      setAttachments([]);
-      
+      clearAttachments();
+
     } catch (error) {
       console.error('Document processing error:', error);
       onSend(`❌ **Document processing failed:** ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setAttachments([]);
+      clearAttachments();
     } finally {
       setIsProcessingDocuments(false);
     }
@@ -228,12 +335,47 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
 
   const handleCancelDocumentUpload = () => {
     setShowDocumentOptions(false);
-    setAttachments([]);
+    clearAttachments();
   };
 
   return (
     <div className="glass-dark border-t border-white/10 p-4 space-y-3">
       {/* Note: Attachments are now handled by DocumentUploadOptions component */}
+
+      <AnimatePresence>
+        {attachments.length > 0 && !showDocumentOptions && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="flex flex-wrap gap-2"
+          >
+            {attachments.map((attachment, index) => (
+              <motion.div
+                key={`${attachment.file.name}-${index}`}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-xs"
+              >
+                {attachment.type === 'document' && <FileText size={14} className="text-blue-300" />}
+                {attachment.type === 'image' && <FileImage size={14} className="text-purple-300" />}
+                {attachment.type === 'audio' && <FileAudio size={14} className="text-emerald-300" />}
+                {attachment.type === 'other' && <FileWarning size={14} className="text-yellow-300" />}
+                <span className="truncate max-w-[140px]">{attachment.file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(index)}
+                  className="text-white/60 hover:text-white"
+                  aria-label={`Remove ${attachment.file.name}`}
+                >
+                  <X size={12} />
+                </button>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Input Area */}
       <div className="flex items-end gap-3">
@@ -285,6 +427,11 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
             className="hidden"
             id="file-upload"
             aria-label="Upload files"
+            accept={[
+              '.pdf,.doc,.docx,.txt,.rtf,.md,.ppt,.pptx,.csv,.xls,.xlsx,.json',
+              'image/*',
+              'audio/*'
+            ].join(',')}
           />
           
           <Button

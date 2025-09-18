@@ -1,13 +1,28 @@
-import { useState } from 'react';
-import { FileText, Database, FolderOpen, Tag, FileSearch, Upload, X, ChevronDown } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  FileText,
+  Database,
+  FileSearch,
+  Upload,
+  X,
+  Image as ImageIcon,
+  FileAudio,
+  FileWarning
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/Button';
 import { VoiceCategorySelector } from './VoiceCategorySelector';
 import { CategoryDetectionService, type Category } from '../../services/categoryDetectionService';
 
+type UploadableFile = {
+  file: File;
+  type: 'document' | 'image' | 'audio' | 'other';
+  previewUrl?: string;
+};
+
 interface DocumentUploadOptionsProps {
-  files: File[];
+  files: UploadableFile[];
   onConfirm: (options: DocumentUploadDecision) => void;
   onCancel: () => void;
 }
@@ -30,20 +45,20 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [suggestedCategory, setSuggestedCategory] = useState<Category | null>(null);
   const [tags, setTags] = useState<string>('');
-  const [showFolderSelector, setShowFolderSelector] = useState(false);
 
   // Detect category based on file names
   const detectCategoryFromFiles = () => {
-    const allFileNames = files.map(f => f.name).join(' ');
+    const allFileNames = files.map(f => f.file.name).join(' ');
     const detected = CategoryDetectionService.detectCategory(allFileNames);
     setSuggestedCategory(detected);
     setSelectedCategory(detected);
   };
 
   // Initialize category detection when component mounts
-  useState(() => {
+  useEffect(() => {
     detectCategoryFromFiles();
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleConfirm = () => {
     const decision: DocumentUploadDecision = {
@@ -76,14 +91,49 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
     }
   };
 
-  const getFilePreview = (file: File) => {
-    const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+  const getFilePreview = (file: UploadableFile) => {
+    const sizeInMB = (file.file.size / (1024 * 1024)).toFixed(2);
+    const typeLabel = file.type === 'document'
+      ? 'Document'
+      : file.type === 'image'
+      ? 'Image'
+      : file.type === 'audio'
+      ? 'Audio'
+      : 'File';
     return {
-      name: file.name,
+      name: file.file.name,
       size: `${sizeInMB} MB`,
-      type: file.type || 'Unknown type'
+      type: typeLabel
     };
   };
+
+  const getIconForFile = (file: UploadableFile) => {
+    switch (file.type) {
+      case 'image':
+        return <ImageIcon size={16} className="text-purple-300" />;
+      case 'audio':
+        return <FileAudio size={16} className="text-emerald-300" />;
+      case 'document':
+        return <FileText size={16} className="text-blue-300" />;
+      default:
+        return <FileWarning size={16} className="text-yellow-300" />;
+    }
+  };
+
+  const fileTypeSummary = useMemo(() => {
+    const summary = {
+      document: 0,
+      image: 0,
+      audio: 0,
+      other: 0
+    };
+
+    files.forEach(file => {
+      summary[file.type] = summary[file.type] + 1;
+    });
+
+    return summary;
+  }, [files]);
 
   return (
     <motion.div
@@ -97,7 +147,20 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
         <Upload size={16} className="text-purple-400 flex-shrink-0" />
         <div className="flex-1">
           <p className="text-purple-400 font-medium text-sm">What would you like to do with these documents?</p>
-          <p className="text-xs text-gray-600 dark:text-white/60 mt-1">{files.length} file{files.length > 1 ? 's' : ''} selected</p>
+          <p className="text-xs text-gray-600 dark:text-white/60 mt-1">
+            {files.length} file{files.length > 1 ? 's' : ''} selected ·
+            {' '}
+            {fileTypeSummary.document > 0 && `${fileTypeSummary.document} doc${fileTypeSummary.document > 1 ? 's' : ''}`}
+            {fileTypeSummary.document > 0 && (fileTypeSummary.image > 0 || fileTypeSummary.audio > 0 || fileTypeSummary.other > 0) && ', '}
+            {fileTypeSummary.image > 0 && `${fileTypeSummary.image} image${fileTypeSummary.image > 1 ? 's' : ''}`}
+            {fileTypeSummary.image > 0 && (fileTypeSummary.audio > 0 || fileTypeSummary.other > 0) && ', '}
+            {fileTypeSummary.audio > 0 && `${fileTypeSummary.audio} audio`}
+            {fileTypeSummary.audio > 0 && fileTypeSummary.other > 0 && ', '}
+            {fileTypeSummary.other > 0 && `${fileTypeSummary.other} other`}
+          </p>
+          <p className="text-xs text-gray-600 dark:text-white/50 mt-1">
+            Tala can summarize documents, describe images, transcribe audio, and optionally store everything in your knowledge base.
+          </p>
         </div>
         <Button
           onClick={onCancel}
@@ -118,9 +181,13 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
             const preview = getFilePreview(file);
             return (
               <div key={index} className="flex items-center gap-2 p-2 bg-white/5 rounded text-xs">
-                <FileText size={12} className="text-gray-500 dark:text-white/50" />
-                <span className="flex-1 truncate">{preview.name}</span>
-                <span className="text-gray-500 dark:text-white/50">{preview.size}</span>
+                {getIconForFile(file)}
+                <div className="flex-1 min-w-0">
+                  <span className="truncate block">{preview.name}</span>
+                  <span className="text-gray-500 dark:text-white/50">
+                    {preview.type} · {preview.size}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -198,7 +265,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
       </div>
 
       {/* Extract Options */}
-      {(selectedAction === 'extract' || selectedAction === 'both') && (
+      {(selectedAction === 'extract' || selectedAction === 'both') && fileTypeSummary.document > 0 && (
         <div className="space-y-3 p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
           <h4 className="text-sm font-medium text-green-400">Extraction Options:</h4>
           <div className="space-y-2">
@@ -248,7 +315,7 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
           <VoiceCategorySelector
             onCategorySelect={handleCategorySelect}
             suggestedCategory={suggestedCategory}
-            voiceContent={files.map(f => f.name).join(', ')}
+            voiceContent={files.map(f => f.file.name).join(', ')}
           />
 
           {/* Tags Input */}
@@ -291,4 +358,4 @@ export const DocumentUploadOptions = ({ files, onConfirm, onCancel }: DocumentUp
   );
 };
 
-export type { DocumentUploadDecision };
+export type { DocumentUploadDecision, UploadableFile };
