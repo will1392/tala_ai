@@ -78,6 +78,7 @@ const KnowledgeDocumentViewer: React.FC = () => {
       if (!docId) return;
 
       console.log('🔍 KnowledgeDocumentViewer - docId received:', docId);
+      console.log('🔍 KnowledgeDocumentViewer - location state:', locationState);
 
       try {
         setLoading(true);
@@ -98,10 +99,17 @@ const KnowledgeDocumentViewer: React.FC = () => {
           headers.Authorization = `Bearer ${authToken}`;
         }
 
-        const response = await fetch(`/api/documents/${encodeURIComponent(docId)}`, {
+        const apiUrl = `/api/documents/${encodeURIComponent(docId)}`;
+        console.log('🔍 KnowledgeDocumentViewer - fetching from:', apiUrl);
+        console.log('🔍 KnowledgeDocumentViewer - headers:', headers);
+
+        const response = await fetch(apiUrl, {
           method: 'GET',
           headers
         });
+
+        console.log('🔍 KnowledgeDocumentViewer - response status:', response.status);
+        console.log('🔍 KnowledgeDocumentViewer - response ok:', response.ok);
 
         if (response.status === 404) {
           throw new Error('Document not found');
@@ -114,13 +122,19 @@ const KnowledgeDocumentViewer: React.FC = () => {
         }
 
         const rawData = await response.json();
+        console.log('🔍 KnowledgeDocumentViewer - raw response data:', rawData);
+        
         const documentData = rawData?.data || rawData;
+        console.log('🔍 KnowledgeDocumentViewer - document data:', documentData);
 
         if (!documentData || !documentData.id) {
+          console.log('❌ KnowledgeDocumentViewer - No document data or missing ID');
           throw new Error('Document not found');
         }
 
         const metadata = parseMetadata(documentData.metadata) || {};
+        console.log('🔍 KnowledgeDocumentViewer - parsed metadata:', metadata);
+        
         const doc: Doc = {
           id: documentData.id,
           folderId: documentData.folder_id || metadata.folderId || 'uncategorized',
@@ -138,6 +152,7 @@ const KnowledgeDocumentViewer: React.FC = () => {
           }
         };
 
+        console.log('✅ KnowledgeDocumentViewer - final document object:', doc);
         setDocument(doc);
       } catch (err) {
         console.error('Error fetching document:', err);

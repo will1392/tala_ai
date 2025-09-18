@@ -133,6 +133,14 @@ export const TalaFinalChat: React.FC = () => {
     setIsHistoryPanelOpen(false);
     const enrichedDoc = doc as Doc & { documentId?: string };
     const targetId = enrichedDoc.documentId || doc.id;
+    
+    console.log('🔍 TalaFinalChat navigating to document:', {
+      docId: doc.id,
+      documentId: enrichedDoc.documentId,
+      targetId,
+      title: doc.title
+    });
+    
     navigate(`/knowledge-doc/${encodeURIComponent(targetId)}`, { state: { document: doc } });
   };
 
@@ -245,20 +253,33 @@ Let's begin with understanding your business. What type of travel experiences do
         }
 
         const data = await response.json();
-        const results: Doc[] = (data.results || []).map((doc: any) => ({
-          id: doc.id || doc.documentId,
-          documentId: doc.documentId || doc.id,
-          title: doc.documentTitle || doc.title || 'Untitled',
-          folderId: doc.folderId || 'uncategorized',
-          type: doc.fileType || 'Document',
-          updated: 'Recently updated',
-          content: doc.contentPreview || doc.excerpt || '',
-          metadata: {
-            fileSize: doc.fileSize,
-            excerpt: doc.contentPreview || doc.excerpt || '',
-            fileUrl: doc.fileUrl
-          }
-        }));
+        console.log('🔍 TalaFinalChat knowledge search response:', data);
+        
+        const results: Doc[] = (data.results || []).map((doc: any) => {
+          // Ensure we use the correct document ID from the database
+          const documentId = doc.documentId || doc.id;
+          console.log('🔍 TalaFinalChat mapping document:', { 
+            originalId: doc.id, 
+            originalDocumentId: doc.documentId, 
+            finalDocumentId: documentId,
+            title: doc.documentTitle || doc.title 
+          });
+          
+          return {
+            id: documentId, // Use the same ID as documentId for consistency
+            documentId: documentId, // This should be the UUID from the database
+            title: doc.documentTitle || doc.title || 'Untitled',
+            folderId: doc.folderId || 'uncategorized',
+            type: doc.fileType || 'Document',
+            updated: 'Recently updated',
+            content: doc.contentPreview || doc.excerpt || '',
+            metadata: {
+              fileSize: doc.fileSize,
+              excerpt: doc.contentPreview || doc.excerpt || '',
+              fileUrl: doc.fileUrl
+            }
+          };
+        });
 
         setKnowledgeBaseResults(results);
         setSelectedKnowledgeDoc((current) => {
