@@ -16,7 +16,10 @@ import {
   WifiOff,
   Wifi,
   Clock,
-  RefreshCw
+  RefreshCw,
+  History,
+  FileText,
+  Search
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import useConversation from '../hooks/useConversation';
@@ -25,18 +28,15 @@ import { marketingContext } from '../services/MarketingContextService';
 import Markdown from '../components/shared/Markdown';
 import StatusProgress from '../components/chat/StatusProgress';
 import { useStatusUpdates } from '../hooks/useStatusUpdates';
-import { ThemeToggle } from '../components/shared/ThemeToggle';
 import Skeleton from '../components/shared/Skeleton';
-import Spinner from '../components/shared/Spinner';
 import TypingDots from '../components/shared/TypingDots';
+import Drawer from '../components/shared/Drawer';
 import { useToast } from '../components/toast/ToastProvider';
 import { normalizeError } from '../lib/errors';
 import { useIsMobile } from '../hooks/useBreakpoint';
-import Drawer from '../components/shared/Drawer';
 import { useTour } from '../components/tour/TourProvider';
 import { Button } from '../components/ui/Button';
 import { Textarea } from '../components/ui/Textarea';
-import { Card, CardContent } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
 import { announceChatStatus } from '../utils/announceToScreenReader';
 
@@ -48,6 +48,10 @@ type MarketingMode =
   | 'ads' 
   | 'content' 
   | 'analytics';
+
+// Placeholder tour steps
+const CHAT_TOUR_STEPS = [];
+const MOBILE_CHAT_TOUR_STEPS = [];
 
 interface Message {
   id: string;
@@ -87,12 +91,16 @@ export const TalaFinalChat: React.FC = () => {
   const [currentMarketingMode, setCurrentMarketingMode] = useState<MarketingMode>('general');
   const [directMailConsultation, setDirectMailConsultation] = useState(false);
   const [showModeDropdown, setShowModeDropdown] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true); // Show by default to see conversations
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [userName, setUserName] = useState('Will'); // This would come from user profile
   const [currentRequestId, setCurrentRequestId] = useState<string | undefined>();
   const [hasLoadedInitialConversation, setHasLoadedInitialConversation] = useState(false);
   const [growthPlanContext, setGrowthPlanContext] = useState<any>(null);
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false); // Safe state name
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
+  const [knowledgeBaseResults, setKnowledgeBaseResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -129,7 +137,7 @@ export const TalaFinalChat: React.FC = () => {
   // Load conversation list on component mount and check URL params
   useEffect(() => {
     loadConversationList();
-    
+
     // Check URL parameters for mode
     const searchParams = new URLSearchParams(location.search);
     const mode = searchParams.get('mode');
@@ -161,6 +169,12 @@ Let's begin with understanding your business. What type of travel experiences do
       setConversationId(newConvId);
     }
   }, [location.search]); // Re-run when URL changes
+
+  useEffect(() => {
+    if (isHistoryOpen) {
+      loadConversationList();
+    }
+  }, [isHistoryOpen, loadConversationList]);
   
   // Handle incoming conversation from growth plan help
   useEffect(() => {
@@ -813,194 +827,12 @@ Let's begin with understanding your business. What type of travel experiences do
       >
         Skip to main content
       </a>
-      {/* Sidebar for conversation history - Desktop */}
-      {!isMobile && (
-        <AnimatePresence>
-          {showSidebar && (
-            <motion.div
-              initial={{ x: -260 }}
-              animate={{ x: 0 }}
-              exit={{ x: -260 }}
-              className={cn(
-                "w-[260px] flex flex-col shadow-2xl",
-                "bg-gray-50 dark:bg-secondary-700",
-                "border-r border-gray-200 dark:border-white/10"
-              )}
-            >
-              <div className={cn(
-                "p-3 flex items-center justify-between",
-                "border-b border-gray-200 dark:border-white/10"
-              )}>
-                <div className="text-sm font-medium text-gray-700 dark:text-white/80">
-                  Chat History
-                </div>
-                <Button
-                  onClick={() => setShowSidebar(false)}
-                  variant="ghost"
-                  size="sm"
-                  className="p-2 min-h-[44px] min-w-[44px]"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2">
-              <div className="text-sm text-gray-600 dark:text-white/60 px-3 py-2">
-                Recent Conversations
-              </div>
-              <ul className="space-y-1" role="list">
-                {loadingHistory && conversations.length === 0 ? (
-                  // Show skeleton while loading conversation history
-                  <>
-                    {[...Array(5)].map((_, i) => (
-                      <li key={i} className="px-3 py-2">
-                        <Skeleton className="h-4 w-full mb-1" />
-                        <Skeleton className="h-3 w-2/3" />
-                      </li>
-                    ))}
-                  </>
-                ) : conversations.slice(0, 10).map((conv) => (
-                  <li
-                    key={conv.id}
-                    role="listitem"
-                  >
-                    <button
-                    onClick={async () => {
-                      // Don't reload if already selected
-                      if (conv.id === conversationId) return;
-                      
-                      // Save current messages before switching
-                      if (conversationId && messages.length > 0) {
-                        const storageKey = `tala_messages_${conversationId}`;
-                        localStorage.setItem(storageKey, JSON.stringify(messages));
-                      }
-                      
-                      // Mark as not loaded so useEffect will reload it
-                      loadedConversationsRef.current.delete(conv.id);
-                      
-                      // Switch conversation (this will trigger the useEffect)
-                      switchConversation(conv.id);
-                      
-                      // Announce conversation switch
-                      announceChatStatus('conversation-switched');
-                      
-                      // Focus main content area for screen readers
-                      setTimeout(() => mainContentRef.current?.focus(), 100);
-                    }}
-                    className={cn(
-                      "w-full text-left px-3 py-2 hover:bg-white/5 rounded-lg cursor-pointer transition-colors",
-                      conv.id === conversationId && "bg-white/10"
-                    )}
-                    aria-label={`Conversation: ${conv.title || 'Untitled'}, last updated ${new Date(conv.updatedAt).toLocaleString()}`}
-                    aria-current={conv.id === conversationId ? "true" : undefined}
-                  >
-                    <div className="text-sm text-gray-800 dark:text-white/80 truncate">
-                      {conv.title || 'Untitled Conversation'}
-                    </div>
-                    <time className="text-xs text-gray-500 dark:text-white/40 mt-0.5" dateTime={conv.updatedAt}>
-                      {new Date(conv.updatedAt).toLocaleString()}
-                    </time>
-                  </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    )}
-    
-      {/* Sidebar for conversation history - Mobile */}
-      {isMobile && (
-        <Drawer open={showSidebar} onClose={() => setShowSidebar(false)} side="left">
-          <div className="flex flex-col h-full bg-gray-50 dark:bg-secondary-700">
-            <div className={cn(
-              "p-4 flex items-center justify-between",
-              "border-b border-gray-200 dark:border-white/10"
-            )}>
-              <div className="text-base font-medium text-gray-700 dark:text-white/80">
-                Chat History
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              <div className="text-sm text-gray-600 dark:text-white/60 px-3 py-2">
-                Recent Conversations
-              </div>
-              <ul className="space-y-2" role="list">
-                {loadingHistory && conversations.length === 0 ? (
-                  <>
-                    {[...Array(5)].map((_, i) => (
-                      <li key={i} className="px-3 py-3">
-                        <Skeleton className="h-4 w-full mb-1" />
-                        <Skeleton className="h-3 w-2/3" />
-                      </li>
-                    ))}
-                  </>
-                ) : conversations.slice(0, 10).map((conv) => (
-                  <li
-                    key={conv.id}
-                    role="listitem"
-                  >
-                    <button
-                    onClick={async () => {
-                      if (conv.id === conversationId) return;
-                      
-                      if (conversationId && messages.length > 0) {
-                        const storageKey = `tala_messages_${conversationId}`;
-                        localStorage.setItem(storageKey, JSON.stringify(messages));
-                      }
-                      
-                      loadedConversationsRef.current.delete(conv.id);
-                      switchConversation(conv.id);
-                      setShowSidebar(false); // Close drawer after selection
-                      
-                      // Clear growth plan context when switching conversations
-                      setGrowthPlanContext(null);
-                      
-                      // Announce conversation switch
-                      announceChatStatus('conversation-switched');
-                      
-                      // Focus main content area for screen readers
-                      setTimeout(() => mainContentRef.current?.focus(), 100);
-                    }}
-                    className={cn(
-                      "w-full text-left px-4 py-3 hover:bg-white/5 rounded-lg cursor-pointer transition-colors min-h-[56px]",
-                      conv.id === conversationId && "bg-white/10"
-                    )}
-                    aria-label={`Conversation: ${conv.title || 'Untitled'}, last updated ${new Date(conv.updatedAt).toLocaleString()}`}
-                    aria-current={conv.id === conversationId ? "true" : undefined}
-                  >
-                    <div className="text-sm text-gray-800 dark:text-white/80 truncate">
-                      {conv.title || 'Untitled Conversation'}
-                    </div>
-                    <time className="text-xs text-gray-500 dark:text-white/40 mt-1" dateTime={conv.updatedAt}>
-                      {new Date(conv.updatedAt).toLocaleString()}
-                    </time>
-                  </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </Drawer>
-      )}
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Header Bar */}
         <div className="flex items-center justify-between px-3 md:px-6 py-3 border-b border-white/10">
           <div className="flex items-center gap-2 md:gap-3">
-            <Button
-              onClick={() => setShowSidebar(!showSidebar)}
-              variant="secondary"
-              size="md"
-              className="bg-white/10 hover:bg-white/15 text-sm"
-              data-tour="chat-history"
-              aria-label={showSidebar ? "Hide chat history" : "Show chat history"}
-              aria-expanded={showSidebar}
-            >
-              <Menu className="w-4 h-4" aria-hidden="true" />
-              <span className="hidden sm:inline">History</span>
-            </Button>
             <Button
               onClick={startNewChat}
               variant={isMarketingMode ? "secondary" : "ghost"}
@@ -1045,7 +877,7 @@ Let's begin with understanding your business. What type of travel experiences do
             
             {/* Help Button */}
             <Button
-              onClick={() => startTour()}
+              onClick={() => startTour(isMobile ? MOBILE_CHAT_TOUR_STEPS : CHAT_TOUR_STEPS)}
               variant="secondary"
               size="md"
               className="text-sm"
@@ -1055,10 +887,24 @@ Let's begin with understanding your business. What type of travel experiences do
               <span className="sm:hidden" aria-hidden="true">?</span>
             </Button>
             
-            {/* Theme Toggle */}
-            <div data-tour="theme-toggle">
-              <ThemeToggle variant="dropdown" showLabel={!isMobile} />
-            </div>
+            {/* History & Search Button */}
+            <Button
+              onClick={() => {
+                setIsHistoryPanelOpen(true);
+                loadConversationList(); // Ensure conversations are loaded
+              }}
+              variant="ghost"
+              size="icon"
+              className="relative hover:bg-primary/10"
+              aria-label="View chat history and search"
+            >
+              <div className="relative w-6 h-6">
+                <Menu className="w-6 h-6 text-primary" aria-hidden="true" />
+                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-white dark:bg-secondary-800 rounded-full border border-primary/20 shadow-sm flex items-center justify-center">
+                  <Search className="w-2.5 h-2.5 text-primary" aria-hidden="true" />
+                </div>
+              </div>
+            </Button>
             
             {requestQueue.length > 0 && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg text-sm" role="status" aria-live="polite">
@@ -1082,32 +928,6 @@ Let's begin with understanding your business. What type of travel experiences do
                 <span>Retrying message...</span>
               </div>
             )}
-            
-            <div className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
-              connectionStatus === 'online' 
-                ? "bg-green-500/20 text-green-400"
-                : connectionStatus === 'offline'
-                ? "bg-red-500/20 text-red-400"
-                : "bg-yellow-500/20 text-yellow-400"
-            )}>
-              {connectionStatus === 'online' ? (
-                <>
-                  <Wifi className="w-4 h-4" />
-                  <span>Online</span>
-                </>
-              ) : connectionStatus === 'offline' ? (
-                <>
-                  <WifiOff className="w-4 h-4" />
-                  <span>Offline</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Connecting...</span>
-                </>
-              )}
-            </div>
           </div>
         </div>
 
@@ -1335,6 +1155,7 @@ Let's begin with understanding your business. What type of travel experiences do
                 onClick={toggleVoiceRecording}
                 variant="ghost"
                 size="sm"
+                data-tour="voice-input"
                 className={cn(
                   "hidden md:flex p-2.5 min-w-[44px] min-h-[44px]",
                   isRecording 
@@ -1458,6 +1279,147 @@ Let's begin with understanding your business. What type of travel experiences do
         </div>
         </div>
       </div>
+      
+      {/* History and Search Panel - Right Side */}
+      <AnimatePresence>
+        {isHistoryPanelOpen && (
+          <motion.div
+            initial={{ x: 320 }}
+            animate={{ x: 0 }}
+            exit={{ x: 320 }}
+            className={cn(
+              "fixed right-0 top-0 h-screen w-80 z-40",
+              "bg-white dark:bg-secondary-800 shadow-2xl",
+              "border-l border-gray-200 dark:border-white/10",
+              "flex flex-col"
+            )}
+          >
+              {/* Panel Header */}
+              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-white/10">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  History & Search
+                </h2>
+                <Button
+                  onClick={() => {
+                    setIsHistoryPanelOpen(false);
+                    setHistorySearchQuery(''); // Clear search when closing
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="p-2"
+                  aria-label="Close panel"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              {/* Search Input */}
+              <div className="px-4 py-4">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={historySearchQuery}
+                    onChange={(e) => setHistorySearchQuery(e.target.value)}
+                    placeholder="Search conversations and knowledge base..."
+                    className={cn(
+                      "w-full px-4 py-2 pr-10 rounded-lg",
+                      "bg-gray-100 dark:bg-white/5",
+                      "border border-gray-200 dark:border-white/10",
+                      "text-sm text-gray-900 dark:text-white",
+                      "placeholder:text-gray-500 dark:placeholder:text-white/40",
+                      "focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    )}
+                    aria-label="Search input"
+                  />
+                  <Search className="absolute right-3 top-2.5 w-4 h-4 text-gray-400 dark:text-white/40" />
+                </div>
+              </div>
+              
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto px-4 pb-4">
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-white/80 mb-3">
+                    Recent Conversations
+                  </h3>
+                  <div className="space-y-2">
+                    {(() => {
+                      const filteredConversations = conversations.filter(conv => {
+                        if (!historySearchQuery) return true;
+                        const searchLower = historySearchQuery.toLowerCase();
+                        return (conv.title || 'Untitled').toLowerCase().includes(searchLower) ||
+                               (conv.last_message || '').toLowerCase().includes(searchLower);
+                      }).slice(0, 10);
+
+                      if (conversations.length === 0) {
+                        return (
+                          <p className="text-sm text-gray-500 dark:text-white/40 text-center py-4">
+                            No conversations yet
+                          </p>
+                        );
+                      }
+
+                      if (filteredConversations.length === 0 && historySearchQuery) {
+                        return (
+                          <p className="text-sm text-gray-500 dark:text-white/40 text-center py-4">
+                            No conversations match "{historySearchQuery}"
+                          </p>
+                        );
+                      }
+
+                      return filteredConversations.map((conv) => (
+                        <button
+                          key={conv.id}
+                          onClick={() => {
+                            switchConversation(conv.id);
+                            setIsHistoryPanelOpen(false);
+                            setHistorySearchQuery(''); // Clear search after selection
+                          }}
+                          className={cn(
+                            "w-full text-left p-3 rounded-lg transition-colors",
+                            "bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10",
+                            conversationId === conv.id && "bg-primary/10 dark:bg-primary/20"
+                          )}
+                        >
+                          <div className="font-medium text-sm text-gray-900 dark:text-white">
+                            {conv.title || 'Untitled Conversation'}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-white/40 mt-1">
+                            {new Date(conv.updatedAt).toLocaleString()}
+                          </div>
+                        </button>
+                      ));
+                    })()}
+                  </div>
+                </div>
+                
+                {/* Placeholder for Knowledge Base results */}
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-white/10">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-white/80 mb-3">
+                    Knowledge Base
+                  </h3>
+                  {historySearchQuery ? (
+                    <div className="text-center py-8">
+                      <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
+                      <p className="text-sm text-gray-500 dark:text-white/40">
+                        Knowledge base search coming soon
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-white/30 mt-1">
+                        Will search documents for "{historySearchQuery}"
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
+                      <p className="text-sm text-gray-500 dark:text-white/40">
+                        Search above to find documents and articles
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

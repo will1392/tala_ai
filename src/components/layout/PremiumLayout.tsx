@@ -18,16 +18,15 @@ import {
   X,
   Search,
   Wand2,
-  Bell,
   Sun,
   Moon,
-  CreditCard
+  CreditCard,
+  Shield
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { GlobalSearch } from './GlobalSearch';
 import { useTheme } from '../../context/ThemeContextNew';
 import { useCredits } from '../../hooks/useCredits';
-import { CreditDebug } from '../debug/CreditDebug';
 
 // UI Components
 const Input = ({ className = '', ...props }: { className?: string; [key: string]: any }) => (
@@ -228,13 +227,6 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
         )}
       </div>
 
-      <div className="px-3 py-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input type="search" placeholder="Search..." className="w-full rounded-2xl bg-muted pl-9 pr-4 py-2" />
-        </div>
-      </div>
-
       <div className="flex-1 overflow-y-auto px-3 py-2">
         <div className="space-y-1">
           {sidebarItems.map((item) => {
@@ -312,6 +304,25 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
             );
           })}
         </div>
+        
+        {/* Super Admin Section */}
+        {creditInfo?.role === 'super_admin' && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="px-3 text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2">
+              Super Admin
+            </p>
+            <button
+              onClick={() => navigate('/admin/users')}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium hover:bg-muted",
+                location.pathname === '/admin/users' && "bg-primary/10 text-primary"
+              )}
+            >
+              <Shield className="h-5 w-5 text-yellow-500" />
+              <span>User Management</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="border-t p-3">
@@ -329,14 +340,9 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
               {creditsLoading ? (
                 <span className="text-sm text-muted-foreground">Loading...</span>
               ) : (
-                <>
-                  <span className="font-bold text-cyan-500">
-                    {creditInfo ? formatCredits(creditInfo.available_credits) : '0'}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {creditInfo?.plan_type === 'agency' ? 'Agency' : 'Agent'}
-                  </Badge>
-                </>
+                <span className="font-bold text-cyan-500">
+                  {creditInfo ? formatCredits(creditInfo.available_credits) : '0'}
+                </span>
               )}
             </div>
           </button>
@@ -358,6 +364,11 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
               </Avatar>
               <span>{userProfile?.name || 'User'}</span>
             </div>
+            <Badge variant="outline" className="text-xs">
+              {creditInfo?.role === 'super_admin' ? 'Super Admin' : 
+               creditInfo?.role === 'agency_owner' ? 'Agency Owner' :
+               creditInfo?.plan_type === 'agency' ? 'Agency' : 'Agent'}
+            </Badge>
           </button>
         </div>
       </div>
@@ -370,26 +381,11 @@ export const PremiumLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState("home");
-  const [notifications] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
   const location = useLocation();
   
   // Use the credits hook
-  const { creditInfo, loading: creditsLoading, refetch } = useCredits();
-  
-  // Log for debugging and force refresh on mount
-  useEffect(() => {
-    console.log('💰 PremiumLayout creditInfo:', creditInfo);
-    console.log('💰 Credits loading:', creditsLoading);
-    
-    // Force a refresh when component mounts
-    refetch();
-  }, []);
-  
-  // Log when creditInfo changes
-  useEffect(() => {
-    console.log('💰 Credit info updated:', creditInfo);
-  }, [creditInfo]);
+  const { creditInfo, loading: creditsLoading } = useCredits();
 
   // Load user profile
   useEffect(() => {
@@ -409,18 +405,13 @@ export const PremiumLayout = () => {
   }, []);
 
   const formatCredits = (credits: number): string => {
-    console.log('💰 formatCredits called with:', credits);
     if (credits >= 10000) {
       // For 10k+, show one decimal
-      const formatted = `${(credits / 1000).toFixed(1)}k`;
-      console.log('💰 formatCredits returning:', formatted);
-      return formatted;
+      return `${(credits / 1000).toFixed(1)}k`;
     } else if (credits >= 1000) {
       // For 1k-9.9k, show two decimals to avoid rounding issues
       const value = credits / 1000;
-      const formatted = `${value.toFixed(2)}k`;
-      console.log('💰 formatCredits returning:', formatted);
-      return formatted;
+      return `${value.toFixed(2)}k`;
     }
     return credits.toString();
   };
@@ -515,18 +506,19 @@ export const PremiumLayout = () => {
             <PanelLeft className="h-5 w-5" />
           </Button>
           <div className="flex flex-1 items-center justify-between">
-            <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
             <div className="flex items-center gap-3">
-              <GlobalSearch />
+              <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
+              {creditInfo?.role === 'super_admin' && (
+                <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+                  <Shield size={16} className="text-yellow-500" />
+                  <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Super Admin</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Hide search on chat pages but keep theme toggle */}
+              {!location.pathname.includes('/chat') && <GlobalSearch />}
               <ThemeToggle />
-              <Button variant="ghost" size="icon" className="rounded-2xl relative">
-                <Bell className="h-5 w-5" />
-                {notifications > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                    {notifications}
-                  </span>
-                )}
-              </Button>
             </div>
           </div>
         </header>
@@ -541,9 +533,6 @@ export const PremiumLayout = () => {
           </motion.div>
         </main>
       </div>
-      
-      {/* Debug panel - remove in production */}
-      <CreditDebug />
     </div>
   );
 };
