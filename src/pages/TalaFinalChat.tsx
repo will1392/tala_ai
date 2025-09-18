@@ -29,8 +29,7 @@ import useConversation from '../hooks/useConversation';
 import useRetryableRequest from '../hooks/useRetryableRequest';
 import { marketingContext } from '../services/MarketingContextService';
 import Markdown from '../components/shared/Markdown';
-import StatusProgress from '../components/chat/StatusProgress';
-import { useStatusUpdates } from '../hooks/useStatusUpdates';
+import { ProcessingStatus } from '../components/chat/ProcessingStatus';
 import Skeleton from '../components/shared/Skeleton';
 import TypingDots from '../components/shared/TypingDots';
 import Drawer from '../components/shared/Drawer';
@@ -146,9 +145,6 @@ export const TalaFinalChat: React.FC = () => {
 
   // Use tour hook
   const { start: startTour } = useTour();
-  
-  // Use status updates hook
-  const { currentStage, statusMessage, details } = useStatusUpdates(currentRequestId, isLoading);
   
   // Use conversation hook for persistence
   const {
@@ -1207,10 +1203,9 @@ Let's begin with understanding your business. What type of travel experiences do
                 </div>
               ))}
               
-              {/* Status Progress Indicator */}
-              <StatusProgress 
-                currentStage={currentStage}
-                details={details}
+              {/* Processing Status Indicator */}
+              <ProcessingStatus
+                requestId={currentRequestId}
                 isProcessing={isLoading}
               />
               

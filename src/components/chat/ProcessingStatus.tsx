@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -11,6 +11,7 @@ import {
   Cpu
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { announceChatStatus } from '../../utils/announceToScreenReader';
 
 interface ProcessingStatusProps {
   requestId?: string;
@@ -30,8 +31,10 @@ const stageIcons: Record<string, React.ReactNode> = {
   'context': <Database className="w-4 h-4" />,
   'search': <Search className="w-4 h-4" />,
   'search_complete': <CheckCircle className="w-4 h-4" />,
+  'analyzing': <Brain className="w-4 h-4" />,
   'generating': <Brain className="w-4 h-4" />,
-  'finalizing': <Sparkles className="w-4 h-4" />
+  'finalizing': <Sparkles className="w-4 h-4" />,
+  'complete': <CheckCircle className="w-4 h-4" />
 };
 
 const stageMessages: Record<string, string> = {
@@ -39,8 +42,21 @@ const stageMessages: Record<string, string> = {
   'context': 'Loading conversation context',
   'search': 'Searching knowledge base',
   'search_complete': 'Found relevant information',
+  'analyzing': 'Analyzing information',
   'generating': 'Analyzing and generating response',
-  'finalizing': 'Finalizing response'
+  'finalizing': 'Finalizing response',
+  'complete': 'Response ready'
+};
+
+const announcementStageMap: Record<string, string> = {
+  'initializing': 'initializing',
+  'context': 'context',
+  'search': 'searching',
+  'search_complete': 'searching',
+  'generating': 'generating',
+  'finalizing': 'generating',
+  'analyzing': 'analyzing',
+  'complete': 'complete'
 };
 
 const knowledgeSearchSteps = [
@@ -78,6 +94,28 @@ export const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
   const [currentStage, setCurrentStage] = useState<string>('initializing');
   const [details, setDetails] = useState<any>(null);
   const [eventSource, setEventSource] = useState<EventSource | null>(null);
+  const previousStageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (requestId && isProcessing) {
+      setCurrentStatus('Initializing...');
+      setCurrentStage('initializing');
+      setDetails(null);
+    }
+  }, [requestId, isProcessing]);
+
+  useEffect(() => {
+    if (!isProcessing) {
+      previousStageRef.current = null;
+      return;
+    }
+
+    const announcementStage = announcementStageMap[currentStage];
+    if (announcementStage && previousStageRef.current !== currentStage) {
+      announceChatStatus(announcementStage);
+      previousStageRef.current = currentStage;
+    }
+  }, [currentStage, isProcessing]);
 
   useEffect(() => {
     if (!requestId || !isProcessing) {
