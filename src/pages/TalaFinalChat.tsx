@@ -131,7 +131,9 @@ export const TalaFinalChat: React.FC = () => {
 
   const handleOpenKnowledgeDoc = (doc: Doc) => {
     setIsHistoryPanelOpen(false);
-    navigate(`/knowledge-doc/${encodeURIComponent(doc.id)}`);
+    const enrichedDoc = doc as Doc & { documentId?: string };
+    const targetId = enrichedDoc.documentId || doc.id;
+    navigate(`/knowledge-doc/${encodeURIComponent(targetId)}`, { state: { document: doc } });
   };
 
   // Use tour hook

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, FileText, Calendar, Tag, Hash, Loader2 } from 'lucide-react';
 import type { Doc } from '../types/knowledge';
 
@@ -12,10 +12,64 @@ const formatFileSize = (bytes: number | undefined) => {
   return `${(kilobytes / 1024).toFixed(1)} MB`;
 };
 
+const getDocType = (fileType?: string): Doc['type'] => {
+  const normalized = fileType?.toLowerCase() || '';
+  if (normalized.includes('pdf')) return 'PDF';
+  if (normalized.includes('spreadsheet') || normalized.includes('excel') || normalized.includes('xlsx')) {
+    return 'Spreadsheet';
+  }
+  if (normalized.includes('presentation') || normalized.includes('powerpoint') || normalized.includes('ppt')) {
+    return 'Presentation';
+  }
+  if (normalized.includes('markdown') || normalized.includes('md')) {
+    return 'Markdown';
+  }
+  return 'Document';
+};
+
+const formatRelativeTime = (timestamp?: string | Date | null) => {
+  if (!timestamp) return 'Recently updated';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Recently updated';
+
+  const now = Date.now();
+  const diffMs = now - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+
+  const weeks = Math.floor(days / 7);
+  return `${weeks}w ago`;
+};
+
+const parseMetadata = (metadata: unknown): Record<string, any> | undefined => {
+  if (!metadata) return undefined;
+  if (typeof metadata === 'string') {
+    try {
+      return JSON.parse(metadata);
+    } catch (error) {
+      console.warn('Failed to parse metadata JSON:', error);
+      return undefined;
+    }
+  }
+  if (typeof metadata === 'object') {
+    return metadata as Record<string, any>;
+  }
+  return undefined;
+};
+
 const KnowledgeDocumentViewer: React.FC = () => {
   const { docId } = useParams<{ docId: string }>();
   const navigate = useNavigate();
-  const [document, setDocument] = useState<Doc | null>(null);
+  const location = useLocation();
+  const locationState = location.state as { document?: Doc } | undefined;
+  const [document, setDocument] = useState<Doc | null>(locationState?.document ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,74 +83,61 @@ const KnowledgeDocumentViewer: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const userId = '59b70373-ba68-4d89-8420-5c3723aef01f'; // Use super_admin user ID
-        const userRole = 'super_admin';
+        const storedUserId = localStorage.getItem('userId');
+        const userId = storedUserId || '59b70373-ba68-4d89-8420-5c3723aef01f';
+        const organizationId = localStorage.getItem('organizationId') || '00000000-0000-0000-0000-000000000001';
         const authToken = sessionStorage.getItem('authToken') || localStorage.getItem('authToken');
 
-        // Use search API to find the document by ID since the individual document endpoint has issues
-        // First try to search using the document ID directly as query
-        const searchQuery = {
-          query: docId,
-          userId: userId,
-          isAdmin: true,
-          limit: 50, // Get more results to find exact match
-          scoreThreshold: 0.05 // Lower threshold to catch more results
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+          'x-organization-id': organizationId
         };
-        
-        console.log('🔍 KnowledgeDocumentViewer - API request:', searchQuery);
-        
-        const response = await fetch('/api/documents/search', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-user-id': userId,
-            'x-organization-id': '00000000-0000-0000-0000-000000000001'
-          },
-          body: JSON.stringify(searchQuery)
+
+        if (authToken) {
+          headers.Authorization = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(`/api/documents/${encodeURIComponent(docId)}`, {
+          method: 'GET',
+          headers
         });
 
-        if (!response.ok) {
+        if (response.status === 404) {
           throw new Error('Document not found');
         }
 
-        const data = await response.json();
-        
-        console.log('🔍 KnowledgeDocumentViewer - API response:', data);
-        
-        // Check if we found the document in search results
-        if (!data.results || data.results.length === 0) {
-          console.log('❌ KnowledgeDocumentViewer - No results found');
+        if (!response.ok) {
+          const details = await response.json().catch(() => null);
+          const message = details?.message || response.statusText || 'Failed to load document';
+          throw new Error(message);
+        }
+
+        const rawData = await response.json();
+        const documentData = rawData?.data || rawData;
+
+        if (!documentData || !documentData.id) {
           throw new Error('Document not found');
         }
-        
-        // Find the exact document by ID from the results
-        const exactMatch = data.results.find(result => 
-          result.id === docId || result.documentId === docId
-        );
-        
-        if (!exactMatch) {
-          console.log('❌ KnowledgeDocumentViewer - No exact ID match found in results:', data.results.map(r => r.id || r.documentId));
-          throw new Error('Document not found');
-        }
-        
-        const searchResult = exactMatch;
-        console.log('🔍 KnowledgeDocumentViewer - Found exact match:', searchResult);
+
+        const metadata = parseMetadata(documentData.metadata) || {};
         const doc: Doc = {
-          id: searchResult.id || searchResult.documentId,
-          documentId: searchResult.documentId || searchResult.id,
-          title: searchResult.documentTitle || searchResult.title || 'Untitled',
-          folderId: searchResult.folderId || 'uncategorized',
-          type: searchResult.fileType || 'Document',
-          updated: searchResult.uploadDate || 'Recently updated',
-          content: searchResult.contentPreview || '', // Search API returns content preview
+          id: documentData.id,
+          folderId: documentData.folder_id || metadata.folderId || 'uncategorized',
+          type: getDocType(documentData.file_type || documentData.mime_type),
+          title: documentData.title || metadata.originalName || documentData.file_name || 'Untitled document',
+          updated: formatRelativeTime(documentData.updated_at || documentData.created_at),
+          content: documentData.content || documentData.content_preview || '',
+          previewUrl: documentData.file_url || metadata.fileUrl,
           metadata: {
-            fileSize: searchResult.metadata?.fileSize,
-            excerpt: searchResult.contentPreview || '',
-            fileUrl: searchResult.metadata?.fileUrl
+            ...metadata,
+            fileSize: documentData.file_size ?? metadata.fileSize,
+            fileUrl: documentData.file_url ?? metadata.fileUrl,
+            mimeType: documentData.mime_type ?? metadata.mimeType,
+            originalName: documentData.file_name ?? metadata.originalName
           }
         };
 
-        console.log('✅ KnowledgeDocumentViewer - Final document object:', doc);
         setDocument(doc);
       } catch (err) {
         console.error('Error fetching document:', err);
