@@ -13,6 +13,7 @@ import { Knowledge } from './pages/Knowledge';
 import { KnowledgeImproved } from './pages/KnowledgeImproved';
 import { KnowledgeFinal } from './pages/KnowledgeFinal';
 import { TalaFinalChat } from './pages/TalaFinalChat';
+import KnowledgeDocumentViewer from './pages/KnowledgeDocumentViewer';
 import { Email } from './pages/Email';
 import { Settings } from './pages/Settings';
 import CMOModeFull from './pages/CMOModeFull';
@@ -39,6 +40,7 @@ import { DEFAULT_TOUR_STEPS } from './tour/steps';
 import { srOnly } from './utils/accessibility';
 import { LiveRegionManager } from './components/accessibility';
 import Credits from './pages/Credits';
+import { UserManagement } from './pages/admin/UserManagement';
 import { ensureUserId } from './utils/ensureUserId';
 import './styles/globals.css';
 
@@ -93,6 +95,7 @@ function App() {
               ) : (
                 <>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="knowledge-doc/:docId" element={<KnowledgeDocumentViewer />} />
                   <Route path="/" element={<PremiumLayout />}>
                     <Route path="dashboard" element={<PremiumDashboard />} />
                     <Route path="chat" element={<TalaFinalChat />} />
@@ -108,6 +111,7 @@ function App() {
                     <Route path="markdown-test" element={<MarkdownTest />} />
                     <Route path="marketing" element={<MarketingDashboard />} />
                     <Route path="credits" element={<Credits />} />
+                    <Route path="admin/users" element={<UserManagement />} />
                   </Route>
                   <Route path="/" element={<Layout />}>
                     <Route path="dashboard-old" element={<Dashboard />} />
