@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Send, 
   Paperclip,
@@ -19,7 +19,10 @@ import {
   RefreshCw,
   History,
   FileText,
-  Search
+  Search,
+  ExternalLink,
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import useConversation from '../hooks/useConversation';
@@ -35,10 +38,12 @@ import { useToast } from '../components/toast/ToastProvider';
 import { normalizeError } from '../lib/errors';
 import { useIsMobile } from '../hooks/useBreakpoint';
 import { useTour } from '../components/tour/TourProvider';
+import { CHAT_TOUR_STEPS, MOBILE_TOUR_STEPS } from '../tour/steps';
 import { Button } from '../components/ui/Button';
 import { Textarea } from '../components/ui/Textarea';
 import { Modal } from '../components/ui/Modal';
 import { announceChatStatus } from '../utils/announceToScreenReader';
+import type { Doc } from '../types/knowledge';
 
 type MarketingMode = 
   | 'general' 
@@ -48,10 +53,6 @@ type MarketingMode =
   | 'ads' 
   | 'content' 
   | 'analytics';
-
-// Placeholder tour steps
-const CHAT_TOUR_STEPS = [];
-const MOBILE_CHAT_TOUR_STEPS = [];
 
 interface Message {
   id: string;
@@ -82,6 +83,7 @@ const marketingModes = [
 
 export const TalaFinalChat: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -99,7 +101,8 @@ export const TalaFinalChat: React.FC = () => {
   const [growthPlanContext, setGrowthPlanContext] = useState<any>(null);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false); // Safe state name
   const [historySearchQuery, setHistorySearchQuery] = useState('');
-  const [knowledgeBaseResults, setKnowledgeBaseResults] = useState<any[]>([]);
+  const [knowledgeBaseResults, setKnowledgeBaseResults] = useState<Doc[]>([]);
+  const [selectedKnowledgeDoc, setSelectedKnowledgeDoc] = useState<Doc | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -112,7 +115,25 @@ export const TalaFinalChat: React.FC = () => {
   
   // Check if mobile
   const isMobile = useIsMobile();
-  
+
+  const formatFileSize = (bytes: number | undefined) => {
+    if (!bytes || Number.isNaN(bytes)) return 'Unknown size';
+    const kb = bytes / 1024;
+    if (kb < 1024) {
+      return `${Math.round(kb)} KB`;
+    }
+    return `${(kb / 1024).toFixed(1)} MB`;
+  };
+
+  const handleKnowledgeResultClick = (doc: Doc) => {
+    setSelectedKnowledgeDoc(doc);
+  };
+
+  const handleOpenKnowledgeDoc = (doc: Doc) => {
+    setIsHistoryPanelOpen(false);
+    navigate(`/knowledge-doc/${encodeURIComponent(doc.id)}`);
+  };
+
   // Use tour hook
   const { start: startTour } = useTour();
   
@@ -175,7 +196,95 @@ Let's begin with understanding your business. What type of travel experiences do
       loadConversationList();
     }
   }, [isHistoryOpen, loadConversationList]);
-  
+
+  // Search knowledge base when the history search query changes
+  useEffect(() => {
+    if (!historySearchQuery.trim()) {
+      setKnowledgeBaseResults([]);
+      setSelectedKnowledgeDoc(null);
+      setIsSearching(false);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsSearching(true);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const userId = localStorage.getItem('userId') || 'test_user_123';
+        const userRole = localStorage.getItem('userRole');
+        const authToken = sessionStorage.getItem('authToken') || localStorage.getItem('authToken');
+
+        const response = await fetch('/api/documents/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authToken ? `Bearer ${authToken}` : '',
+            'x-user-id': userId,
+            'x-organization-id': '00000000-0000-0000-0000-000000000001'
+          },
+          body: JSON.stringify({
+            query: historySearchQuery.trim(),
+            userId: userId,
+            isAdmin: userRole === 'admin',
+            limit: 8,
+            scoreThreshold: 0.2
+          })
+        });
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (!response.ok) {
+          console.error('Search failed:', response.statusText);
+          setKnowledgeBaseResults([]);
+          return;
+        }
+
+        const data = await response.json();
+        const results: Doc[] = (data.results || []).map((doc: any) => ({
+          id: doc.id || doc.documentId,
+          documentId: doc.documentId || doc.id,
+          title: doc.documentTitle || doc.title || 'Untitled',
+          folderId: doc.folderId || 'uncategorized',
+          type: doc.fileType || 'Document',
+          updated: 'Recently updated',
+          content: doc.contentPreview || doc.excerpt || '',
+          metadata: {
+            fileSize: doc.fileSize,
+            excerpt: doc.contentPreview || doc.excerpt || '',
+            fileUrl: doc.fileUrl
+          }
+        }));
+
+        setKnowledgeBaseResults(results);
+        setSelectedKnowledgeDoc((current) => {
+          if (!current) {
+            return null;
+          }
+
+          const stillPresent = results.find((doc) => doc.id === current.id);
+          return stillPresent || null;
+        });
+      } catch (error) {
+        console.error('Knowledge search error:', error);
+        if (!isCancelled) {
+          setKnowledgeBaseResults([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsSearching(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [historySearchQuery]);
+
   // Handle incoming conversation from growth plan help
   useEffect(() => {
     if (!hasLoadedInitialConversation && location.state) {
@@ -877,7 +986,7 @@ Let's begin with understanding your business. What type of travel experiences do
             
             {/* Help Button */}
             <Button
-              onClick={() => startTour(isMobile ? MOBILE_CHAT_TOUR_STEPS : CHAT_TOUR_STEPS)}
+              onClick={() => startTour(isMobile ? MOBILE_TOUR_STEPS : CHAT_TOUR_STEPS)}
               variant="secondary"
               size="md"
               className="text-sm"
@@ -897,6 +1006,7 @@ Let's begin with understanding your business. What type of travel experiences do
               size="icon"
               className="relative hover:bg-primary/10"
               aria-label="View chat history and search"
+              data-tour="chat-history"
             >
               <div className="relative w-6 h-6">
                 <Menu className="w-6 h-6 text-primary" aria-hidden="true" />
@@ -1392,21 +1502,111 @@ Let's begin with understanding your business. What type of travel experiences do
                   </div>
                 </div>
                 
-                {/* Placeholder for Knowledge Base results */}
+                {/* Knowledge Base results */}
                 <div className="mt-6 pt-6 border-t border-gray-200 dark:border-white/10">
                   <h3 className="text-sm font-medium text-gray-700 dark:text-white/80 mb-3">
                     Knowledge Base
                   </h3>
                   {historySearchQuery ? (
-                    <div className="text-center py-8">
-                      <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
-                      <p className="text-sm text-gray-500 dark:text-white/40">
-                        Knowledge base search coming soon
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-white/30 mt-1">
-                        Will search documents for "{historySearchQuery}"
-                      </p>
-                    </div>
+                    isSearching ? (
+                      <div className="flex flex-col items-center justify-center text-center py-12">
+                        <Loader2 className="w-6 h-6 text-primary animate-spin mb-3" />
+                        <p className="text-sm text-gray-600 dark:text-white/60">
+                          Searching your knowledge for "{historySearchQuery}"…
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-white/30 mt-1">
+                          Tala looks for uploaded documents, guides, and policies
+                        </p>
+                      </div>
+                    ) : knowledgeBaseResults.length > 0 ? (
+                      <div className="space-y-3">
+                        {knowledgeBaseResults.map((doc) => {
+                          const isSelected = selectedKnowledgeDoc?.id === doc.id;
+                          return (
+                            <div
+                              key={doc.id}
+                              className={cn(
+                                'rounded-xl border transition-all duration-200',
+                                isSelected
+                                  ? 'border-primary/60 bg-primary/10 dark:bg-primary/20 shadow-lg shadow-primary/10'
+                                  : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/5'
+                              )}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleOpenKnowledgeDoc(doc)}
+                                className={cn(
+                                  'w-full px-4 py-3 flex items-start gap-3 text-left rounded-t-xl focus:outline-none',
+                                  isSelected
+                                    ? 'bg-primary/5 dark:bg-primary/10'
+                                    : 'hover:bg-gray-100 dark:hover:bg-white/10'
+                                )}
+                                aria-pressed={isSelected}
+                              >
+                                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                  <FileText className="w-4 h-4" aria-hidden="true" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white leading-snug">
+                                      {doc.title}
+                                    </h4>
+                                    <span className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-white/40">
+                                      {doc.type.toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-xs text-gray-500 dark:text-white/50 leading-relaxed max-h-10 overflow-hidden">
+                                    {doc.metadata?.excerpt || doc.content || 'No preview available'}
+                                  </p>
+                                </div>
+                                <ChevronRight
+                                  className={cn(
+                                    'w-4 h-4 mt-1 text-gray-300 dark:text-white/30 transition-transform',
+                                    isSelected && 'rotate-90 text-primary'
+                                  )}
+                                  aria-hidden="true"
+                                />
+                              </button>
+                              {isSelected && (
+                                <div className="px-4 pb-4 pt-3 border-t border-gray-200 dark:border-white/10 text-left space-y-3">
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-gray-500 dark:text-white/50">
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-primary/15 text-primary">
+                                      {doc.type}
+                                    </span>
+                                    <span>Updated {doc.updated}</span>
+                                    {doc.metadata?.fileSize && (
+                                      <span>{formatFileSize(doc.metadata.fileSize)}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-gray-600 dark:text-white/60 leading-relaxed whitespace-pre-wrap">
+                                    {((doc.content || doc.metadata?.excerpt || '').split('\n').slice(0, 4).join('\n'))}
+                                    {((doc.content || doc.metadata?.excerpt || '').split('\n').length > 4) && '…'}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenKnowledgeDoc(doc)}
+                                    className="inline-flex items-center gap-2 text-xs font-semibold text-primary hover:text-primary/80"
+                                  >
+                                    <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                                    Open document
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-10">
+                        <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
+                        <p className="text-sm text-gray-500 dark:text-white/40">
+                          No knowledge documents matched "{historySearchQuery}"
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-white/30 mt-1">
+                          Try a different search or upload new resources in the knowledge workspace
+                        </p>
+                      </div>
+                    )
                   ) : (
                     <div className="text-center py-8">
                       <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
