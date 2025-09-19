@@ -137,10 +137,23 @@ export const TalaFinalChat: React.FC = () => {
       docId: doc.id,
       documentId: enrichedDoc.documentId,
       targetId,
-      title: doc.title
+      title: doc.title,
+      folderId: doc.folderId
     });
     
-    navigate(`/knowledge-doc/${encodeURIComponent(targetId)}`, { state: { document: doc } });
+    // Navigate to Knowledge page with document parameters
+    const params = new URLSearchParams({
+      doc: targetId,
+      highlight: historySearchQuery || '' // Include search query for highlighting
+    });
+    
+    if (doc.folderId) {
+      params.append('folder', doc.folderId);
+    }
+    
+    const url = `/knowledge?${params.toString()}`;
+    console.log('🔍 TalaFinalChat navigating to:', url);
+    navigate(url);
   };
 
   // Use tour hook
