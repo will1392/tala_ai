@@ -111,8 +111,30 @@ class CloudStorageService {
         }
       };
 
-      const result = await this.s3.upload(params).promise();
+      // Add timeout wrapper for S3 upload
+      const uploadWithTimeout = new Promise(async (resolve, reject) => {
+        let timeoutId;
+        
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('S3 upload timeout after 3 minutes'));
+          }, 3 * 60 * 1000); // 3 minute timeout for S3 upload
+        });
+        
+        try {
+          const result = await Promise.race([
+            this.s3.upload(params).promise(),
+            timeoutPromise
+          ]);
+          clearTimeout(timeoutId);
+          resolve(result);
+        } catch (error) {
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      });
       
+      const result = await uploadWithTimeout;
       console.log(`✅ File uploaded to S3: ${result.Location}`);
       
       return {
@@ -123,6 +145,18 @@ class CloudStorageService {
       };
     } catch (error) {
       console.error('❌ S3 upload failed:', error);
+      
+      // Provide more detailed error information
+      if (error.message.includes('timeout')) {
+        throw new Error(`S3 upload timed out. The file may be too large or there may be network issues.`);
+      } else if (error.code === 'NoSuchBucket') {
+        throw new Error(`S3 bucket '${this.s3Bucket}' does not exist. Please create the bucket first.`);
+      } else if (error.code === 'InvalidAccessKeyId' || error.code === 'SignatureDoesNotMatch') {
+        throw new Error(`S3 authentication failed. Please check AWS credentials.`);
+      } else if (error.code === 'AccessDenied') {
+        throw new Error(`S3 access denied. Please check IAM permissions for the bucket.`);
+      }
+      
       throw new Error(`S3 upload failed: ${error.message}`);
     }
   }

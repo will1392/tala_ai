@@ -71,23 +71,60 @@ export class ApiSearchService implements ISearchService {
 
       console.log(`📄 Uploading document: ${file.name} for user ${userId} (admin: ${isAdmin}) to folder: ${folderId || 'none'}, primaryFolder: ${primaryFolderId || 'none'}`);
 
-      const response = await fetch(`${this.baseUrl}/documents/upload`, {
-        method: 'POST',
-        body: formData,
-      });
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error(`⏱️ Upload timeout for ${file.name} after 5 minutes`);
+        controller.abort();
+      }, 5 * 60 * 1000); // 5 minute timeout
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || `Upload failed with status ${response.status}`);
+      try {
+        const response = await fetch(`${this.baseUrl}/documents/upload`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = `Upload failed with status ${response.status}`;
+          
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.error || errorJson.message || errorMessage;
+            
+            // Log detailed error information
+            if (errorJson.details) {
+              console.error(`❌ Upload error details:`, errorJson.details);
+            }
+            if (errorJson.troubleshooting) {
+              console.error(`🔧 Troubleshooting tips:`, errorJson.troubleshooting);
+            }
+          } catch (parseError) {
+            errorMessage = errorText || errorMessage;
+          }
+          
+          throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        console.log(`✅ Document uploaded successfully:`, result);
+        
+        return {
+          documentId: result.documentId,
+          chunksStored: result.chunksStored
+        };
+      } catch (error) {
+        clearTimeout(timeoutId);
+        
+        if (error.name === 'AbortError') {
+          throw new Error(`Upload timed out after 5 minutes. The file may be too large or the server is not responding.`);
+        }
+        
+        throw error;
       }
-
-      const result = await response.json();
-      console.log(`✅ Document uploaded successfully:`, result);
-      
-      return {
-        documentId: result.documentId,
-        chunksStored: result.chunksStored
-      };
     } catch (error) {
       console.error('❌ Document upload failed:', error);
       throw new Error(`Document upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

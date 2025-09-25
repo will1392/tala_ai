@@ -32,6 +32,7 @@ interface FileUploadStatus {
   uploadStartTime?: number;
   uploadEndTime?: number;
   retryCount: number;
+  statusMessage?: string;
 }
 
 interface UploadStats {
@@ -252,13 +253,40 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
       setFileStatuses(prev => 
         prev.map(status => 
           status.id === id 
-            ? { ...status, status: 'uploading', uploadStartTime: Date.now(), progress: 0 }
+            ? { 
+                ...status, 
+                status: 'uploading', 
+                uploadStartTime: Date.now(), 
+                progress: 0,
+                statusMessage: 'Preparing upload...'
+              }
             : status
         )
       );
 
       // Start progress simulation
       const stopProgress = simulateProgress(id);
+      
+      // Update status message as upload progresses
+      setTimeout(() => {
+        setFileStatuses(prev => 
+          prev.map(status => 
+            status.id === id && status.status === 'uploading'
+              ? { ...status, statusMessage: 'Uploading to server...' }
+              : status
+          )
+        );
+      }, 500);
+      
+      setTimeout(() => {
+        setFileStatuses(prev => 
+          prev.map(status => 
+            status.id === id && status.status === 'uploading'
+              ? { ...status, statusMessage: 'Processing document...' }
+              : status
+          )
+        );
+      }, 2000);
       
       try {
         const result = await uploadDocument(file, selectedFolder || undefined, selectedPrimaryFolder || undefined);
@@ -649,7 +677,7 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
                                     )}
                                     {fileStatus.status === 'uploading' && (
                                       <span className="text-primary">
-                                        Uploading... {fileStatus.progress}%
+                                        {fileStatus.statusMessage || 'Uploading...'} {fileStatus.progress}%
                                       </span>
                                     )}
                                     {fileStatus.status === 'paused' && (

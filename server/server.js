@@ -2095,7 +2095,25 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
         return res.status(500).json({ 
           error: 'Storage configuration error',
           details: 'System must be configured for S3 storage. Local storage is not supported.',
-          storageType: storageProvider
+          storageType: storageProvider,
+          troubleshooting: {
+            required: 'Set STORAGE_TYPE=s3 in server/.env file',
+            checkEnv: 'Ensure AWS credentials are properly configured'
+          }
+        });
+      }
+      
+      // Check if S3 credentials are configured
+      if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_S3_BUCKET) {
+        console.error(`❌ S3 configuration missing required credentials`);
+        return res.status(500).json({ 
+          error: 'S3 configuration incomplete',
+          details: 'AWS credentials or S3 bucket not configured',
+          troubleshooting: {
+            checkCredentials: 'Verify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set in server/.env',
+            checkBucket: 'Ensure AWS_S3_BUCKET is set in server/.env',
+            checkRegion: 'Verify AWS_REGION is set in server/.env'
+          }
         });
       }
       
