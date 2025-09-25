@@ -11,6 +11,8 @@ interface SearchResult {
   excerpt: string;
   type: 'document' | 'article' | 'guide';
   path?: string;
+  folderId?: string;
+  primaryFolderId?: string;
 }
 
 export const GlobalSearch = () => {
@@ -29,7 +31,8 @@ export const GlobalSearch = () => {
       category: 'Destinations',
       excerpt: 'Complete guide to obtaining tourist and business visas for Japan...',
       type: 'document',
-      path: '/knowledge'
+      path: '/knowledge',
+      folderId: 'japan-001'
     },
     {
       id: '2',
@@ -102,6 +105,28 @@ export const GlobalSearch = () => {
 
   const handleResultClick = (result: SearchResult) => {
     setIsOpen(false);
+
+    if (result.type === 'document') {
+      const [basePath = '/knowledge', existingQuery = ''] = result.path ? result.path.split('?') : ['/knowledge', ''];
+      const params = new URLSearchParams(existingQuery);
+
+      if (result.id) {
+        params.set('docId', result.id);
+      }
+
+      if (result.folderId) {
+        params.set('folderId', result.folderId);
+      } else if (result.primaryFolderId) {
+        params.set('primaryFolderId', result.primaryFolderId);
+      }
+
+      navigate({
+        pathname: basePath || '/knowledge',
+        search: params.toString() ? `?${params.toString()}` : ''
+      });
+      return;
+    }
+
     if (result.path) {
       navigate(result.path);
     }

@@ -16,7 +16,6 @@ import {
   Menu,
   PanelLeft,
   X,
-  Search,
   Wand2,
   Sun,
   Moon,
@@ -28,20 +27,9 @@ import { GlobalSearch } from './GlobalSearch';
 import { useTheme } from '../../context/ThemeContextNew';
 import { useCredits } from '../../hooks/useCredits';
 
-// UI Components
-const Input = ({ className = '', ...props }: { className?: string; [key: string]: any }) => (
-  <input
-    className={cn(
-      'flex h-10 w-full rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary',
-      className
-    )}
-    {...props}
-  />
-);
-
-const Button = ({ 
-  children, 
-  variant = 'default', 
+const Button = ({
+  children,
+  variant = 'default',
   size = 'default',
   className = '',
   ...props 
@@ -209,7 +197,7 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
     <div className="flex h-full flex-col border-r">
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center">
-          <img 
+          <img
             src="/assets/tala-logo-white.png"
             alt="Tala AI"
             className="h-14 w-auto object-contain dark:block hidden"
