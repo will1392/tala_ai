@@ -60,6 +60,11 @@ export function requireCredits(operation, customCost = null) {
     });
     
     // Skip credits check for certain conditions
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⚠️ Credits check skipped in development mode');
+      return next();
+    }
+    
     if (process.env.CREDITS_ENABLED === 'false') {
       console.log('⚠️ Credits disabled via environment variable');
       return next();

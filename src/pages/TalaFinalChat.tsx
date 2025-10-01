@@ -37,7 +37,7 @@ import { useToast } from '../components/toast/ToastProvider';
 import { normalizeError } from '../lib/errors';
 import { useIsMobile } from '../hooks/useBreakpoint';
 import { useTour } from '../components/tour/TourProvider';
-import { CHAT_TOUR_STEPS, MOBILE_TOUR_STEPS } from '../tour/steps';
+import { DEFAULT_TOUR_STEPS, MOBILE_TOUR_STEPS } from '../tour/steps';
 import { Button } from '../components/ui/Button';
 import { Textarea } from '../components/ui/Textarea';
 import { Modal } from '../components/ui/Modal';
@@ -1018,7 +1018,7 @@ Let's begin with understanding your business. What type of travel experiences do
             
             {/* Help Button */}
             <Button
-              onClick={() => startTour(isMobile ? MOBILE_TOUR_STEPS : CHAT_TOUR_STEPS)}
+              onClick={() => startTour(isMobile ? MOBILE_TOUR_STEPS : DEFAULT_TOUR_STEPS)}
               variant="secondary"
               size="md"
               className="text-sm"
@@ -1139,9 +1139,12 @@ Let's begin with understanding your business. What type of travel experiences do
                           </div>
                         ) : (
                           <img 
-                            src="/assets/tala-emblem.png"
+                            src="/assets/tala-emblem.svg"
                             alt="Tala AI"
-                            className="h-8 w-8 object-contain rounded-lg"
+                            className="h-8 w-8 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.src = '/assets/tala-emblem.png';
+                            }}
                           />
                         )}
                       </div>

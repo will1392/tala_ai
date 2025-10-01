@@ -16,13 +16,21 @@ import { useTheme } from '../../context/ThemeContext';
 import { useCredits } from '../../hooks/useCredits';
 
 const navItems = [
-  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { path: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
-  { path: '/chat', icon: MessageSquare, label: 'Chat' },
-  { path: '/email', icon: Mail, label: 'Email' },
-  { path: '/cmo', icon: Target, label: 'CMO Mode' },
-  { path: '/settings', icon: Settings, label: 'Settings' },
-];
+  { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', feature: 'DASHBOARD' },
+  { path: '/knowledge', icon: BookOpen, label: 'Knowledge Base', feature: 'KNOWLEDGE' },
+  { path: '/chat', icon: MessageSquare, label: 'Chat', feature: 'CHAT' },
+  { path: '/email', icon: Mail, label: 'Email', feature: 'EMAIL' },
+  { path: '/cmo', icon: Target, label: 'CMO Mode', feature: 'CMO' },
+  { path: '/settings', icon: Settings, label: 'Settings', feature: 'SETTINGS' },
+].filter(item => {
+  // In production, only show enabled features
+  if (import.meta.env.VITE_ENV === 'production') {
+    const featureKey = `VITE_FEATURE_${item.feature}`;
+    return import.meta.env[featureKey] === 'true';
+  }
+  // In development, show everything
+  return true;
+});
 
 export const Sidebar = () => {
   const { resolvedTheme } = useTheme();
@@ -70,26 +78,14 @@ export const Sidebar = () => {
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
           <img 
-            src="/assets/tala-logo-white.png"
+            src="/assets/tala-logo-sidebar.svg"
             alt="Tala AI"
             className="h-10 w-auto dark:block hidden"
-            onError={(e) => {
-              console.error('Logo failed to load:', e);
-              // Fallback to text
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.insertAdjacentHTML('afterend', '<div class="text-2xl font-bold text-white">TALA</div>');
-            }}
           />
           <img 
-            src="/assets/tala-logo-dark.png"
+            src="/assets/tala-logo-light.svg"
             alt="Tala AI"
             className="h-10 w-auto dark:hidden block"
-            onError={(e) => {
-              console.error('Logo failed to load:', e);
-              // Fallback to text
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.insertAdjacentHTML('afterend', '<div class="text-2xl font-bold text-gray-900">TALA</div>');
-            }}
           />
         </div>
       </div>

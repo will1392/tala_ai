@@ -210,12 +210,12 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center">
           <img 
-            src="/assets/tala-logo-white.png"
+            src="/assets/tala-logo-sidebar.svg"
             alt="Tala AI"
             className="h-14 w-auto object-contain dark:block hidden"
           />
           <img 
-            src="/assets/tala-logo-dark.png"
+            src="/assets/tala-logo-light.svg"
             alt="Tala AI"
             className="h-14 w-auto object-contain dark:hidden block"
           />
