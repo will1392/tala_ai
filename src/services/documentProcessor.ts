@@ -1,6 +1,6 @@
 // import PDFParse from 'pdf-parse'; // Not compatible with browser
 // import mammoth from 'mammoth'; // Not included in production build
-import * as XLSX from 'xlsx';
+// import * as XLSX from 'xlsx'; // Not included in production build
 
 /**
  * Document Processing Service for Tala AI
@@ -146,21 +146,10 @@ export class DocumentProcessor {
   /**
    * Extract text from Excel spreadsheets
    */
-  private async extractExcelText(buffer: ArrayBuffer): Promise<string> {
-    try {
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      let text = '';
-      
-      workbook.SheetNames.forEach(sheetName => {
-        const sheet = workbook.Sheets[sheetName];
-        const csvData = XLSX.utils.sheet_to_csv(sheet);
-        text += `Sheet: ${sheetName}\n${csvData}\n\n`;
-      });
-      
-      return text;
-    } catch (error) {
-      throw new Error(`Excel extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+  private async extractExcelText(_buffer: ArrayBuffer): Promise<string> {
+    // Excel parsing requires server-side processing
+    console.warn('Excel parsing requires server-side processing');
+    return '[Excel content would be extracted server-side]';
   }
 
   /**
