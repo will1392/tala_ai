@@ -37,9 +37,18 @@ export const LoginPage = () => {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2, type: "spring" }}
-            className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 glow"
+            className="flex items-center justify-center mx-auto mb-4"
           >
-            <span className="text-3xl font-bold text-secondary-900">T</span>
+            <img 
+              src="/assets/tala-logo-sidebar.svg"
+              alt="Tala AI"
+              className="h-16 w-auto dark:block hidden"
+            />
+            <img 
+              src="/assets/tala-logo-light.svg"
+              alt="Tala AI"
+              className="h-16 w-auto dark:hidden block"
+            />
           </motion.div>
           <h1 className="text-3xl font-bold mb-2">Welcome to Tala AI</h1>
           <p className="text-white/70">Your AI-powered travel assistant</p>
