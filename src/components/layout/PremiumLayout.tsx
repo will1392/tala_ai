@@ -200,8 +200,16 @@ const sidebarItems: SidebarItem[] = [
   },
 ];
 
+const sidebarFeatureFlagMap: Record<string, string> = {
+  home: 'VITE_FEATURE_DASHBOARD',
+  chat: 'VITE_FEATURE_CHAT',
+  marketing: 'VITE_FEATURE_MARKETING',
+  email: 'VITE_FEATURE_EMAIL',
+  knowledge: 'VITE_FEATURE_KNOWLEDGE',
+};
+
 // Sidebar Content Component
-const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, userProfile, creditInfo, creditsLoading, formatCredits, onClose }: any) => {
+const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, activeTab, onNavigate, userProfile, creditInfo, creditsLoading, formatCredits, onClose }: any) => {
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -229,7 +237,7 @@ const SidebarContent = ({ expandedItems, toggleExpanded, activeTab, onNavigate, 
 
       <div className="flex-1 overflow-y-auto px-3 py-2">
         <div className="space-y-1">
-          {sidebarItems.map((item) => {
+          {items.map((item: SidebarItem) => {
             const isActive = item.path === location.pathname;
             
             return (
@@ -387,6 +395,20 @@ export const PremiumLayout = () => {
   // Use the credits hook
   const { creditInfo, loading: creditsLoading } = useCredits();
 
+  const envVars = import.meta.env as Record<string, string | boolean | undefined>;
+  const isProduction = envVars.VITE_ENV === 'production';
+  const filteredSidebarItems = isProduction
+    ? sidebarItems.filter((item) => {
+        const flagKey = sidebarFeatureFlagMap[item.id];
+        if (!flagKey) {
+          return true;
+        }
+
+        const flagValue = envVars[flagKey];
+        return flagValue === true || flagValue === 'true';
+      })
+    : sidebarItems;
+
   // Load user profile
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -467,6 +489,7 @@ export const PremiumLayout = () => {
         )}
       >
         <SidebarContent
+          items={filteredSidebarItems}
           expandedItems={expandedItems}
           toggleExpanded={toggleExpanded}
           activeTab={activeTab}
@@ -486,6 +509,7 @@ export const PremiumLayout = () => {
         )}
       >
         <SidebarContent
+          items={filteredSidebarItems}
           expandedItems={expandedItems}
           toggleExpanded={toggleExpanded}
           activeTab={activeTab}
