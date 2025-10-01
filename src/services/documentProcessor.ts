@@ -1,5 +1,5 @@
 // import PDFParse from 'pdf-parse'; // Not compatible with browser
-import mammoth from 'mammoth';
+// import mammoth from 'mammoth'; // Not included in production build
 import * as XLSX from 'xlsx';
 
 /**
@@ -137,13 +137,10 @@ export class DocumentProcessor {
   /**
    * Extract text from Word documents
    */
-  private async extractWordText(buffer: ArrayBuffer): Promise<string> {
-    try {
-      const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) });
-      return result.value;
-    } catch (error) {
-      throw new Error(`Word document extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+  private async extractWordText(_buffer: ArrayBuffer): Promise<string> {
+    // Word document parsing requires server-side processing
+    console.warn('Word document parsing requires server-side processing');
+    return '[Word document content would be extracted server-side]';
   }
 
   /**

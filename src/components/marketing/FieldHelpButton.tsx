@@ -63,7 +63,7 @@ const FIELD_HELP_CONTENT: Record<string, FieldHelpContent> = {
       "Be specific but not too narrow"
     ]
   },
-  campaign_budget: {
+  initial_budget: {
     title: "Selecting Your Campaign Budget",
     explanation: "Your budget determines how many potential clients we can reach. Direct mail has predictable costs and measurable results.",
     examples: [
