@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Mail, Eye, EyeOff, UserCheck } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { Input } from '../shared/Input';
@@ -21,16 +21,6 @@ export const LoginPage = () => {
       toast.success(`Welcome back, ${user.name}!`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Login failed');
-    }
-  };
-
-  const fillCredentials = (userType: 'admin' | 'agent') => {
-    if (userType === 'admin') {
-      setEmail('admin@tala.ai');
-      setPassword('admin123');
-    } else {
-      setEmail('agent1@travel.com');
-      setPassword('agent123');
     }
   };
 
@@ -103,35 +93,6 @@ export const LoginPage = () => {
               Sign In
             </Button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-white/10">
-            <p className="text-sm text-white/60 mb-3 text-center">Demo Credentials:</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => fillCredentials('admin')}
-                className="flex items-center gap-2 text-xs"
-              >
-                <UserCheck size={16} />
-                Admin Login
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => fillCredentials('agent')}
-                className="flex items-center gap-2 text-xs"
-              >
-                <UserCheck size={16} />
-                Agent Login
-              </Button>
-            </div>
-            <div className="mt-3 text-xs text-white/40 space-y-1">
-              <p><strong>Admin:</strong> admin@tala.ai / admin123</p>
-              <p><strong>Agent:</strong> agent1@travel.com / agent123</p>
-            </div>
-          </div>
         </GlassCard>
       </motion.div>
     </div>
