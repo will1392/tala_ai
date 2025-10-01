@@ -11,7 +11,7 @@ interface AuthStore extends AuthState {
 // Mock users for testing
 const mockUsers: Record<string, { user: User; password: string }> = {
   'will@weareapexcreatives.com': {
-    password: 'tala2024',
+    password: 'tala$1111',
     user: {
       id: 'will-1',
       email: 'will@weareapexcreatives.com',
