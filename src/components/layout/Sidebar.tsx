@@ -25,8 +25,10 @@ const navItems = [
 ].filter(item => {
   // In production, only show enabled features
   if (import.meta.env.VITE_ENV === 'production') {
-    const featureKey = `VITE_FEATURE_${item.feature}`;
-    return import.meta.env[featureKey] === 'true';
+    const featureKey = `VITE_FEATURE_${item.feature}` as keyof ImportMetaEnv;
+    const featureValue = import.meta.env[featureKey];
+    // Check for both string 'true' and boolean true
+    return featureValue === 'true' || featureValue === true;
   }
   // In development, show everything
   return true;
