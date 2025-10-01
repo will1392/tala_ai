@@ -1,9 +1,9 @@
+/* Import markdown styles */
+@import './markdown.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import markdown styles */
-@import './markdown.css';
 
 /* Accessibility utilities */
 @layer utilities {
