@@ -206,6 +206,7 @@ const sidebarFeatureFlagMap: Record<string, string> = {
   marketing: 'VITE_FEATURE_MARKETING',
   email: 'VITE_FEATURE_EMAIL',
   knowledge: 'VITE_FEATURE_KNOWLEDGE',
+  tasks: 'VITE_FEATURE_TASKS',
 };
 
 // Sidebar Content Component

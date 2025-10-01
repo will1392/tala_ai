@@ -94,10 +94,12 @@ function App() {
                 <Route path="*" element={<LoginPage />} />
               ) : (
                 <>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/" element={<Navigate to="/chat" replace />} />
                   <Route path="knowledge-doc/:docId" element={<KnowledgeDocumentViewer />} />
                   <Route path="/" element={<PremiumLayout />}>
-                    <Route path="dashboard" element={<PremiumDashboard />} />
+                    {(import.meta.env.VITE_ENV !== 'production' || import.meta.env.VITE_FEATURE_DASHBOARD === 'true' || import.meta.env.VITE_FEATURE_DASHBOARD === true) && (
+                      <Route path="dashboard" element={<PremiumDashboard />} />
+                    )}
                     <Route path="chat" element={<TalaFinalChat />} />
                     <Route path="chat-redesigned" element={<TalaFinalChatRedesigned />} />
                     <Route path="chat-demo" element={<ChatView />} />
