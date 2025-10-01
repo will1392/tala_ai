@@ -102,14 +102,18 @@ function App() {
                     <Route path="chat-redesigned" element={<TalaFinalChatRedesigned />} />
                     <Route path="chat-demo" element={<ChatView />} />
                     <Route path="demo-flow" element={<DemoFlow />} />
-                    <Route path="email" element={<Email />} />
+                    {import.meta.env.VITE_ENV !== 'production' || import.meta.env.VITE_FEATURE_EMAIL === 'true' ? (
+                      <Route path="email" element={<Email />} />
+                    ) : null}
                     <Route path="settings" element={<Settings />} />
                     <Route path="knowledge" element={<KnowledgeFinal />} />
                     <Route path="knowledge-final" element={<KnowledgeFinal />} />
                     <Route path="knowledge-original" element={<Knowledge />} />
                     <Route path="ui-components" element={<UIComponentShowcase />} />
                     <Route path="markdown-test" element={<MarkdownTest />} />
-                    <Route path="marketing" element={<MarketingDashboard />} />
+                    {import.meta.env.VITE_ENV !== 'production' || import.meta.env.VITE_FEATURE_MARKETING === 'true' ? (
+                      <Route path="marketing" element={<MarketingDashboard />} />
+                    ) : null}
                     <Route path="credits" element={<Credits />} />
                     <Route path="admin/users" element={<UserManagement />} />
                   </Route>
