@@ -18,6 +18,7 @@ import { useCredits } from '../../hooks/useCredits';
 const navItems = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', feature: 'DASHBOARD' },
   { path: '/knowledge', icon: BookOpen, label: 'Knowledge Base', feature: 'KNOWLEDGE' },
+  { path: '/hooks', icon: Sparkles, label: 'Hook Generator', feature: 'HOOK_GENERATOR' },
   { path: '/chat', icon: MessageSquare, label: 'Chat', feature: 'CHAT' },
   { path: '/email', icon: Mail, label: 'Email', feature: 'EMAIL' },
   { path: '/cmo', icon: Target, label: 'CMO Mode', feature: 'CMO' },
@@ -25,8 +26,11 @@ const navItems = [
 ].filter(item => {
   // In production, only show enabled features
   if (import.meta.env.VITE_ENV === 'production') {
+    if (!item.feature) return true;
     const featureKey = `VITE_FEATURE_${item.feature}` as keyof ImportMetaEnv;
     const featureValue = import.meta.env[featureKey];
+    // Default to visible unless explicitly disabled
+    if (featureValue === undefined) return true;
     // Check for both string 'true' and boolean true
     return featureValue === 'true' || featureValue === true;
   }

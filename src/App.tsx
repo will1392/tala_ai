@@ -25,6 +25,7 @@ import CMOBasic from './pages/CMOBasic';
 import CMODebugSimple from './pages/CMODebugSimple';
 import CMOWorking from './pages/CMOWorking';
 import CMOFull from './pages/CMOFull';
+import HookGenerator from './pages/HookGenerator';
 // import EmailInbox from './components/email/EmailInbox';
 import { DueTaskBanner } from './components/notifications/DueTaskBanner';
 import { useAuthStore } from './store/authStore';
@@ -111,6 +112,7 @@ function App() {
                     <Route path="knowledge" element={<KnowledgeFinal />} />
                     <Route path="knowledge-final" element={<KnowledgeFinal />} />
                     <Route path="knowledge-original" element={<Knowledge />} />
+                    <Route path="hooks" element={<HookGenerator />} />
                     <Route path="ui-components" element={<UIComponentShowcase />} />
                     <Route path="markdown-test" element={<MarkdownTest />} />
                     {(import.meta.env.VITE_ENV !== 'production' || import.meta.env.VITE_FEATURE_MARKETING === 'true' || import.meta.env.VITE_FEATURE_MARKETING === true) && (
