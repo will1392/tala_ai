@@ -25,7 +25,7 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50 dark:bg-transparent">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -50,16 +50,16 @@ export const LoginPage = () => {
               className="h-16 w-auto dark:hidden block"
             />
           </motion.div>
-          <h1 className="text-3xl font-bold mb-2">Welcome to Tala AI</h1>
-          <p className="text-white/70">Your AI-powered travel assistant</p>
+          <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">Welcome to Tala AI</h1>
+          <p className="text-gray-600 dark:text-white/70">Your AI-powered travel assistant</p>
         </div>
 
         <GlassCard>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">Email</label>
               <div className="relative">
-                <Mail size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50" />
+                <Mail size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-white/50" />
                 <Input
                   type="email"
                   value={email}
@@ -72,9 +72,9 @@ export const LoginPage = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">Password</label>
               <div className="relative">
-                <Lock size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50" />
+                <Lock size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-white/50" />
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -86,7 +86,7 @@ export const LoginPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-white/50 hover:text-gray-600 dark:hover:text-white"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>

@@ -670,11 +670,35 @@ class MockAuthProvider extends BaseAuthProvider {
       }
     };
     
+    // Brycen from Apex Creatives
+    const brycen = {
+      id: 'mock-brycen-1',
+      email: 'brycen@weareapexcreatives.com',
+      password: 'mwpCbII1ClTkbbTQ2LTX',
+      firstName: 'Brycen',
+      lastName: 'Smith',
+      name: 'Brycen Smith',
+      isActive: true,
+      emailVerified: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastLogin: null,
+      loginCount: 0,
+      roles: ['SUPER_ADMIN'],
+      organizationId: 'mock-org-apex',
+      provider: 'mock',
+      providerData: {
+        mockId: 'mock-brycen-1',
+        isDefault: false
+      }
+    };
+    
     // Add users to mock database
     this.users.set(admin.id, admin);
     this.users.set(owner.id, owner);
     this.users.set(agent.id, agent);
     this.users.set(client.id, client);
+    this.users.set(brycen.id, brycen);
     
     this.log(`Created ${this.users.size} default mock users`);
   }
