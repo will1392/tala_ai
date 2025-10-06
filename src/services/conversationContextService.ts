@@ -19,6 +19,7 @@ import type {
   IntentType
 } from '../types/conversationContext';
 import { CONTEXT_CONFIG } from '../types/conversationContext';
+import { buildApiUrl } from '../utils/api';
 
 export class ConversationContextService {
   private contexts: Map<string, ConversationContext> = new Map();
@@ -110,7 +111,7 @@ export class ConversationContextService {
       const contextSummary = this.buildContextSummary(context);
 
       // Use OpenAI function calling for structured extraction
-      const response = await fetch('http://localhost:3001/api/chat/extract-context', {
+      const response = await fetch(buildApiUrl('chat/extract-context'), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

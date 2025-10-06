@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { buildApiUrl } from '../utils/api';
 
 interface CreditInfo {
   available_credits: number;
@@ -17,9 +18,7 @@ export const useCredits = () => {
       setError(null);
       
       const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
-      const apiUrl = import.meta.env.VITE_API_URL || '/api';
-      
-      const response = await fetch(`${apiUrl}/credits/balance`, {
+      const response = await fetch(buildApiUrl('credits/balance'), {
         headers: {
           'x-user-id': userId
         }

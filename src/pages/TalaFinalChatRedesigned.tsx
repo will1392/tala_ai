@@ -23,6 +23,7 @@ import toast from 'react-hot-toast';
 import useConversation from '../hooks/useConversation';
 import useRetryableRequest from '../hooks/useRetryableRequest';
 import { renderMarkdownSimple } from '../utils/markdownRenderer';
+import { buildApiUrl } from '../utils/api';
 import StageBar from '../components/chat/StageBar';
 import type { Stage } from '../components/chat/StageBar';
 import ChatBubble from '../components/chat/ChatBubble';
@@ -257,7 +258,7 @@ export const TalaFinalChatRedesigned: React.FC = () => {
 
     try {
       const data = await executeWithRetry(async () => {
-        const response = await fetch(`http://localhost:3001/api/chat/v2`, {
+        const response = await fetch(buildApiUrl('chat/v2'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

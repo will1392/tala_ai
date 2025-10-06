@@ -18,6 +18,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Textarea } from '../shared/Textarea';
 import { Badge } from '../shared/Badge';
+import { buildApiUrl } from '../../utils/api';
 
 interface TalaFieldAssistantProps {
   fieldId: string;
@@ -95,7 +96,7 @@ export function TalaFieldAssistant({
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chat/v2', {
+      const response = await fetch(buildApiUrl('chat/v2'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

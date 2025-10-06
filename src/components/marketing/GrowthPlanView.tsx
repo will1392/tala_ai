@@ -36,6 +36,7 @@ import { Modal } from '../ui/Modal';
 import { useNavigate } from 'react-router-dom';
 import { marketingContext } from '../../services/MarketingContextService';
 import type { GrowthPlan, GrowthPhase, GrowthStep, EvidenceItem } from '../../types/marketing';
+import { buildApiUrl } from '../../utils/api';
 
 interface GrowthPlanViewProps {
   brandId: string;
@@ -232,7 +233,7 @@ Expected deliverables: ${talaHelpStep.outputs?.join(', ') || 'Marketing material
 Please provide specific marketing guidance and actionable steps. This is NOT a travel query - this is about marketing strategy and implementation.`;
 
       // Send to chat API with CMO mode
-      const response = await fetch('/api/chat/v2', {
+      const response = await fetch(buildApiUrl('chat/v2'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

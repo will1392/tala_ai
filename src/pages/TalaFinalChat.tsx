@@ -42,6 +42,7 @@ import { Button } from '../components/ui/Button';
 import { Textarea } from '../components/ui/Textarea';
 import { Modal } from '../components/ui/Modal';
 import { announceChatStatus } from '../utils/announceToScreenReader';
+import { buildApiUrl } from '../utils/api';
 import type { Doc } from '../types/knowledge';
 
 type MarketingMode = 
@@ -234,7 +235,7 @@ Let's begin with understanding your business. What type of travel experiences do
         const userRole = localStorage.getItem('userRole');
         const authToken = sessionStorage.getItem('authToken') || localStorage.getItem('authToken');
 
-        const response = await fetch('/api/documents/search', {
+        const response = await fetch(buildApiUrl('documents/search'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -407,7 +408,7 @@ Let's begin with understanding your business. What type of travel experiences do
       console.log('🔄 Loading messages for conversation:', convId);
       
       // Always try backend first - this is our source of truth
-      const response = await fetch(`/api/conversations/${convId}/messages`, {
+      const response = await fetch(buildApiUrl(`conversations/${convId}/messages`), {
         headers: {
           'x-user-id': 'admin-1'
         }
@@ -697,7 +698,7 @@ Let's begin with understanding your business. What type of travel experiences do
           };
         }
         
-        const response = await fetch(`/api/chat/v2`, {
+        const response = await fetch(buildApiUrl('chat/v2'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -892,7 +893,7 @@ Let's begin with understanding your business. What type of travel experiences do
     // Recreate the request
     try {
       const data = await executeWithRetry(async () => {
-        const response = await fetch(`/api/chat/v2`, {
+        const response = await fetch(buildApiUrl('chat/v2'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -93,7 +93,8 @@ export default function CreditsDashboard() {
 
   const fetchCreditStatus = async () => {
     try {
-      const response = await fetch('/api/credits/status', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/credits/status`, {
         headers: {
           'x-user-id': localStorage.getItem('userId') || 'demo-user'
         }
