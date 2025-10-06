@@ -659,6 +659,10 @@ ALTER TABLE document_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE primary_folders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE migrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schema_version ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON migrations FROM anon, authenticated;
+REVOKE ALL ON schema_version FROM anon, authenticated;
+GRANT SELECT ON migrations TO service_role;
+GRANT SELECT ON schema_version TO service_role;
 
 -- Organizations: Users can only see their own organization
 CREATE POLICY "Users can view own organization" ON organizations FOR SELECT USING (
@@ -888,6 +892,8 @@ WHERE c.deleted_at IS NULL
       )
   );
 ALTER VIEW conversation_summaries SET (security_invoker = true);
+REVOKE ALL ON conversation_summaries FROM anon;
+GRANT SELECT ON conversation_summaries TO authenticated;
 
 -- View of documents the caller is allowed to access
 CREATE OR REPLACE VIEW accessible_documents AS
@@ -910,6 +916,8 @@ WHERE d.deleted_at IS NULL
       )
   );
 ALTER VIEW accessible_documents SET (security_invoker = true);
+REVOKE ALL ON accessible_documents FROM anon;
+GRANT SELECT ON accessible_documents TO authenticated;
 
 -- View for document search with folder information limited by access rules
 CREATE OR REPLACE VIEW document_search AS
@@ -926,13 +934,14 @@ LEFT JOIN document_tags dt ON d.id = dt.document_id
 LEFT JOIN tags t ON dt.tag_id = t.id
 GROUP BY d.id, f.name, f.path, owner.display_name;
 ALTER VIEW document_search SET (security_invoker = true);
+REVOKE ALL ON document_search FROM anon;
+GRANT SELECT ON document_search TO authenticated;
 
 -- View exposing details about the current user only
 CREATE OR REPLACE VIEW user_details AS
 SELECT
     u.id,
     u.organization_id,
-    u.auth_user_id,
     u.email,
     u.first_name,
     u.last_name,
@@ -949,6 +958,8 @@ WHERE
     auth.role() = 'service_role'
     OR u.auth_user_id = auth.uid();
 ALTER VIEW user_details SET (security_invoker = true);
+REVOKE ALL ON user_details FROM anon;
+GRANT SELECT ON user_details TO authenticated;
 
 -- View for organization usage scoped to the requesting tenant
 CREATE OR REPLACE VIEW agency_usage_summary AS
@@ -981,6 +992,8 @@ WHERE
           )
     );
 ALTER VIEW agency_usage_summary SET (security_invoker = true);
+REVOKE ALL ON agency_usage_summary FROM anon;
+GRANT SELECT ON agency_usage_summary TO authenticated;
 
 -- =============================================================================
 -- COMMENTS
