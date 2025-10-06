@@ -1,4 +1,5 @@
 import type { ISearchService } from './serviceFactory';
+import { buildApiUrl } from '../utils/api';
 
 /**
  * API-based Search Service for Tala AI
@@ -11,7 +12,8 @@ export class ApiSearchService implements ISearchService {
   private initialized = false;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    // Use buildApiUrl to ensure correct /api path
+    this.baseUrl = buildApiUrl();
   }
 
   private getAuthHeaders(isJson: boolean = true): Record<string, string> {
