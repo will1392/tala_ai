@@ -17,8 +17,9 @@ export const useCredits = () => {
       setError(null);
       
       const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
+      const apiUrl = import.meta.env.VITE_API_URL || '/api';
       
-      const response = await fetch('/api/credits/balance', {
+      const response = await fetch(`${apiUrl}/credits/balance`, {
         headers: {
           'x-user-id': userId
         }
