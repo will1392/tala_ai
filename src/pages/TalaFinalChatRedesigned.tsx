@@ -29,6 +29,7 @@ import type { Stage } from '../components/chat/StageBar';
 import ChatBubble from '../components/chat/ChatBubble';
 import { useStatusUpdates } from '../hooks/useStatusUpdates';
 import Topbar from '../components/layout/Topbar';
+import { useAuthStore } from '../store/authStore';
 
 type MarketingMode = 
   | 'general' 
@@ -74,12 +75,14 @@ export const TalaFinalChatRedesigned: React.FC = () => {
   const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const [userName, setUserName] = useState('Will');
   const [currentRequestId, setCurrentRequestId] = useState<string | undefined>();
   const [stage, setStage] = useState<Stage>('complete');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const user = useAuthStore((state) => state.user);
+  const userName = user?.name?.trim() || 'there';
   
   // Use status updates hook
   const { currentStage, statusMessage, details } = useStatusUpdates(currentRequestId, isLoading);

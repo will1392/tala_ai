@@ -1136,7 +1136,7 @@ Let's begin with understanding your business. What type of travel experiences do
                               ? "bg-gray-200 dark:bg-white/20 text-gray-900 dark:text-white"
                               : "bg-primary/20 text-primary"
                           )}>
-                            {userName[0]}
+                            {userInitial}
                           </div>
                         ) : (
                           <img 
