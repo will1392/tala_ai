@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Maximize2, X, CheckCircle2, Trash2, Tag, Link2, Calendar, Loader2 } from 'lucide-react';
 import type { Doc } from '../../types/knowledge';
+import { buildApiUrl } from '../../utils/api';
 import Markdown from '../shared/Markdown';
 
 type Props = {
@@ -26,8 +27,18 @@ export default function DocPreviewEnhanced({ doc, onUseInChat, onRemove }: Props
       if (doc.previewUrl && (doc.previewUrl.includes('s3.amazonaws.com') || doc.previewUrl.includes('s3-'))) {
         setLoading(true);
         try {
-          const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-          const response = await fetch(`${baseUrl}/documents/${doc.id}/url?userId=admin-1&isAdmin=true`);
+          const token = localStorage.getItem('auth_token');
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          
+          const response = await fetch(
+            buildApiUrl(`documents/${doc.id}/url?userId=admin-1&isAdmin=true`),
+            { headers }
+          );
           
           if (response.ok) {
             const data = await response.json();
@@ -72,8 +83,7 @@ export default function DocPreviewEnhanced({ doc, onUseInChat, onRemove }: Props
     
     // Handle local API URLs - need to be proxied
     if (signedUrl.startsWith('/api/files/')) {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-      return `${baseUrl.replace('/api', '')}${signedUrl}`;
+      return `${buildApiUrl().replace('/api', '')}${signedUrl}`;
     }
     
     return signedUrl;

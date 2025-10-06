@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../shared/Button';
 import { pdfjs } from 'react-pdf';
 import { useState, useEffect } from 'react';
+import { buildApiUrl } from '../../utils/api';
 import '../../styles/pdf-viewer.css';
 
 // Back to the original working configuration
@@ -65,16 +66,24 @@ export const DocumentViewer = ({
       // For cloud URLs, fetch signed URL
       setLoadingUrl(true);
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const token = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch(
-          `${apiUrl}/api/documents/${document.id}/url?userId=admin-1&isAdmin=true`
+          buildApiUrl(`documents/${document.id}/url?userId=admin-1&isAdmin=true`),
+          { headers }
         );
         
         if (response.ok) {
           const data = await response.json();
           setSignedUrl(data.url);
         } else {
-          console.error('Failed to fetch signed URL');
+          console.error('Failed to fetch signed URL:', response.status);
           setSignedUrl(document.fileUrl); // Fallback to original URL
         }
       } catch (error) {
@@ -102,12 +111,11 @@ export const DocumentViewer = ({
 
   const isPDF = document.fileType === 'application/pdf' && document.fileUrl;
   // Use signed URL for cloud storage, construct local URL for local storage
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   const pdfUrl = isPDF ? (
     signedUrl 
       ? (signedUrl.startsWith('http') 
           ? signedUrl 
-          : `${apiUrl}${signedUrl}`.replace(/ /g, '%20'))
+          : `${buildApiUrl()}${signedUrl}`.replace(/ /g, '%20'))
       : ''
   ) : '';
   
