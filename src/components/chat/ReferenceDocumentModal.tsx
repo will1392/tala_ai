@@ -47,7 +47,8 @@ export const ReferenceDocumentModal = ({ isOpen, onClose, reference }: Reference
     setError(null);
     
     try {
-      const response = await fetch(`http://localhost:3001/api/documents/${documentId}?userId=admin-1`, {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/documents/${documentId}?userId=admin-1`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

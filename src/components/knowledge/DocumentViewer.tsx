@@ -65,8 +65,9 @@ export const DocumentViewer = ({
       // For cloud URLs, fetch signed URL
       setLoadingUrl(true);
       try {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
         const response = await fetch(
-          `http://localhost:3001/api/documents/${document.id}/url?userId=admin-1&isAdmin=true`
+          `${apiUrl}/api/documents/${document.id}/url?userId=admin-1&isAdmin=true`
         );
         
         if (response.ok) {
@@ -101,11 +102,12 @@ export const DocumentViewer = ({
 
   const isPDF = document.fileType === 'application/pdf' && document.fileUrl;
   // Use signed URL for cloud storage, construct local URL for local storage
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   const pdfUrl = isPDF ? (
     signedUrl 
       ? (signedUrl.startsWith('http') 
           ? signedUrl 
-          : `http://localhost:3001${signedUrl}`.replace(/ /g, '%20'))
+          : `${apiUrl}${signedUrl}`.replace(/ /g, '%20'))
       : ''
   ) : '';
   

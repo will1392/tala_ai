@@ -127,7 +127,8 @@ export const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
     }
 
     // Connect to SSE endpoint
-    const source = new EventSource(`http://localhost:3001/api/chat/status/stream/${requestId}`);
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const source = new EventSource(`${apiUrl}/api/chat/status/stream/${requestId}`);
     
     source.onmessage = (event) => {
       try {

@@ -43,8 +43,9 @@ export function useStatusUpdates(
       return;
     }
 
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const eventSource = new EventSource(
-      `http://localhost:3001/api/chat/status/stream/${requestId}`
+      `${apiUrl}/chat/status/stream/${requestId}`
     );
 
     eventSource.onopen = () => {

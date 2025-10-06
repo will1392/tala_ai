@@ -148,7 +148,8 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
     if (!lastVoiceMessage) return;
     
     try {
-      const response = await fetch('http://localhost:3001/api/voice/store', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/voice/store`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
