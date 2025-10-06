@@ -49,7 +49,7 @@ const channelFallback = (channel: string) => {
     'Email': 'Drop this in the subject line or first sentence to win the open.',
     'Webinar': 'Open your session with this to lock people in from second one.',
     'Landing Page': 'Anchor your hero section with this promise.',
-    'Direct Mail': 'Print this as the bold headline they can't ignore in the mailbox.',
+    'Direct Mail': 'Print this as the bold headline they can\'t ignore in the mailbox.',
     'Sales Call': 'Use this as an icebreaker to reframe the stakes instantly.'
   };
   return mapping[channel] || 'Deploy this hook wherever you fight for the first few seconds of attention.';
@@ -168,7 +168,7 @@ const templates: Template[] = [
     type: 'Question',
     awareness: 'Completely Unaware',
     build: ({ audiencePlural }) => `What if your next hook made ${audiencePlural} ask "Where has this been?"`,
-    rationale: 'Leans on curiosity while centering the audience's reaction to the content.'
+    rationale: 'Leans on curiosity while centering the audience\'s reaction to the content.'
   },
   {
     id: 'hook-conditional-proof',

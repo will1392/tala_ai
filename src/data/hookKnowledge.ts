@@ -142,7 +142,7 @@ export const HOOK_KNOWLEDGE: HookKnowledgeBase = {
         'Use odd or specific counts to avoid sounding generic.',
         'Tie the list to the exact outcome your audience craves.'
       ],
-      example: 'In this video I'm going to talk to you about the 28 ways to stay poor.'
+      example: 'In this video I\'m going to talk to you about the 28 ways to stay poor.'
     },
     {
       id: 'category-exclamation',
@@ -206,7 +206,7 @@ export const BASE_HOOK_KNOWLEDGE_SNIPPETS: KnowledgeSnippet[] = [
     id: 'snippet-larry-king',
     title: 'The Larry King Hook Lesson',
     content:
-      'Dean Graziosi's infomercial only worked after the opening hook focused on the viewer ("Have you ever…") instead of his credentials. Two sentences can make or break a campaign.'
+      'Dean Graziosi\'s infomercial only worked after the opening hook focused on the viewer ("Have you ever...") instead of his credentials. Two sentences can make or break a campaign.'
   },
   {
     id: 'snippet-cocktail-party',
