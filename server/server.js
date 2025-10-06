@@ -912,6 +912,11 @@ console.log('✅ Direct Mail Agent routes mounted at /api/direct-mail-agent');
 // import documentsRouter from './routes/documents.js';
 // app.use('/api/documents', documentsRouter);
 
+// Upload Batch Monitoring Routes
+import uploadBatchesRouter from './routes/upload-batches.js';
+app.use('/api/upload-batches', uploadBatchesRouter);
+console.log('✅ Upload Batch Monitoring routes mounted at /api/upload-batches');
+
 // Email Connection Routes
 // import emailConnectRoutes from './routes/email-connect.js';
 // app.use('/api/email', emailConnectRoutes); // Commented out - duplicate route mounting
