@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
-type Ctx = { theme: Theme; toggle: () => void };
+type Ctx = { theme: Theme; toggle: () => void; setTheme: (theme: Theme) => void };
 
-export const ThemeCtx = createContext<Ctx>({ theme: "dark", toggle: () => {} });
+export const ThemeCtx = createContext<Ctx>({ theme: "dark", toggle: () => {}, setTheme: () => {} });
 export const useTheme = () => useContext(ThemeCtx);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -19,8 +19,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("tala_theme", theme);
   }, [theme]);
 
+  const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+
   return (
-    <ThemeCtx.Provider value={{ theme, toggle: () => setTheme(t => (t === "dark" ? "light" : "dark")) }}>
+    <ThemeCtx.Provider value={{ theme, toggle, setTheme }}>
       {children}
     </ThemeCtx.Provider>
   );

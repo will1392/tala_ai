@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import { GlassCard } from '../layout/GlassCard';
@@ -6,12 +6,20 @@ import { Button } from '../shared/Button';
 import { Input } from '../shared/Input';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
+import { useTheme } from '../../context/ThemeContextNew';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading } = useAuthStore();
+  const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    if (theme !== 'dark') {
+      setTheme('dark');
+    }
+  }, [theme, setTheme]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

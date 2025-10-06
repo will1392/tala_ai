@@ -30,6 +30,16 @@ const mockUsers: Record<string, { user: User; password: string }> = {
       createdAt: new Date('2024-01-01')
     }
   },
+  'brycen@weareapexcreatives.com': {
+    password: 'mwpCbII1ClTkbbTQ2LTX',
+    user: {
+      id: 'mock-brycen-1',
+      email: 'brycen@weareapexcreatives.com',
+      role: 'super_admin',
+      name: 'Brycen Smith',
+      createdAt: new Date('2024-01-01')
+    }
+  },
   'agent1@travel.com': {
     password: 'agent123',
     user: {

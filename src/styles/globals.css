@@ -210,7 +210,7 @@ html, body, #root {
   
   .glass-input {
     @apply glass bg-white/5 border-white/20 focus:border-primary focus:bg-white/10;
-    @apply placeholder-white/50 text-white;
+    @apply placeholder:text-gray-500 dark:placeholder-white/50 text-gray-900 dark:text-white;
   }
   
   .glow {
