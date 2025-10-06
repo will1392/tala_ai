@@ -1,4 +1,5 @@
 import type { PrimaryFolder, CreatePrimaryFolderRequest, UpdatePrimaryFolderRequest, FolderHierarchy } from '../types/primaryFolder';
+import { buildApiUrl } from '../utils/api';
 
 export interface PrimaryFolderStats {
   totalPrimaryFolders: number;
@@ -18,7 +19,18 @@ class PrimaryFolderService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    this.baseUrl = buildApiUrl();
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   }
 
   /**
@@ -35,7 +47,9 @@ class PrimaryFolderService {
     const url = `${this.baseUrl}/primary-folders?${params}`;
     console.log('📡 Fetching from URL:', url);
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: this.getAuthHeaders(),
+    });
     console.log('📡 Response status:', response.status, response.statusText);
 
     if (!response.ok) {
@@ -63,9 +77,7 @@ class PrimaryFolderService {
     
     const response = await fetch(`${this.baseUrl}/primary-folders`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify(request),
     });
 
@@ -87,9 +99,7 @@ class PrimaryFolderService {
     
     const response = await fetch(`${this.baseUrl}/primary-folders/${folderId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify(updates),
     });
 
@@ -111,9 +121,7 @@ class PrimaryFolderService {
     
     const response = await fetch(`${this.baseUrl}/primary-folders/${folderId}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify({ userId }),
     });
 
@@ -136,7 +144,9 @@ class PrimaryFolderService {
       isAdmin: isAdmin.toString(),
     });
 
-    const response = await fetch(`${this.baseUrl}/primary-folders/${primaryFolderId}/hierarchy?${params}`);
+    const response = await fetch(`${this.baseUrl}/primary-folders/${primaryFolderId}/hierarchy?${params}`, {
+      headers: this.getAuthHeaders(),
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to fetch folder hierarchy' }));

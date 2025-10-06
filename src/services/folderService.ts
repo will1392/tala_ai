@@ -1,3 +1,5 @@
+import { buildApiUrl } from '../utils/api';
+
 export interface Folder {
   id: string;
   name: string;
@@ -20,7 +22,18 @@ class FolderService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    this.baseUrl = buildApiUrl();
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   }
 
   async createFolder(userId: string, request: CreateFolderRequest): Promise<Folder> {
@@ -29,7 +42,7 @@ class FolderService {
     const response = await fetch(`${this.baseUrl}/folders`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
         'x-user-id': userId
       },
       body: JSON.stringify(request),
@@ -60,7 +73,9 @@ class FolderService {
       isAdmin: isAdmin.toString(),
     });
 
-    const response = await fetch(`${this.baseUrl}/folders?${params}`);
+    const response = await fetch(`${this.baseUrl}/folders?${params}`, {
+      headers: this.getAuthHeaders(),
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to fetch folders' }));
@@ -77,9 +92,7 @@ class FolderService {
     
     const response = await fetch(`${this.baseUrl}/folders/${folderId}`, {
       method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify({ userId }),
     });
 
@@ -96,9 +109,7 @@ class FolderService {
     
     const response = await fetch(`${this.baseUrl}/folders/${folderId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.getAuthHeaders(),
       body: JSON.stringify({ ...updates, userId }),
     });
 
