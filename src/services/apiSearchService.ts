@@ -14,6 +14,21 @@ export class ApiSearchService implements ISearchService {
     this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
   }
 
+  private getAuthHeaders(isJson: boolean = true): Record<string, string> {
+    const headers: Record<string, string> = {};
+    const token = localStorage.getItem('auth_token');
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (isJson) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    return headers;
+  }
+
   /**
    * Initialize the service (check backend health)
    */
@@ -82,6 +97,7 @@ export class ApiSearchService implements ISearchService {
         const response = await fetch(`${this.baseUrl}/documents/upload`, {
           method: 'POST',
           body: formData,
+          headers: this.getAuthHeaders(false),
           signal: controller.signal,
         });
 
@@ -144,9 +160,7 @@ export class ApiSearchService implements ISearchService {
 
       const response = await fetch(`${this.baseUrl}/documents/search`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({
           query,
           userId: userId || 'default-user',
@@ -208,7 +222,9 @@ export class ApiSearchService implements ISearchService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/collections`);
+      const response = await fetch(`${this.baseUrl}/collections`, {
+        headers: this.getAuthHeaders(),
+      });
       if (!response.ok) {
         throw new Error(`Failed to get statistics: ${response.status}`);
       }
@@ -270,9 +286,7 @@ export class ApiSearchService implements ISearchService {
 
       const response = await fetch(`${this.baseUrl}/documents?${params.toString()}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
