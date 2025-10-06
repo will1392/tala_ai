@@ -63,18 +63,18 @@ class ServiceFactory {
       return true;
     }
 
-    // Check if API keys are missing (auto-enable demo mode)
-    const hasQdrantConfig = !!(
-      import.meta.env.VITE_QDRANT_URL && 
-      import.meta.env.VITE_QDRANT_API_KEY
-    );
-    
-    const hasOpenAIConfig = !!import.meta.env.VITE_OPENAI_API_KEY;
+    // In production, always use real backend API
+    if (import.meta.env.VITE_ENV === 'production') {
+      console.log('🚀 Production mode detected - using backend API');
+      return false;
+    }
 
-    if (!hasQdrantConfig || !hasOpenAIConfig) {
-      console.log('⚠️ API keys not configured, falling back to Demo Mode');
-      console.log('📝 To use real services, set VITE_QDRANT_URL, VITE_QDRANT_API_KEY, and VITE_OPENAI_API_KEY');
-      return true;
+    // Check if backend API URL is configured
+    const hasBackendAPI = !!import.meta.env.VITE_API_URL;
+    
+    if (hasBackendAPI) {
+      console.log('🌐 Backend API configured - using API services');
+      return false;
     }
 
     // Check if in development and demo mode preferred
@@ -82,10 +82,13 @@ class ServiceFactory {
     const preferDemo = import.meta.env.VITE_PREFER_DEMO_MODE === 'true';
     
     if (isDev && preferDemo) {
+      console.log('🎭 Demo mode preferred in development');
       return true;
     }
 
-    return false;
+    // Default to demo mode if no backend configured
+    console.log('⚠️ No backend API configured, falling back to Demo Mode');
+    return true;
   }
 
   /**
@@ -93,23 +96,19 @@ class ServiceFactory {
    */
   getServiceInfo(): {
     mode: 'demo' | 'production';
-    hasQdrant: boolean;
-    hasOpenAI: boolean;
+    hasBackendAPI: boolean;
+    isProduction: boolean;
     canUseReal: boolean;
   } {
-    const hasQdrant = !!(
-      import.meta.env.VITE_QDRANT_URL && 
-      import.meta.env.VITE_QDRANT_API_KEY
-    );
-    
-    const hasOpenAI = !!import.meta.env.VITE_OPENAI_API_KEY;
-    const canUseReal = hasQdrant && hasOpenAI;
+    const hasBackendAPI = !!import.meta.env.VITE_API_URL;
+    const isProduction = import.meta.env.VITE_ENV === 'production';
+    const canUseReal = hasBackendAPI || isProduction;
     const mode = this.shouldUseDemoMode() ? 'demo' : 'production';
 
     return {
       mode,
-      hasQdrant,
-      hasOpenAI,
+      hasBackendAPI,
+      isProduction,
       canUseReal
     };
   }
