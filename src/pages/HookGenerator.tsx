@@ -83,7 +83,7 @@ const HookGenerator = () => {
     });
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!form.targetAudience || !form.offering || !form.painPoints) {
       toast.error('Please complete the audience, offering, and pain points before generating hooks.');
       return;
@@ -104,10 +104,50 @@ const HookGenerator = () => {
       additionalNotes: form.additionalNotes
     };
 
-    const generated = generateHooks(request);
-    setResults(generated);
-    setLastRequest(request);
-    toast.success('Generated 20 hooks tuned to your brief.');
+    const loadingToast = toast.loading('Generating expert-level hooks...');
+
+    try {
+      const response = await fetch('/api/hooks/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || error.error || 'Generation failed');
+      }
+
+      const data = await response.json();
+      
+      if (!data.success || !data.hooks) {
+        throw new Error('Invalid response from server');
+      }
+
+      setResults(data.hooks);
+      setLastRequest(request);
+      
+      toast.dismiss(loadingToast);
+      toast.success(`Generated ${data.hooks.length} hooks (Quality: ${data.metadata.quality})`);
+      
+      console.log('✅ Hook generation complete:', {
+        count: data.hooks.length,
+        quality: data.metadata.quality,
+        summary: data.metadata.validationSummary
+      });
+
+    } catch (error) {
+      console.error('Hook generation error:', error);
+      toast.dismiss(loadingToast);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate hooks. Please try again.');
+      
+      const fallbackHooks = generateHooks(request);
+      setResults(fallbackHooks);
+      setLastRequest(request);
+      toast.success('Generated 20 hooks using fallback method.');
+    }
   };
 
   const handleCopy = async (hook: GeneratedHook) => {

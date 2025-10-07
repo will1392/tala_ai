@@ -532,6 +532,10 @@ const folders = loadFolders();
 
 // API Routes
 
+// Hook Generation Service
+import HookGenerationService from './services/hookGenerationService.js';
+const hookService = new HookGenerationService();
+
 // Email routes
 import emailRoutes from './routes/email.js';
 app.use('/api/email', emailRoutes);
@@ -554,6 +558,68 @@ app.post('/api/credits/purchase', purchaseCredits);
 app.get('/api/credits/packages', getCreditPackages);
 app.post('/api/credits/upgrade-tier', upgradeTier);
 app.get('/api/credits/history', getTransactionHistory);
+
+// Hook Generation API
+app.post('/api/hooks/generate', optionalAuth, requireCredits('hook_generation'), asyncHandler(async (req, res) => {
+  console.log('🎣 Hook generation request received');
+  
+  const { 
+    targetAudience, 
+    offering, 
+    painPoints, 
+    desiredOutcome, 
+    marketingChannels, 
+    tone, 
+    campaignGoal, 
+    additionalNotes 
+  } = req.body;
+
+  // Validation
+  if (!targetAudience || !offering || !painPoints || painPoints.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: targetAudience, offering, and painPoints are required'
+    });
+  }
+
+  try {
+    const request = {
+      targetAudience,
+      offering,
+      painPoints: Array.isArray(painPoints) ? painPoints : [painPoints],
+      desiredOutcome: desiredOutcome || 'achieve better results',
+      marketingChannels: marketingChannels && marketingChannels.length > 0 ? marketingChannels : ['Paid Ads'],
+      tone: tone || 'Bold and direct',
+      campaignGoal: campaignGoal || '',
+      additionalNotes: additionalNotes || ''
+    };
+
+    console.log('📋 Generating hooks for:', {
+      audience: request.targetAudience,
+      offering: request.offering,
+      painCount: request.painPoints.length,
+      channels: request.marketingChannels
+    });
+
+    const result = await hookService.generateWithValidation(request);
+
+    console.log('✅ Successfully generated', result.hooks.length, 'hooks');
+    console.log('   Quality:', result.metadata.quality);
+
+    res.json({
+      success: true,
+      ...result
+    });
+
+  } catch (error) {
+    console.error('❌ Hook generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate hooks',
+      details: error.message
+    });
+  }
+}));
 
 // Comprehensive health check endpoint
 app.get('/api/health', async (req, res) => {
