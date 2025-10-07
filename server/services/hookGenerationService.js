@@ -38,7 +38,7 @@ Return ONLY the JSON array, no additional text.`;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4.5-turbo',
+        model: 'gpt-5-nano-2025-08-07',
         messages: [
           {
             role: 'system',
@@ -49,8 +49,8 @@ Return ONLY the JSON array, no additional text.`;
             content: prompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 500
+        temperature: 1.0,
+        max_completion_tokens: 500
       });
 
       const content = response.choices[0].message.content.trim();
@@ -154,7 +154,7 @@ Return ONLY valid JSON. No markdown, no explanations, just the JSON array of 20 
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4.5-turbo',
+        model: 'gpt-5-nano-2025-08-07',
         messages: [
           {
             role: 'system',
@@ -165,8 +165,8 @@ Return ONLY valid JSON. No markdown, no explanations, just the JSON array of 20 
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 4000
+        temperature: 1.0,
+        max_completion_tokens: 4000
       });
 
       const content = response.choices[0].message.content.trim();
@@ -245,7 +245,7 @@ Return ONLY valid JSON.`;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4.5-turbo',
+        model: 'gpt-5-nano-2025-08-07',
         messages: [
           {
             role: 'system',
@@ -256,8 +256,8 @@ Return ONLY valid JSON.`;
             content: prompt
           }
         ],
-        temperature: 0.1,
-        max_tokens: 2000
+        temperature: 1.0,
+        max_completion_tokens: 2000
       });
 
       const validation = JSON.parse(response.choices[0].message.content.trim());
