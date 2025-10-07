@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { HOOK_KNOWLEDGE } from '../../src/data/hookKnowledge.js';
+import { HOOK_KNOWLEDGE } from '../data/hookKnowledge.js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
