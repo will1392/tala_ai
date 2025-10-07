@@ -145,7 +145,7 @@ Return JSON with hooks array. Each hook must have: text, style, awarenessLevel, 
             content: userPrompt
           }
         ],
-        temperature: 0.3,
+        temperature: 1.0,
         max_completion_tokens: 3000,
         response_format: { type: 'json_object' }
       });
