@@ -6,6 +6,104 @@ const openai = new OpenAI({
 });
 
 class HookGenerationService {
+
+  buildList(values = []) {
+    return values
+      .map((value) => value && value.trim())
+      .filter(Boolean)
+      .map((value) => value.replace(/\s+/g, ' '));
+  }
+
+  buildDiscoverySummary(request) {
+    const lines = [];
+    const pains = this.buildList(request.painPoints);
+
+    lines.push(`Audience: ${request.targetAudience || 'Luxury travelers'}`);
+    lines.push(`Offer / Mechanism: ${request.offering || 'Premium travel planning'}`);
+
+    if (pains.length) {
+      lines.push('Top pains:');
+      pains.slice(0, 4).forEach((pain, index) => {
+        lines.push(`  ${index + 1}. ${pain}`);
+      });
+    }
+
+    if (request.desiredOutcome) {
+      lines.push(`Desired outcome: ${request.desiredOutcome}`);
+    }
+
+    if (request.campaignGoal) {
+      lines.push(`Campaign goal: ${request.campaignGoal}`);
+    }
+
+    if (request.tone) {
+      lines.push(`Tone to echo: ${request.tone}`);
+    }
+
+    if (request.marketingChannels?.length) {
+      lines.push(`Primary channels: ${request.marketingChannels.join(', ')}`);
+    }
+
+    if (request.additionalNotes) {
+      lines.push(`Extra notes: ${request.additionalNotes}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  buildAngleDirectives(request) {
+    const pains = this.buildList(request.painPoints);
+    const outcome = request.desiredOutcome || 'the promised trip';
+    const offer = request.offering || 'your offer';
+    const haystack = ` ${request.offering} ${request.desiredOutcome} ${request.campaignGoal} ${request.additionalNotes}`.toLowerCase();
+    const hasSpeedCue = /24\s?-?hour|same\s?-?day|overnight|next day|speed|fast|hours?/.test(haystack);
+    const hasUpgradeCue = /upgrade|perk|vip|bonus|suite|amenit/.test(haystack);
+    const hasSkipCue = /skip|line|queue|crowd|bypass/.test(haystack);
+
+    const directives = [];
+
+    if (pains.length) {
+      pains.forEach((pain) => {
+        directives.push(`Flip "${pain}" into a vivid relief, not a copy-paste restatement.`);
+      });
+    }
+
+    directives.push(`Show how ${offer} delivers ${outcome} without the pains above.`);
+    directives.push(
+      hasSpeedCue
+        ? 'Work in at least one hook about the fast turnaround / blueprint / 24-hour relief that surfaced in discovery.'
+        : 'Include a speed or friction-free planning angle to contrast with the current pain.'
+    );
+    directives.push(
+      hasUpgradeCue
+        ? 'Highlight the automatic upgrades / perks / VIP treatment discovery mentioned.'
+        : 'If perks matter for this avatar, suggest how your process unlocks elevated treatment.'
+    );
+    directives.push(
+      hasSkipCue
+        ? 'Mirror the "skip the lines / bypass crowds" insight in at least one hook.'
+        : 'Offer at least one hook that removes a major friction moment (long lines, logistics, approvals).'
+    );
+    directives.push('Blend tangible proof angles (who already won) with curiosity or story seeds for cold audiences.');
+
+    return directives;
+  }
+
+  buildHormoziReminders() {
+    return [
+      'Lead with the avatar or a situational hook (Cocktail Party effect).',
+      'Make one promise per line; the hook sells the next 5 seconds, not the full offer.',
+      'Keep the writing punchy: 6–14 words, active voice, confident verbs.'
+    ];
+  }
+
+  buildOriginalityChecks() {
+    return [
+      'Rewrite the discovery inputs—no phrase longer than three words should appear verbatim unless it is a branded term.',
+      'Rotate openers (questions, commands, statements, story seeds) so hooks do not feel templated.',
+      'Use Hormozi principles for structure, not for copy/pasting his example sentences.'
+    ];
+  }
   
   countWords(text) {
     return text.trim().split(/\s+/).length;
@@ -132,32 +230,47 @@ Return valid JSON only. No markdown, no explanations.`;
     const hookStyles = ['Statement', 'Question', 'Command', 'Conditional', 'Story seed'];
     const awarenessLevels = ['Most', 'Product', 'Solution', 'Problem', 'Unaware'];
 
+    const discoverySummary = this.buildDiscoverySummary(request);
+    const angleDirectives = this.buildAngleDirectives(request);
+    const hormoziReminders = this.buildHormoziReminders();
+    const originalityChecks = this.buildOriginalityChecks();
+
     const provenExamples = HOOK_KNOWLEDGE.provenHookExamples.paid_ads.slice(0, 5);
+    const channelList = Array.isArray(request.marketingChannels) && request.marketingChannels.length
+      ? request.marketingChannels.join(', ')
+      : 'Paid Ads';
 
-    const angles = [
-      ...request.painPoints,
-      request.desiredOutcome,
-      request.campaignGoal,
-    ].filter(Boolean).join('; ');
+    const userPrompt = `Avatar focus: ${request.targetAudience || 'Luxury travelers'}
+Topic / offer: ${request.offering || request.desiredOutcome || 'Campaign hook'}
+Channels in play: ${channelList}
 
-    const userPrompt = `Avatar: ${request.targetAudience || 'Luxury travelers'}
-Topic: ${request.offering || request.desiredOutcome || 'Campaign hook'}
-Deliver: 21 hooks in JSON. Label 70/20/10. Do not include CTAs.
-Angles to include: ${angles || 'stress-free planning; upgrades; line-skipping'}
-Desired outcome: ${request.desiredOutcome || 'clear promise'}
-Campaign goal: ${request.campaignGoal || 'drive conversions'}
-Tone: ${request.tone || 'Bold and direct'}
-Channels: ${request.marketingChannels.join(', ') || 'Paid Ads'}
-${request.additionalNotes ? `Notes: ${request.additionalNotes}` : ''}
+---
+Discovery intake (synthesize into fresh hooks):
+${discoverySummary}
 
-Ban: jargon, double ideas, >14 words, CTA words (book/call/click/schedule).
-Hook styles to use: ${hookStyles.join(', ')}
-Awareness levels to cover: ${awarenessLevels.join(', ')}
+---
+Angle directives (reinterpret, do not copy):
+- ${angleDirectives.join('\n- ')}
 
-Proven examples to mimic (tone/length):
-${provenExamples.map(ex => `– "${ex}"`).join('\n')}
+---
+Hormozi guardrails to honor:
+- ${hormoziReminders.join('\n- ')}
 
-Follow the JSON format contract exactly.`;
+Originality checks before returning:
+- ${originalityChecks.join('\n- ')}
+
+Style rotation required: ${hookStyles.join(', ')}
+Awareness coverage required: ${awarenessLevels.join(', ')}
+
+Deliverable:
+- 21 hooks in JSON.
+- Label each hook 70-core, 20-adjacent, or 10-experimental (70/20/10 split across the set).
+- awareness_level must be one of Most/Product/Solution/Problem/Unaware.
+- No CTAs, no markdown, no explanations.
+- Hooks must read like net-new lines—never reuse the discovery wording verbatim.
+
+Reference Hormozi tones without lifting sentences. Proven examples to mirror cadence only:
+${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
 
     try {
       const response = await openai.chat.completions.create({
@@ -172,7 +285,8 @@ Follow the JSON format contract exactly.`;
             content: userPrompt
           }
         ],
-        temperature: 1.0,
+        temperature: 0.4,
+        top_p: 0.9,
         max_completion_tokens: 3000,
         response_format: { type: 'json_object' }
       });
