@@ -38,7 +38,7 @@ Return ONLY the JSON array, no additional text.`;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.5-turbo',
         messages: [
           {
             role: 'system',
@@ -154,7 +154,7 @@ Return ONLY valid JSON. No markdown, no explanations, just the JSON array of 20 
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-4.5-turbo',
         messages: [
           {
             role: 'system',
@@ -245,7 +245,7 @@ Return ONLY valid JSON.`;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.5-turbo',
         messages: [
           {
             role: 'system',
