@@ -96,6 +96,7 @@ export const TalaFinalChat: React.FC = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [userName, setUserName] = useState('Will'); // This would come from user profile
+  const userInitial = userName.charAt(0).toUpperCase();
   const [currentRequestId, setCurrentRequestId] = useState<string | undefined>();
   const [hasLoadedInitialConversation, setHasLoadedInitialConversation] = useState(false);
   const [growthPlanContext, setGrowthPlanContext] = useState<any>(null);
