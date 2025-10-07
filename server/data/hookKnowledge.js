@@ -428,7 +428,7 @@ export const HOOK_KNOWLEDGE = {
       'Winning hooks from other people\'s free content (content with tons of views in your space)',
       'Platform-specific ad libraries (last resort - hard to know what performs)'
     ],
-    rule7020:10: {
+    innovationRule: {
       core70: 'Use proven winners from your own top 5 performers. Stabilizes advertising, guarantees baseline.',
       emerging20: 'Winner-adjacent. Model concepts that work in other niches. Promising but less proven.',
       experimental10: 'Totally new ideas. Risky but could be huge wins. Moonshots.'
