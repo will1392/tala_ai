@@ -19,41 +19,18 @@ export interface GeneratedHook {
   rationale: string;
   channelNote: string;
   supportingInsights: string[];
+  label?: string;
+  wordCount?: number;
 }
 
-interface ToneProfile {
-  blocker: string;
-  promiseVerb: string;
-  solutionLead: string;
-  proofLead: string;
-  empathyLead: string;
-  spark: string;
-  vibe: string;
-}
-
-interface ChannelInfo {
-  noun: string;
-  action: string;
-}
-
-interface TemplateHelpers {
-  tone: ToneProfile;
-  callout: string;
-  audience: string;
-  audiencePlural: string;
-  goalFocus: string;
-  channel: ChannelInfo;
-  getPain: (index?: number) => string;
-  listPains: (count?: number) => string;
-}
-
-interface Template {
-  id: string;
-  type: string;
-  awareness: string;
-  build: (context: GeneratorContext, helpers: TemplateHelpers) => string;
-  rationale: (context: GeneratorContext, helpers: TemplateHelpers) => string;
-}
+type HookStyle = 'Statement' | 'Question' | 'Command' | 'Conditional' | 'Story seed';
+type HookLabel = '70-core' | '20-adjacent' | '10-experimental';
+type HookAwareness =
+  | 'Most Aware'
+  | 'Product Aware'
+  | 'Solution Aware'
+  | 'Problem Aware'
+  | 'Completely Unaware';
 
 interface GeneratorContext {
   audience: string;
@@ -68,63 +45,29 @@ interface GeneratorContext {
   notes: string;
 }
 
-const toneProfiles: Record<string, ToneProfile> = {
-  'Bold and direct': {
-    blocker: 'Stop letting',
-    promiseVerb: 'unlock',
-    solutionLead: "Here's how to",
-    proofLead: 'We just helped',
-    empathyLead: 'Truth:',
-    spark: 'Your move:',
-    vibe: 'bold and decisive'
-  },
-  'Conversational and empathetic': {
-    blocker: "Let's stop letting",
-    promiseVerb: 'regain',
-    solutionLead: "Let's map out how to",
-    proofLead: 'Clients tell us',
-    empathyLead: 'I get it—',
-    spark: "Let's do this:",
-    vibe: 'warm and collaborative'
-  },
-  'High-energy hype': {
-    blocker: "You're not here to let",
-    promiseVerb: 'ignite',
-    solutionLead: "Here's the play to",
-    proofLead: 'Watch how',
-    empathyLead: 'Real talk:',
-    spark: 'Bring the energy:',
-    vibe: 'electric and upbeat'
-  },
-  'Calm authority': {
-    blocker: "It's time to stop letting",
-    promiseVerb: 'build',
-    solutionLead: "Here's the steady fix to",
-    proofLead: 'We quietly guide',
-    empathyLead: 'Reminder:',
-    spark: 'Next step:',
-    vibe: 'measured and confident'
-  },
-  'Data-driven confidence': {
-    blocker: 'The numbers say to stop letting',
-    promiseVerb: 'prove',
-    solutionLead: 'Use this process to',
-    proofLead: 'Our latest sprint helped',
-    empathyLead: 'Signal:',
-    spark: 'Run the play:',
-    vibe: 'evidence-backed and precise'
-  }
-};
+interface HookContext extends GeneratorContext {
+  callout: string;
+  audiencePluralLower: string;
+  painSnippet: string;
+  outcomeSnippet: string;
+  offeringSnippet: string;
+  goalSnippet: string;
+  planAsset: string;
+  stressPromise: string;
+  upgradeCue: string;
+  skipCue: string;
+  speedVerb: string;
+}
 
-const channelInfoMap: Record<string, ChannelInfo> = {
-  'Paid Ads': { noun: 'paid ad opener', action: 'slow the scroll' },
-  'Organic Social': { noun: 'social post hook', action: 'stop the thumb' },
-  Email: { noun: 'subject line', action: 'win the open' },
-  Webinar: { noun: 'webinar intro', action: 'keep viewers logged in' },
-  'Landing Page': { noun: 'hero headline', action: 'anchor the page' },
-  'Direct Mail': { noun: 'mailpiece headline', action: 'jump off the page' },
-  'Sales Call': { noun: 'call opener', action: 'reframe the stakes immediately' }
-};
+interface HookBlueprint {
+  id: string;
+  style: HookStyle;
+  awareness: HookAwareness;
+  label: HookLabel;
+  angle: string;
+  build: (context: HookContext) => string;
+  rationale: (context: HookContext) => string;
+}
 
 const sanitize = (value: string) => value.trim();
 
@@ -134,23 +77,38 @@ const capitalizeFirst = (value: string) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 };
 
-const formatList = (items: string[]) => {
-  const filtered = items.filter((item) => sanitize(item).length > 0);
-  if (filtered.length === 0) return '';
-  if (filtered.length === 1) return filtered[0];
-  if (filtered.length === 2) return `${filtered[0]} and ${filtered[1]}`;
-  return `${filtered.slice(0, -1).join(', ')}, and ${filtered[filtered.length - 1]}`;
+const toWords = (value: string) => sanitize(value).replace(/[–—]/g, ' ').split(/\s+/).filter(Boolean);
+
+const shortenPhrase = (value: string, maxWords: number, fallback: string) => {
+  const words = toWords(value);
+  if (!words.length) return fallback;
+  return words.slice(0, maxWords).join(' ');
 };
 
-const truncate = (value: string, max = 60) => {
-  const trimmed = sanitize(value);
-  if (trimmed.length <= max) return trimmed;
-  return `${trimmed.slice(0, max - 1)}…`;
+const normalizePain = (value: string) => {
+  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
+  const withoutLead = trimmed.replace(/^\b(feeling|being|getting)\b\s+/i, '');
+  return shortenPhrase(withoutLead, 4, 'planning stress').toLowerCase();
+};
+
+const normalizeOutcome = (value: string) => {
+  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
+  return shortenPhrase(trimmed, 4, 'dream trip');
+};
+
+const normalizeOffering = (value: string) => {
+  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
+  return shortenPhrase(trimmed, 4, 'our plan');
+};
+
+const normalizeGoal = (value: string) => {
+  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
+  return shortenPhrase(trimmed, 4, 'win bookings');
 };
 
 const toAudiencePlural = (audience: string) => {
   const trimmed = sanitize(audience);
-  if (!trimmed) return 'audience';
+  if (!trimmed) return 'travelers';
   if (trimmed.toLowerCase().endsWith('s')) return trimmed;
   if (trimmed.toLowerCase().endsWith('y')) {
     return `${trimmed.slice(0, -1)}ies`;
@@ -165,255 +123,365 @@ const ensureMarketingChannels = (channels: string[]) => {
   return channels;
 };
 
-const buildContext = (request: HookRequest): GeneratorContext => {
+const detectSpeedDescriptor = (context: GeneratorContext) => {
+  const haystack = `${context.notes} ${context.offering} ${context.campaignGoal}`.toLowerCase();
+  if (haystack.includes('24-hour') || haystack.includes('24 hour') || haystack.includes('24hr')) {
+    return '24-hour';
+  }
+  if (haystack.includes('same-day') || haystack.includes('same day')) {
+    return 'same-day';
+  }
+  if (haystack.includes('overnight')) {
+    return 'overnight';
+  }
+  return 'next-day';
+};
+
+const detectAssetNoun = (context: GeneratorContext) => {
+  const haystack = `${context.offering} ${context.notes}`.toLowerCase();
+  if (haystack.includes('blueprint')) return 'blueprint';
+  if (haystack.includes('template')) return 'template';
+  if (haystack.includes('guide')) return 'guide';
+  if (haystack.includes('plan')) return 'plan';
+  if (haystack.includes('map')) return 'map';
+  if (haystack.includes('itinerary')) return 'itinerary';
+  return 'plan';
+};
+
+const buildContext = (request: HookRequest): HookContext => {
   const pains = request.painPoints.filter((item) => sanitize(item).length > 0);
-  const primaryPain = pains[0] || 'feeling stuck';
+  const primaryPain = pains[0] || 'planning stress';
   const marketingChannels = ensureMarketingChannels(request.marketingChannels);
 
-  return {
-    audience: sanitize(request.targetAudience) || 'entrepreneur',
-    audiencePlural: toAudiencePlural(request.targetAudience || 'entrepreneur'),
-    offering: sanitize(request.offering) || 'our offer',
+  const base: GeneratorContext = {
+    audience: sanitize(request.targetAudience) || 'Luxury travelers',
+    audiencePlural: toAudiencePlural(request.targetAudience || 'Luxury traveler'),
+    offering: sanitize(request.offering) || 'concierge team',
     primaryPain,
     pains,
-    outcome: sanitize(request.desiredOutcome) || 'break through plateau',
+    outcome: sanitize(request.desiredOutcome) || 'dream trip',
     marketingChannels,
-    tone: sanitize(request.tone) || 'Bold',
-    campaignGoal: sanitize(request.campaignGoal) || 'drive conversions',
-    notes: sanitize(request.additionalNotes)
+    tone: sanitize(request.tone) || 'Bold and direct',
+    campaignGoal: sanitize(request.campaignGoal) || 'drive bookings',
+    notes: sanitize(request.additionalNotes),
   };
-};
 
-const resolveTone = (tone: string): ToneProfile => toneProfiles[tone] || toneProfiles['Bold and direct'];
+  const speedDescriptor = detectSpeedDescriptor(base);
+  const assetNoun = detectAssetNoun(base);
+  const planAsset = `${speedDescriptor} ${assetNoun}`;
+  const painSnippet = normalizePain(base.primaryPain);
+  const outcomeSnippet = normalizeOutcome(base.outcome);
+  const offeringSnippet = normalizeOffering(base.offering);
+  const goalSnippet = normalizeGoal(base.campaignGoal || base.outcome);
 
-const resolveChannelInfo = (channel?: string): ChannelInfo => {
-  if (!channel) {
-    return { noun: 'campaign opener', action: 'earn the first five seconds' };
-  }
-  return channelInfoMap[channel] || { noun: 'campaign opener', action: 'earn the first five seconds' };
-};
+  const noteLower = base.notes.toLowerCase();
+  const upgradeCue = noteLower.includes('perk') || noteLower.includes('upgrade')
+    ? 'perks waiting'
+    : 'automatic upgrades';
 
-const createHelpers = (context: GeneratorContext): TemplateHelpers => {
-  const tone = resolveTone(context.tone);
-  const pains = context.pains.length ? context.pains : [context.primaryPain];
-  const audience = capitalizeFirst(context.audience);
-  const audiencePlural = capitalizeFirst(context.audiencePlural);
-  const getPain = (index = 0) => pains[index % pains.length] || context.primaryPain;
-  const listPains = (count = pains.length) => formatList(pains.slice(0, count));
-  const goalFocus = context.campaignGoal || context.outcome;
-  const channel = resolveChannelInfo(context.marketingChannels[0]);
+  const skipCue = noteLower.includes('line') || noteLower.includes('queue')
+    ? 'skip every line'
+    : 'skip lines';
+
+  const stressPromise = `stress-free ${outcomeSnippet}`;
+  const speedVerb =
+    speedDescriptor === '24-hour' ? 'overnight' : speedDescriptor === 'same-day' ? 'same-day' : 'fast';
 
   return {
-    tone,
-    callout: `${audience} —`,
-    audience,
-    audiencePlural,
-    goalFocus,
-    channel,
-    getPain,
-    listPains
+    ...base,
+    callout: `${capitalizeFirst(base.audience)}:`,
+    audiencePluralLower: base.audiencePlural.toLowerCase(),
+    painSnippet,
+    outcomeSnippet,
+    offeringSnippet,
+    goalSnippet,
+    planAsset,
+    stressPromise,
+    upgradeCue,
+    skipCue,
+    speedVerb,
   };
 };
 
-const templates: Template[] = [
-  {
-    id: 'callout-direct',
-    type: 'Label + Promise',
-    awareness: 'Solution Aware',
-    build: (context, helpers) =>
-      `${helpers.callout} ${helpers.tone.blocker} ${helpers.getPain()} win the first impression so you can ${helpers.tone.promiseVerb} ${context.outcome} with ${context.offering}.`,
-    rationale: (context, helpers) =>
-      `Directly labels ${helpers.audiencePlural} and contrasts ${helpers.getPain()} with the promise of ${context.outcome} for a fast pattern interrupt.`
-  },
-  {
-    id: 'question-victory',
-    type: 'Question',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `What happens when ${helpers.audiencePlural} finally silence ${helpers.getPain()}? ${helpers.tone.solutionLead} ${context.outcome}.`,
-    rationale: (context, helpers) =>
-      `Asks a pointed question that agitates ${helpers.getPain()} while positioning ${context.outcome} as the natural answer.`
-  },
-  {
-    id: 'proof-story',
-    type: 'Proof Point',
-    awareness: 'Product Aware',
-    build: (context, helpers) =>
-      `${helpers.tone.proofLead} ${helpers.audiencePlural} traded ${helpers.getPain()} for ${context.outcome} with ${context.offering}.`,
-    rationale: (context, helpers) =>
-      `Shows the transformation ${helpers.audiencePlural} want—moving from ${helpers.getPain()} to ${context.outcome}—and credits the offer.`
-  },
-  {
-    id: 'channel-flip',
-    type: 'Channel Remix',
-    awareness: 'Solution Aware',
-    build: (context, helpers) =>
-      `Flip your next ${helpers.channel.noun} into ${context.outcome} bait by leading with relief from ${helpers.getPain()}.`,
-    rationale: (context, helpers) =>
-      `Gives concrete direction on how to adapt the hook for a ${helpers.channel.noun} while tying relief from ${helpers.getPain()} to ${context.outcome}.`
-  },
-  {
-    id: 'pain-stack',
-    type: 'Pain Stack',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `${helpers.audiencePlural} keep wrestling with ${helpers.listPains(2)}. This hook drags them straight toward ${context.outcome}.`,
-    rationale: (context, helpers) =>
-      `Stacks the key pains ${helpers.audiencePlural} feel, then pivots to the promised outcome of ${context.outcome}.`
-  },
-  {
-    id: 'goal-stall',
-    type: 'Bold Statement',
-    awareness: 'Solution Aware',
-    build: (context, helpers) =>
-      `Your ${helpers.goalFocus} stalls whenever ${helpers.getPain()} hijacks attention—${helpers.tone.solutionLead} point the story at ${context.outcome}.`,
-    rationale: (context, helpers) =>
-      `Links the campaign goal (${helpers.goalFocus}) with the cost of ${helpers.getPain()} and points directly toward ${context.outcome}.`
-  },
-  {
-    id: 'tension-lead',
-    type: 'Tension Builder',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `Every ${helpers.getPain()} costs ${helpers.audiencePlural} momentum on ${helpers.goalFocus}. Lead with this line before you mention ${context.offering}.`,
-    rationale: (context, helpers) =>
-      `Highlights the stakes of ${helpers.getPain()} and sets up ${context.offering} as the relief without sounding salesy.`
-  },
-  {
-    id: 'quote-opener',
-    type: 'Scripted Opener',
-    awareness: 'Most Aware',
-    build: (context, helpers) =>
-      `Open with: "${helpers.callout} ${helpers.tone.solutionLead.toLowerCase()} ${context.outcome} without ${helpers.getPain()}."`,
-    rationale: (context, helpers) =>
-      `Hands over a word-for-word opening that pairs ${helpers.audience} with the promise of ${context.outcome}.`
-  },
-  {
-    id: 'empathy-swap',
-    type: 'Insight',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `${helpers.tone.empathyLead} ${capitalizeFirst(helpers.getPain())} signals your message is buried. Swap in this hook and make ${context.outcome} feel inevitable.`,
-    rationale: (context, helpers) =>
-      `Uses an empathetic lead to acknowledge ${helpers.getPain()} before steering toward ${context.outcome}.`
-  },
-  {
-    id: 'story-moment',
-    type: 'Story Teaser',
-    awareness: 'Completely Unaware',
-    build: (context, helpers) =>
-      `${helpers.tone.blocker} ${helpers.getPain()} call the shots—start the story at the moment ${helpers.audiencePlural} feel ${context.outcome}.`,
-    rationale: (context, helpers) =>
-      `Frames a before-and-after story that centers ${helpers.audiencePlural} finally feeling ${context.outcome}.`
-  },
-  {
-    id: 'before-after',
-    type: 'Contrast',
-    awareness: 'Solution Aware',
-    build: (context, helpers) =>
-      `Show the before: "${helpers.getPain()}". Then the after: "${context.outcome}". That's your five-second ${helpers.channel.noun} hook.`,
-    rationale: (context, helpers) =>
-      `Uses a clear contrast between ${helpers.getPain()} and ${context.outcome} so your ${helpers.channel.noun} instantly communicates the transformation.`
-  },
-  {
-    id: 'pain-first',
-    type: 'Bold Statement',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `Everyone promises ${context.outcome}; few admit how brutal ${helpers.getPain()} feels. Lead with the pain, then point to ${context.offering}.`,
-    rationale: (context, helpers) =>
-      `Contrasts the common promise with your willingness to name ${helpers.getPain()}, making the offer feel grounded.`
-  },
-  {
-    id: 'proof-sequence',
-    type: 'Proof Point',
-    awareness: 'Product Aware',
-    build: (context, helpers) =>
-      `${helpers.tone.proofLead} ${helpers.audiencePlural} who now enjoy ${context.outcome} started by naming ${helpers.getPain()}. Do the same.`,
-    rationale: (context, helpers) =>
-      `Shows a simple sequence: acknowledge ${helpers.getPain()} then promise ${context.outcome}, mirroring what worked before.`
-  },
-  {
-    id: 'memory-jog',
-    type: 'Story Recall',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `Remember when ${helpers.getPain()} torpedoed your ${helpers.goalFocus}? This hook replays the fix and fast-tracks ${context.outcome}.`,
-    rationale: (context, helpers) =>
-      `Triggers a vivid memory of ${helpers.getPain()} before promising the corrected future of ${context.outcome}.`
-  },
-  {
-    id: 'future-pace',
-    type: 'Future Pace',
-    awareness: 'Solution Aware',
-    build: (context, helpers) =>
-      `Picture next quarter: ${context.outcome}, zero ${helpers.getPain(1)}. That future starts with this opener.`,
-    rationale: (context, helpers) =>
-      `Paints the aspirational future where ${helpers.audiencePlural} live in ${context.outcome} territory and makes the hook the first domino.`
-  },
-  {
-    id: 'objection-flip',
-    type: 'Objection Flip',
-    awareness: 'Product Aware',
-    build: (context, helpers) =>
-      `If they shrug that "${helpers.getPain()} is just part of the game," drop this line and walk them toward ${context.outcome}.`,
-    rationale: (context, helpers) =>
-      `Handles a likely objection by reframing ${helpers.getPain()} as optional once they see ${context.outcome} as the alternative.`
-  },
-  {
-    id: 'metric-frame',
-    type: 'Metric Frame',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `${helpers.tone.blocker} ${helpers.getPain()} drain your ${helpers.goalFocus}. Highlight the metric ${context.outcome} will move first.`,
-    rationale: (context, helpers) =>
-      `Connects ${helpers.getPain()} to the metric behind ${helpers.goalFocus}, then reinforces that ${context.outcome} is what moves it.`
-  },
-  {
-    id: 'micro-win',
-    type: 'Quick Win',
-    awareness: 'Solution Aware',
-    build: (context, helpers) =>
-      `Give them the quick win: "${context.outcome} in 7 days" and tie it to ending ${helpers.getPain()}. That's the hook.`,
-    rationale: (context, helpers) =>
-      `Promises a tangible micro-win of ${context.outcome} while naming ${helpers.getPain()} as the pain it resolves.`
-  },
-  {
-    id: 'pattern-break',
-    type: 'Pattern Interrupt',
-    awareness: 'Problem Aware',
-    build: (context, helpers) =>
-      `If ${helpers.getPain()} keeps repeating, the opening line is wrong. Replace it with this promise of ${context.outcome}.`,
-    rationale: (context, helpers) =>
-      `Calls out the failing status quo of living with ${helpers.getPain()} and positions the promise of ${context.outcome} as the corrective lever.`
-  },
-  {
-    id: 'spark-cta',
-    type: 'CTA Assist',
-    awareness: 'Most Aware',
-    build: (context, helpers) =>
-      `${helpers.tone.spark} Use it so ${helpers.audiencePlural} connect escaping ${helpers.getPain()} with saying yes to ${context.offering}.`,
-    rationale: (context, helpers) =>
-      `Pairs the tone-driven call-to-action with a clear link between ${helpers.getPain()}, ${context.outcome}, and saying yes to ${context.offering}.`
-  }
-];
-
-const buildInsights = (context: GeneratorContext, helpers: TemplateHelpers) => {
+const buildInsights = (context: HookContext) => {
   const insights = new Set<string>();
-  insights.add(`Audience: ${helpers.audiencePlural}`);
-  insights.add(`Offer: ${context.offering}`);
-  insights.add(`Outcome: ${context.outcome}`);
-  insights.add(`Pain: ${helpers.getPain()}`);
+  insights.add(`Audience: ${capitalizeFirst(context.audiencePlural)}`);
+  insights.add(`Offer: ${capitalizeFirst(context.offeringSnippet)}`);
+  insights.add(`Outcome: ${capitalizeFirst(context.outcomeSnippet)}`);
+  insights.add(`Top pain: ${capitalizeFirst(context.painSnippet)}`);
   if (context.pains.length > 1) {
-    insights.add(`Also facing: ${helpers.listPains(Math.min(3, context.pains.length))}`);
+    const rest = context.pains
+      .slice(1)
+      .map((pain) => capitalizeFirst(normalizePain(pain)));
+    if (rest.length) {
+      insights.add(`Also note: ${rest.slice(0, 2).join(', ')}`);
+    }
   }
-  insights.add(`Goal: ${helpers.goalFocus}`);
+  insights.add(`Goal: ${capitalizeFirst(context.goalSnippet)}`);
   if (context.notes) {
-    insights.add(`Context: ${truncate(context.notes, 70)}`);
+    insights.add(
+      `Notes: ${context.notes.length > 70 ? `${context.notes.slice(0, 67)}…` : context.notes}`
+    );
   }
   insights.add(`Tone: ${context.tone}`);
-
   return Array.from(insights).slice(0, 7);
+};
+
+const countWords = (value: string) => toWords(value).length;
+
+const hasCTAWords = (value: string) => /\b(book|call|click|schedule|consult|consultation)\b/i.test(value);
+
+const hasPassiveVoice = (value: string) => /\b(is being|was being|were being|has been|have been|had been|will be|being)\b/i.test(value);
+
+const hookBlueprints: HookBlueprint[] = [
+  {
+    id: 'core-callout-speed',
+    style: 'Statement',
+    awareness: 'Problem Aware',
+    label: '70-core',
+    angle: 'Speed',
+    build: (context) =>
+      `${context.callout} ${capitalizeFirst(context.painSnippet)}? Take our ${context.planAsset}.`,
+    rationale: (context) =>
+      `Names ${context.painSnippet} then hands them a ${context.planAsset} so relief feels instant.`,
+  },
+  {
+    id: 'core-trade-stress',
+    style: 'Statement',
+    awareness: 'Problem Aware',
+    label: '70-core',
+    angle: 'Stress relief',
+    build: (context) => `${context.callout} Trade ${context.painSnippet} for ${context.stressPromise} now.`,
+    rationale: (context) =>
+      `Contrasts the current stress (${context.painSnippet}) with the promise of ${context.stressPromise}.`,
+  },
+  {
+    id: 'core-outcome-trigger',
+    style: 'Statement',
+    awareness: 'Solution Aware',
+    label: '70-core',
+    angle: 'Transformation',
+    build: (context) => `${context.callout} ${capitalizeFirst(context.outcomeSnippet)} starts once ${context.painSnippet} stops.`,
+    rationale: (context) => `Signals the new reality (${context.outcomeSnippet}) begins when ${context.painSnippet} disappears.`,
+  },
+  {
+    id: 'core-command-skip',
+    style: 'Command',
+    awareness: 'Solution Aware',
+    label: '70-core',
+    angle: 'Line-skipping',
+    build: (context) => `${context.callout} Skip lines; keep ${context.outcomeSnippet} on schedule.`,
+    rationale: () => 'Turns line-skipping into the opener so the promise is immediate.',
+  },
+  {
+    id: 'core-conditional-plan',
+    style: 'Conditional',
+    awareness: 'Problem Aware',
+    label: '70-core',
+    angle: 'Speed',
+    build: (context) => `If ${context.painSnippet} drains you, grab this ${context.planAsset}.`,
+    rationale: (context) =>
+      `Makes the ${context.planAsset} the obvious fix for anyone stuck in ${context.painSnippet}.`,
+  },
+  {
+    id: 'core-upgrade-signal',
+    style: 'Statement',
+    awareness: 'Product Aware',
+    label: '70-core',
+    angle: 'Upgrades',
+    build: (context) => `${context.callout} Upgrades land once you drop ${context.painSnippet}.`,
+    rationale: (context) => `Links desired perks to eliminating ${context.painSnippet}.`,
+  },
+  {
+    id: 'core-proof',
+    style: 'Statement',
+    awareness: 'Product Aware',
+    label: '70-core',
+    angle: 'Proof',
+    build: (context) => `${context.callout} Clients ditched ${context.painSnippet} and kept ${context.outcomeSnippet}.`,
+    rationale: (context) => `Shows real people escaping ${context.painSnippet} while holding onto ${context.outcomeSnippet}.`,
+  },
+  {
+    id: 'core-plan-vs-tabs',
+    style: 'Statement',
+    awareness: 'Solution Aware',
+    label: '70-core',
+    angle: 'Speed',
+    build: (context) => `${context.callout} ${capitalizeFirst(context.planAsset)} beats endless tabs every time.`,
+    rationale: () => 'Frames the asset as the shortcut compared to chaotic tab-juggling.',
+  },
+  {
+    id: 'core-question-proof',
+    style: 'Question',
+    awareness: 'Product Aware',
+    label: '70-core',
+    angle: 'Proof',
+    build: (context) =>
+      `Why do ${context.audiencePluralLower} trust ${context.offeringSnippet} for ${context.outcomeSnippet}?`,
+    rationale: (context) =>
+      `Uses social proof—others trust ${context.offeringSnippet} to reach ${context.outcomeSnippet}.`,
+  },
+  {
+    id: 'core-stressfree-plan',
+    style: 'Statement',
+    awareness: 'Solution Aware',
+    label: '70-core',
+    angle: 'Stress relief',
+    build: (context) => `${context.callout} Stress-free ${context.outcomeSnippet} lives inside this ${context.planAsset}.`,
+    rationale: (context) => `Pairs the stress-free promise with the tangible ${context.planAsset}.`,
+  },
+  {
+    id: 'core-speed-verb',
+    style: 'Statement',
+    awareness: 'Solution Aware',
+    label: '70-core',
+    angle: 'Speed',
+    build: (context) => `${context.callout} ${capitalizeFirst(context.speedVerb)} planning starts with our ${context.planAsset}.`,
+    rationale: (context) => `Signals how quickly momentum returns once they use the ${context.planAsset}.`,
+  },
+  {
+    id: 'core-upgrade-follow',
+    style: 'Statement',
+    awareness: 'Product Aware',
+    label: '70-core',
+    angle: 'Upgrades',
+    build: (context) => `${context.callout} ${capitalizeFirst(context.upgradeCue)} follow our ${context.offeringSnippet}.`,
+    rationale: () => 'Connects perks to the offer so upgrades feel automatic.',
+  },
+  {
+    id: 'core-queue-command',
+    style: 'Command',
+    awareness: 'Solution Aware',
+    label: '70-core',
+    angle: 'Line-skipping',
+    build: (context) => `${context.callout} Breeze past queues with this ${context.planAsset}.`,
+    rationale: () => 'Invites them to skip queues by deploying the plan asset immediately.',
+  },
+  {
+    id: 'core-goal-link',
+    style: 'Statement',
+    awareness: 'Most Aware',
+    label: '70-core',
+    angle: 'Goal tie-in',
+    build: (context) => `${context.callout} ${capitalizeFirst(context.goalSnippet)} needs less ${context.painSnippet}.`,
+    rationale: (context) => `Links the campaign goal to removing ${context.painSnippet}.`,
+  },
+  {
+    id: 'adjacent-concierge-script',
+    style: 'Command',
+    awareness: 'Product Aware',
+    label: '20-adjacent',
+    angle: 'Upgrades',
+    build: (context) => `${context.callout} Borrow our concierge script; watch upgrades stack.`,
+    rationale: () => 'Gives a directive that promises visible perks fast.',
+  },
+  {
+    id: 'adjacent-speed-question',
+    style: 'Question',
+    awareness: 'Solution Aware',
+    label: '20-adjacent',
+    angle: 'Speed',
+    build: (context) =>
+      `What if ${context.audiencePluralLower} planned ${context.outcomeSnippet} in minutes?`,
+    rationale: (context) => `Opens a curiosity loop about faster planning toward ${context.outcomeSnippet}.`,
+  },
+  {
+    id: 'adjacent-swap-tabs',
+    style: 'Command',
+    awareness: 'Problem Aware',
+    label: '20-adjacent',
+    angle: 'Stress relief',
+    build: (context) => `${context.callout} Swap midnight spreadsheets for guided ${context.outcomeSnippet}.`,
+    rationale: () => 'Paints the relief of dropping chaotic spreadsheets for a guided path.',
+  },
+  {
+    id: 'adjacent-calm-outcome',
+    style: 'Statement',
+    awareness: 'Solution Aware',
+    label: '20-adjacent',
+    angle: 'Stress relief',
+    build: (context) => `${context.callout} ${capitalizeFirst(context.outcomeSnippet)} without panic lives here.`,
+    rationale: () => 'Promises the desired outcome minus the panic.',
+  },
+  {
+    id: 'adjacent-upgrade-shortcut',
+    style: 'Conditional',
+    awareness: 'Product Aware',
+    label: '20-adjacent',
+    angle: 'Upgrades',
+    build: (context) => `If upgrades matter, our ${context.planAsset} is your shortcut.`,
+    rationale: () => 'Reframes the asset as the lever for people chasing perks.',
+  },
+  {
+    id: 'experimental-story-customs',
+    style: 'Story seed',
+    awareness: 'Completely Unaware',
+    label: '10-experimental',
+    angle: 'Story',
+    build: (context) =>
+      `Story seed: ${capitalizeFirst(context.audiencePluralLower)} breezed past customs with one map.`,
+    rationale: () => 'Teases a vivid story about stress-free travel moments.',
+  },
+  {
+    id: 'experimental-story-upgrades',
+    style: 'Story seed',
+    awareness: 'Completely Unaware',
+    label: '10-experimental',
+    angle: 'Upgrades',
+    build: (context) =>
+      `Story seed: ${capitalizeFirst(context.audiencePluralLower)} cheered when upgrades greeted them.`,
+    rationale: () => 'Hints at a celebration scene to spark curiosity.',
+  },
+];
+
+const buildChannelNote = (
+  channels: string[],
+  angle: string,
+  primaryPain: string,
+  outcome: string
+) => {
+  const angleLower = angle.toLowerCase();
+  if (!channels.length) {
+    return `Use this ${angleLower} hook wherever attention is scarce to trade ${primaryPain} for ${outcome}.`;
+  }
+
+  if (channels.length === 1) {
+    const channel = channels[0];
+    const info = resolveChannelInfo(channel);
+    return `For your ${info.noun}, lead with the ${angleLower} angle so you ${info.action} while moving from ${primaryPain} to ${outcome}.`;
+  }
+
+  return `Thread this ${angleLower} angle through ${channels.join(', ')} so escaping ${primaryPain} always points to ${outcome}.`;
+};
+
+const resolveChannelInfo = (channel?: string) => {
+  switch (channel) {
+    case 'Paid Ads':
+      return { noun: 'paid ad opener', action: 'slow the scroll' };
+    case 'Organic Social':
+      return { noun: 'social hook', action: 'stop the thumb' };
+    case 'Email':
+      return { noun: 'subject line', action: 'earn the open' };
+    case 'Webinar':
+      return { noun: 'webinar intro', action: 'keep viewers logged in' };
+    case 'Landing Page':
+      return { noun: 'hero headline', action: 'anchor the page' };
+    case 'Direct Mail':
+      return { noun: 'mailpiece headline', action: 'jump off the page' };
+    case 'Sales Call':
+      return { noun: 'call opener', action: 'reframe the stakes' };
+    default:
+      return { noun: 'campaign opener', action: 'earn the first five seconds' };
+  }
+};
+
+const qaPasses = (text: string) => {
+  const wordCount = countWords(text);
+  if (wordCount < 6 || wordCount > 14) return false;
+  if (hasCTAWords(text)) return false;
+  if (hasPassiveVoice(text)) return false;
+  if (/\b(unlock|leverage|synergy|synergies|paradigm|disrupt|innovative solution|cutting-edge|game-changing)\b/i.test(text)) return false;
+  return true;
 };
 
 const nextId = (() => {
@@ -424,32 +492,40 @@ const nextId = (() => {
   };
 })();
 
-const buildChannelNote = (channels: string[], primaryPain: string, outcome: string) => {
-  if (!channels.length) {
-    return `Use this wherever attention is scarce to swap ${primaryPain} for ${outcome}.`;
-  }
-
-  if (channels.length === 1) {
-    const info = resolveChannelInfo(channels[0]);
-    return `Run this as your ${info.noun} to ${info.action} by trading ${primaryPain} for ${outcome}.`;
-  }
-
-  return `Thread this opening through your ${formatList(channels)} so escaping ${primaryPain} always points to ${outcome}.`;
-};
-
 export const generateHooks = (request: HookRequest): GeneratedHook[] => {
   const context = buildContext(request);
-  const helpers = createHelpers(context);
-  const insights = buildInsights(context, helpers);
-  const channelNote = buildChannelNote(context.marketingChannels, context.primaryPain, context.outcome);
+  const insights = buildInsights(context);
 
-  return templates.map((template) => ({
-    id: nextId(),
-    text: template.build(context, helpers),
-    type: template.type,
-    awareness: template.awareness,
-    rationale: template.rationale(context, helpers),
-    channelNote,
-    supportingInsights: insights
-  }));
+  const hooks = hookBlueprints
+    .map((blueprint) => {
+      const text = blueprint.build(context);
+      if (!qaPasses(text)) {
+        return null;
+      }
+
+      const channelNote = buildChannelNote(
+        context.marketingChannels,
+        blueprint.angle,
+        context.painSnippet,
+        context.outcomeSnippet
+      );
+
+      const supportingInsights = Array.from(
+        new Set([...insights, `Angle: ${blueprint.angle}`])
+      ).slice(0, 7);
+
+      return {
+        id: nextId(),
+        text,
+        type: `${blueprint.style} · ${blueprint.angle}`,
+        awareness: blueprint.awareness,
+        rationale: blueprint.rationale(context),
+        channelNote,
+        supportingInsights,
+        label: blueprint.label,
+      } satisfies GeneratedHook;
+    })
+    .filter((hook): hook is GeneratedHook => Boolean(hook));
+
+  return hooks;
 };

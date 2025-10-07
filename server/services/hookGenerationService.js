@@ -49,46 +49,69 @@ class HookGenerationService {
     };
   }
 
+  normalizeAwarenessLevel(level) {
+    if (!level) {
+      return 'Solution Aware';
+    }
+
+    const normalized = level.toString().toLowerCase().replace(/[^a-z]/g, '');
+    const mapping = {
+      most: 'Most Aware',
+      product: 'Product Aware',
+      solution: 'Solution Aware',
+      problem: 'Problem Aware',
+      unaware: 'Completely Unaware'
+    };
+
+    return mapping[normalized] || 'Solution Aware';
+  }
+
+  normalizeLabel(label, index) {
+    if (label) {
+      const normalized = label.toString().toLowerCase();
+      if (normalized.includes('70')) return '70-core';
+      if (normalized.includes('20')) return '20-adjacent';
+      if (normalized.includes('10')) return '10-experimental';
+    }
+
+    if (index < 14) return '70-core';
+    if (index < 19) return '20-adjacent';
+    return '10-experimental';
+  }
+
   buildHooksmithSystemPrompt() {
     return `ROLE: You are Hooksmith, a conversion-focused ad hook generator trained on Alex Hormozi's ad assembly approach.
 
-TASK: Produce concise, grammatically correct hooks only (no bodies, no CTAs) that follow Hormozi's Hook Discipline: one clear promise/value, plain language, specific avatar call-out.
+TASK: Produce concise, grammatically correct hooks only (no bodies, no CTAs unless requested) that follow Hormozi's Hook Discipline: one clear promise/value, plain language, specific avatar call-out if provided.
 
 QUALITY BAR:
-– 6–14 words; active voice; no filler; no stacked clauses
-– Choose exactly ONE style per hook: Statement / Question / Command / Conditional / Story seed
-– NO jargon ("unlock synergies"), NO vague verbs ("leverage"), NO weasel words ("maybe," "could")
-– NO combined steps: hooks are separate from "meat" and CTA
-– When asked for multiple hooks, return 70-20-10 split: 70% proven angles, 20% "winner-adjacent," 10% experimental. Label them.
+– 6–14 words; active voice; one idea; no filler or stacked clauses.
+– Choose exactly one style per hook: Statement / Question / Command / Conditional / Story seed.
+– No jargon ("unlock synergies"), no vague verbs ("leverage"), no weasel words ("maybe," "could").
+– No combined steps: hooks are separate from "meat" and CTA.
+– When asked for multiple hooks, obey the 70-20-10 split (label hooks 70-core, 20-adjacent, 10-experimental).
 
-OUTPUT FORMAT: JSON only. Structure:
+FORMAT CONTRACT: Return JSON only with keys avatar, topic, hooks[], notes. Each hook entry must contain:
 {
-  "hooks": [
-    {
-      "text": "6-14 word hook",
-      "style": "Statement|Question|Command|Conditional|Narrative",
-      "awarenessLevel": "Most Aware|Product Aware|Solution Aware|Problem Aware|Completely Unaware",
-      "label": "70-core|20-adjacent|10-experimental"
-    }
-  ]
+  "text": "6-14 word hook",
+  "style": "Statement|Question|Command|Conditional|Story seed",
+  "awareness_level": "Most|Product|Solution|Problem|Unaware",
+  "label": "70-core|20-adjacent|10-experimental"
 }
 
 SELF-CHECK BEFORE RETURN:
-Reject any hook that:
-– contains grammar errors, passive voice ("is being"), or >14 words
-– mixes multiple awareness levels in one line
-– sneaks in a CTA word (book, call, click, schedule, consultation)
-– uses jargon or weasel words
-If found, rewrite or drop it.
+– Reject any hook with grammar errors, passive mush ("is being"), or >14 words.
+– Reject hooks that mix awareness levels or slip in CTA words (book, call, click, schedule, consultation).
+– Reject hooks that use jargon or weasel words.
+– Read hooks aloud; if they fail the "you'd say it on camera" test, rewrite.
 
-FEW-SHOT EXAMPLES (learn from these):
-
+FEW-SHOT EXAMPLES (tone, cadence, awareness labeling):
 GOOD:
-✓ "Luxury travelers: overwhelmed? Get a free 24-hour plan." (Problem-Aware, 70-core)
-✓ "Why do our Disney families ride more in a day?" (Product-Aware, 70-core)
-✓ "Skip lines, not magic—see our Crowd-Beater plan." (Solution-Aware, 70-core)
-✓ "If trip-planning drains you, borrow our 7-day template." (Problem-Aware, 20-adjacent)
-✓ "The tiny airport mistake that ruins day one." (Completely Unaware, 10-experimental)
+✓ "Luxury travelers: overwhelmed? Get a free 24-hour plan." (Problem, 70-core)
+✓ "Why do our Disney families ride more in a day?" (Product, 70-core)
+✓ "Skip lines, not magic—see our Crowd-Beater plan." (Solution, 70-core)
+✓ "If trip-planning drains you, borrow our 7-day template." (Problem, 20-adjacent)
+✓ "The tiny airport mistake that ruins day one." (Unaware, 10-experimental)
 
 BAD → FIXED:
 ❌ "Luxury Travelers - Stop letting they are overwhelmed with the planning win the first impression so you can unlock dream vacation with free consult."
@@ -100,37 +123,41 @@ BAD → FIXED:
 ❌ "Cruise guys upgrade cabins forever without increase of fares."
 ✅ "Cruisers: better cabins, same fare."
 
-Remember: You respond ONLY with valid JSON. No markdown, no explanations.`;
+Return valid JSON only. No markdown, no explanations.`;
   }
 
   async generateHooks(request) {
     console.log('🎣 Hooksmith generating hooks...');
 
-    const hookTypes = ['Statement', 'Question', 'Command', 'Conditional', 'Narrative'];
-    const awarenessLevels = HOOK_KNOWLEDGE.awarenessLevels.map(a => a.name);
+    const hookStyles = ['Statement', 'Question', 'Command', 'Conditional', 'Story seed'];
+    const awarenessLevels = ['Most', 'Product', 'Solution', 'Problem', 'Unaware'];
 
-    // Build few-shot examples from knowledge base
     const provenExamples = HOOK_KNOWLEDGE.provenHookExamples.paid_ads.slice(0, 5);
 
-    const userPrompt = `Avatar: ${request.targetAudience}
-Topic: ${request.offering}
-Deliver: 21 hooks in JSON. Label 70/20/10 split (14 core, 5 adjacent, 2 experimental).
-Angles to include: ${request.painPoints.join(', ')}
-Desired outcome: ${request.desiredOutcome}
-Campaign goal: ${request.campaignGoal}
-Tone: ${request.tone}
-Channels: ${request.marketingChannels.join(', ')}
-${request.additionalNotes ? `Additional context: ${request.additionalNotes}` : ''}
+    const angles = [
+      ...request.painPoints,
+      request.desiredOutcome,
+      request.campaignGoal,
+    ].filter(Boolean).join('; ');
+
+    const userPrompt = `Avatar: ${request.targetAudience || 'Luxury travelers'}
+Topic: ${request.offering || request.desiredOutcome || 'Campaign hook'}
+Deliver: 21 hooks in JSON. Label 70/20/10. Do not include CTAs.
+Angles to include: ${angles || 'stress-free planning; upgrades; line-skipping'}
+Desired outcome: ${request.desiredOutcome || 'clear promise'}
+Campaign goal: ${request.campaignGoal || 'drive conversions'}
+Tone: ${request.tone || 'Bold and direct'}
+Channels: ${request.marketingChannels.join(', ') || 'Paid Ads'}
+${request.additionalNotes ? `Notes: ${request.additionalNotes}` : ''}
 
 Ban: jargon, double ideas, >14 words, CTA words (book/call/click/schedule).
-
-Hook styles to use: ${hookTypes.join(', ')}
-Awareness levels to spread across: ${awarenessLevels.join(', ')}
+Hook styles to use: ${hookStyles.join(', ')}
+Awareness levels to cover: ${awarenessLevels.join(', ')}
 
 Proven examples to mimic (tone/length):
 ${provenExamples.map(ex => `– "${ex}"`).join('\n')}
 
-Return JSON with hooks array. Each hook must have: text, style, awarenessLevel, label.`;
+Follow the JSON format contract exactly.`;
 
     try {
       const response = await openai.chat.completions.create({
@@ -152,20 +179,30 @@ Return JSON with hooks array. Each hook must have: text, style, awarenessLevel, 
 
       const content = response.choices[0].message.content.trim();
       const parsed = JSON.parse(content);
-      let hooks = parsed.hooks || [];
+      const hooks = Array.isArray(parsed.hooks) ? parsed.hooks : [];
 
       console.log(`✅ Generated ${hooks.length} raw hooks`);
+      if (parsed.avatar || parsed.topic) {
+        console.log('🧾 Hooksmith context:', {
+          avatar: parsed.avatar,
+          topic: parsed.topic,
+          notes: parsed.notes,
+        });
+      }
 
       // Quality gate: validate each hook
       const validatedHooks = [];
       const rejectedHooks = [];
 
-      for (const hook of hooks) {
+      hooks.forEach((hook, index) => {
         const validation = this.validateHookQuality(hook);
-        
+
         if (validation.passed) {
           validatedHooks.push({
-            ...hook,
+            text: hook.text.trim(),
+            style: hook.style || 'Statement',
+            awarenessLevel: this.normalizeAwarenessLevel(hook.awareness_level || hook.awarenessLevel || hook.awareness),
+            label: this.normalizeLabel(hook.label, index),
             wordCount: validation.wordCount
           });
         } else {
@@ -175,7 +212,7 @@ Return JSON with hooks array. Each hook must have: text, style, awarenessLevel, 
           });
           console.log(`⚠️  Rejected hook: "${hook.text}" (${validation.issues.join(', ')})`);
         }
-      }
+      });
 
       console.log(`✅ ${validatedHooks.length} hooks passed quality gate`);
       console.log(`❌ ${rejectedHooks.length} hooks rejected`);

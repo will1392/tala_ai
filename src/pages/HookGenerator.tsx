@@ -146,7 +146,7 @@ const HookGenerator = () => {
       const fallbackHooks = generateHooks(request);
       setResults(fallbackHooks);
       setLastRequest(request);
-      toast.success('Generated 20 hooks using fallback method.');
+      toast.success(`Generated ${fallbackHooks.length} hooks using fallback method.`);
     }
   };
 
@@ -329,7 +329,7 @@ const HookGenerator = () => {
             onClick={handleGenerate}
             className="w-full rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 py-3 font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:scale-[1.01] hover:shadow-purple-500/30"
           >
-            Generate 20 Hooks
+            Generate Hooks
           </button>
         </section>
 
@@ -343,7 +343,11 @@ const HookGenerator = () => {
                 Tala threads your brief through each hook, pairing the pains you listed with the promise you need to make.
               </p>
             </div>
-            {results.length > 0 && <p className="text-xs uppercase tracking-wide text-white/50">20 hooks ready to deploy</p>}
+            {results.length > 0 && (
+              <p className="text-xs uppercase tracking-wide text-white/50">
+                {results.length} hooks ready to deploy
+              </p>
+            )}
           </div>
 
           {briefItems.length > 0 && (
@@ -363,7 +367,7 @@ const HookGenerator = () => {
           {results.length === 0 ? (
             <div className="rounded-xl border border-dashed border-white/20 bg-white/5 p-8 text-center">
               <p className="text-white/70">
-                Answer the discovery questions above and click "Generate 20 Hooks" to see tailored angles appear here.
+                Answer the discovery questions above and click "Generate Hooks" to see tailored angles appear here.
               </p>
             </div>
           ) : (
