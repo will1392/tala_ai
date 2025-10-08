@@ -21,6 +21,7 @@ export interface GeneratedHook {
   supportingInsights: string[];
   label?: string;
   wordCount?: number;
+  angle?: string | null;
 }
 
 type HookStyle = 'Statement' | 'Question' | 'Command' | 'Conditional' | 'Story seed';
@@ -523,6 +524,7 @@ export const generateHooks = (request: HookRequest): GeneratedHook[] => {
         channelNote,
         supportingInsights,
         label: blueprint.label,
+        angle: blueprint.angle,
       } satisfies GeneratedHook;
     })
     .filter((hook): hook is GeneratedHook => Boolean(hook));

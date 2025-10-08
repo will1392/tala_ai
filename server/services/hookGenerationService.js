@@ -7,6 +7,21 @@ const openai = new OpenAI({
 
 class HookGenerationService {
 
+  buildDiscoveryQA(request) {
+    const qa = [
+      { question: 'Target audience', answer: request.targetAudience },
+      { question: 'Offering', answer: request.offering },
+      { question: 'Primary pains', answer: this.buildList(request.painPoints).join('; ') },
+      { question: 'Desired outcome', answer: request.desiredOutcome },
+      { question: 'Campaign goal', answer: request.campaignGoal },
+      { question: 'Tone guidance', answer: request.tone },
+      { question: 'Marketing channels', answer: Array.isArray(request.marketingChannels) ? request.marketingChannels.join(', ') : '' },
+      { question: 'Additional notes', answer: request.additionalNotes }
+    ];
+
+    return qa.filter((item) => item.answer && item.answer.trim());
+  }
+
   buildList(values = []) {
     return values
       .map((value) => value && value.trim())
@@ -230,6 +245,34 @@ Return valid JSON only. No markdown, no explanations.`;
     const hookStyles = ['Statement', 'Question', 'Command', 'Conditional', 'Story seed'];
     const awarenessLevels = ['Most', 'Product', 'Solution', 'Problem', 'Unaware'];
 
+    const strategicPlan = await this.buildStrategicPlan(request);
+    const planAngles = Array.isArray(strategicPlan.angles) ? strategicPlan.angles : [];
+    const planAngleSection = planAngles.length
+      ? planAngles
+          .map((angle, index) => {
+            const parts = [];
+            parts.push(`Angle ${index + 1}: ${angle.name || 'Unnamed Angle'}`);
+            if (angle.pain) parts.push(`Pain to spotlight: ${angle.pain}`);
+            if (angle.desiredShift || angle.promise) parts.push(`Promise: ${angle.desiredShift || angle.promise}`);
+            if (angle.proof) parts.push(`Proof / credibility move: ${angle.proof}`);
+            if (angle.hookGuidance) parts.push(`Hook guidance: ${angle.hookGuidance}`);
+            return parts.join('\n');
+          })
+          .join('\n\n')
+      : 'No structured angles returned—fall back to pain/outcome pairing.';
+
+    const planVoice = Array.isArray(strategicPlan.languageRules) && strategicPlan.languageRules.length
+      ? strategicPlan.languageRules
+      : ['Write for spoken delivery, confident and direct.', 'Keep copy concrete—no abstractions or consultant-speak.'];
+
+    const planProofPoints = Array.isArray(strategicPlan.proofPoints) && strategicPlan.proofPoints.length
+      ? strategicPlan.proofPoints
+      : ['Reference existing wins, social proof, or tangible process steps.'];
+
+    const planAvoid = Array.isArray(strategicPlan.forbiddenPhrases) && strategicPlan.forbiddenPhrases.length
+      ? strategicPlan.forbiddenPhrases
+      : ['Do not reuse discovery wording verbatim.', 'Avoid generic promises like "scale faster" or "unlock growth".'];
+
     const discoverySummary = this.buildDiscoverySummary(request);
     const angleDirectives = this.buildAngleDirectives(request);
     const hormoziReminders = this.buildHormoziReminders();
@@ -247,6 +290,22 @@ Channels in play: ${channelList}
 ---
 Discovery intake (synthesize into fresh hooks):
 ${discoverySummary}
+
+---
+Strategic plan synthesized from discovery:
+Avatar summary: ${strategicPlan.avatar || request.targetAudience}
+Primary outcome to promise: ${strategicPlan.primaryOutcome || request.desiredOutcome || request.campaignGoal}
+${planAngles.length ? 'Angle breakdown:' : ''}
+${planAngleSection}
+
+Voice + message rules:
+- ${planVoice.join('\n- ')}
+
+Proof points to weave in:
+- ${planProofPoints.join('\n- ')}
+
+Never say:
+- ${planAvoid.join('\n- ')}
 
 ---
 Angle directives (reinterpret, do not copy):
@@ -312,12 +371,14 @@ ${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
         const validation = this.validateHookQuality(hook);
 
         if (validation.passed) {
+          const assignedAngle = planAngles.length ? planAngles[index % planAngles.length] : null;
           validatedHooks.push({
             text: hook.text.trim(),
             style: hook.style || 'Statement',
             awarenessLevel: this.normalizeAwarenessLevel(hook.awareness_level || hook.awarenessLevel || hook.awareness),
             label: this.normalizeLabel(hook.label, index),
-            wordCount: validation.wordCount
+            wordCount: validation.wordCount,
+            angle: assignedAngle
           });
         } else {
           rejectedHooks.push({
@@ -344,9 +405,10 @@ ${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
         awareness: hook.awarenessLevel,
         label: hook.label,
         wordCount: hook.wordCount,
-        rationale: this.generateRationale(hook, request),
+        angle: hook.angle?.name || null,
+        rationale: this.generateRationale(hook, request, hook.angle),
         channelNote: this.generateChannelNote(hook, request.marketingChannels),
-        supportingInsights: this.buildInsights(request)
+        supportingInsights: this.buildInsights(request, hook.angle, strategicPlan)
       }));
 
     } catch (error) {
@@ -355,7 +417,7 @@ ${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
     }
   }
 
-  generateRationale(hook, request) {
+  generateRationale(hook, request, angle) {
     const levelDescriptions = {
       'Most Aware': 'Targets warm audience who knows your brand, just needs the offer',
       'Product Aware': 'For those familiar with solutions but unsure about yours',
@@ -363,10 +425,19 @@ ${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
       'Problem Aware': 'Agitates known pain points to create urgency',
       'Completely Unaware': 'Creates curiosity for those who don\'t yet know they need help'
     };
-    return levelDescriptions[hook.awarenessLevel] || 'Strategically crafted for target audience';
+    const base = levelDescriptions[hook.awarenessLevel] || 'Strategically crafted for target audience';
+    if (angle?.pain || angle?.desiredShift || angle?.promise) {
+      const pain = angle.pain ? `Pain: ${angle.pain}` : null;
+      const promise = angle.desiredShift || angle.promise ? `Promise: ${angle.desiredShift || angle.promise}` : null;
+      return [base, pain, promise].filter(Boolean).join(' • ');
+    }
+    return base;
   }
 
   generateChannelNote(hook, channels) {
+    if (!channels || !Array.isArray(channels)) {
+      return 'Deploy as opening line across chosen channels';
+    }
     if (channels.includes('Paid Ads')) {
       return 'First 3-5 words stop the scroll—front-loaded value';
     } else if (channels.includes('Email')) {
@@ -377,7 +448,7 @@ ${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
     return 'Deploy as opening line across chosen channels';
   }
 
-  buildInsights(request) {
+  buildInsights(request, angle, plan) {
     const insights = [
       `Audience: ${request.targetAudience}`,
       `Offer: ${request.offering}`,
@@ -394,7 +465,15 @@ ${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
 
     insights.push(`Tone: ${request.tone}`);
 
-    return insights.slice(0, 6);
+    if (angle?.name) {
+      insights.push(`Angle: ${angle.name}`);
+    }
+
+    if (plan?.proofPoints?.length) {
+      insights.push(`Proof focus: ${plan.proofPoints[0]}`);
+    }
+
+    return [...new Set(insights)].slice(0, 6);
   }
 
   async generateWithValidation(request) {
@@ -434,6 +513,91 @@ ${provenExamples.map((example) => `- "${example}"`).join('\n')}`;
         channels: request.marketingChannels
       }
     };
+  }
+
+  buildStrategistSystemPrompt() {
+    return `ROLE: You are a marketing strategist named Briefsmith.
+
+TASK: Convert raw discovery answers into a structured angle plan that a hook writer can execute without guessing. Capture the real pains, what relief looks like, and the proof or mechanism that makes the promise credible.
+
+OUTPUT: Return JSON with keys avatar, primaryOutcome, angles[], languageRules[], proofPoints[], forbiddenPhrases[]. Each angle requires name, pain, desiredShift (or promise), proof, hookGuidance.
+
+RULES:
+– Stay faithful to the discovery inputs—no fabricating offers we were not told about.
+– Keep language concrete and interview-style (no buzzwords).
+– Prioritize what feels emotionally urgent and commercially valuable.
+– Highlight contradictions or differentiators if provided.`;
+  }
+
+  buildStrategistUserPrompt(request) {
+    const qaPairs = this.buildDiscoveryQA(request)
+      .map((item) => `Q: ${item.question}\nA: ${item.answer}`)
+      .join('\n\n');
+
+    const pains = this.buildList(request.painPoints);
+
+    return `Discovery interview transcript:
+${qaPairs}
+
+Key pain signals (deduplicated): ${pains.join(' | ') || 'None listed'}
+
+Instruction: Create 3-5 differentiated angles that translate these pains into sharp hook territories. Each angle should map a pain to a specific promise and cite what gives the promise credibility.`;
+  }
+
+  async buildStrategicPlan(request) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-5-nano-2025-08-07',
+        temperature: 0.2,
+        max_completion_tokens: 1200,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: this.buildStrategistSystemPrompt() },
+          { role: 'user', content: this.buildStrategistUserPrompt(request) }
+        ]
+      });
+
+      const raw = response.choices?.[0]?.message?.content?.trim();
+      if (!raw) throw new Error('Empty strategist response');
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Strategic plan parse failure');
+      }
+
+      console.log('🧠 Strategic plan synthesized for hooks');
+      return parsed;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn('⚠️  Strategic plan generation failed, using heuristic fallback:', message);
+      const pains = this.buildList(request.painPoints).slice(0, 3);
+      const fallbackAngles = pains.length
+        ? pains.map((pain, index) => ({
+            name: `Pain relief ${index + 1}`,
+            pain,
+            desiredShift: request.desiredOutcome || 'Get the promised outcome without the pain',
+            proof: request.additionalNotes || 'Reference past client wins or proprietary process.',
+            hookGuidance: 'Contrast the painful status quo with the relief the offer delivers.'
+          }))
+        : [
+            {
+              name: 'Outcome-first promise',
+              pain: request.campaignGoal || 'Lack of momentum',
+              desiredShift: request.desiredOutcome || 'Show the fastest path to the outcome',
+              proof: request.additionalNotes || 'Lean on expertise, speed, or social proof',
+              hookGuidance: 'Lead with the desired future state, then tease the mechanism.'
+            }
+          ];
+
+      return {
+        avatar: request.targetAudience,
+        primaryOutcome: request.desiredOutcome || request.campaignGoal,
+        angles: fallbackAngles,
+        languageRules: ['Keep it sharp and conversational.', 'Speak like a strategist who has seen the problem 100 times.'],
+        proofPoints: request.additionalNotes ? [request.additionalNotes] : [],
+        forbiddenPhrases: []
+      };
+    }
   }
 }
 
