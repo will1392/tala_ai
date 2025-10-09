@@ -21,7 +21,7 @@ export async function chat({ system, user, temperature = 0.4, maxTokens = 200 })
     model: DEFAULT_MODEL,
     messages,
     temperature,
-    max_tokens: maxTokens
+    max_completion_tokens: maxTokens
   });
 
   return response.choices?.[0]?.message?.content?.trim() || '';
