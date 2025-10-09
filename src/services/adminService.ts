@@ -101,6 +101,15 @@ export const adminService = {
         })
       });
 
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('API Error:', response.status, text);
+        return {
+          success: false,
+          error: `Server error (${response.status}): ${text || response.statusText}`
+        };
+      }
+
       const data = await response.json();
       return data;
     } catch (error) {
