@@ -115,7 +115,10 @@ export const EnhancedUploadZone = ({ onClose, folders, primaryFolderId, onUpload
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
       'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'text/plain': ['.txt']
+      'text/plain': ['.txt'],
+      'audio/*': ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.webm'],
+      'video/mp4': ['.mp4'],
+      'video/mpeg': ['.mpeg']
     },
     disabled: !isInitialized,
     maxSize: 500 * 1024 * 1024, // 500MB limit (increased from 50MB)

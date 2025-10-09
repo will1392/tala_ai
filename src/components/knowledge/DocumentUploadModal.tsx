@@ -214,7 +214,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'text/plain': ['.txt'],
       'text/markdown': ['.md'],
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif']
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+      'audio/*': ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.webm'],
+      'video/mp4': ['.mp4'],
+      'video/mpeg': ['.mpeg']
     },
     disabled: isUploading,
     multiple: true
