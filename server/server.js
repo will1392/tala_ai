@@ -453,7 +453,7 @@ async function transcribeAudioFile(file) {
 
   const transcription = await openai.audio.transcriptions.create({
     file: audioStream,
-    model: 'gpt-4o-mini-transcribe',
+    model: 'whisper-1',
     response_format: 'verbose_json'
   });
 

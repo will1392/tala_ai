@@ -144,5 +144,15 @@
     "userId": "admin-1",
     "isAdmin": true,
     "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8"
+  },
+  {
+    "id": "7bb98088-29e1-4a83-9261-a0c17574c747",
+    "name": "Travel Talks",
+    "description": "",
+    "createdAt": "2025-10-09T17:32:52.538Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "38698a32-7697-4577-8b00-cc0501eecad7"
   }
 ]
