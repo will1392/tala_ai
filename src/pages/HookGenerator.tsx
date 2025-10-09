@@ -51,8 +51,8 @@ const DISCOVERY_QUESTIONS: DiscoveryQuestion[] = [
   },
   {
     id: 'struggle',
-    prompt: 'What's tripping them up right now?',
-    helper: 'Keep it simple—what is the annoying problem they can't shake?',
+    prompt: 'What is tripping them up right now?',
+    helper: 'Keep it simple - what is the annoying problem they cannot shake?',
     placeholder: 'e.g., answering the same internal questions 50 times a week'
   },
   {
@@ -65,7 +65,7 @@ const DISCOVERY_QUESTIONS: DiscoveryQuestion[] = [
     id: 'offer',
     prompt: 'What are we offering to make that happen?',
     helper: 'Name the product, service, or system you want the hooks to sell.',
-    placeholder: 'e.g., Tala—an internal AI assistant trained on your knowledge base'
+    placeholder: 'e.g., Tala - an internal AI assistant trained on your knowledge base'
   },
   {
     id: 'context',
