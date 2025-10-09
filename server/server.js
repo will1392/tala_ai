@@ -431,6 +431,13 @@ async function extractTextFromFile(buffer, mimetype, filename) {
 }
 
 async function transcribeAudioFile(file) {
+  console.log('🎧 Starting audio transcription:', {
+    filename: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+    sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + 'MB'
+  });
+
   const isAudioFile = file.mimetype?.startsWith('audio/') || 
                       file.mimetype === 'video/mp4' || 
                       file.mimetype === 'video/mpeg' ||
@@ -445,43 +452,61 @@ async function transcribeAudioFile(file) {
   }
 
   if (file.size > 25 * 1024 * 1024) {
-    throw new Error('Audio file exceeds 25MB transcription limit');
+    throw new Error(`Audio file exceeds 25MB transcription limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
   }
 
-  const audioStream = Readable.from(file.buffer);
-  audioStream.path = file.originalname;
+  try {
+    console.log('🎧 Calling OpenAI Whisper API...');
+    const audioStream = Readable.from(file.buffer);
+    audioStream.path = file.originalname;
 
-  const transcription = await openai.audio.transcriptions.create({
-    file: audioStream,
-    model: 'whisper-1',
-    response_format: 'verbose_json'
-  });
+    const transcription = await openai.audio.transcriptions.create({
+      file: audioStream,
+      model: 'whisper-1',
+      response_format: 'verbose_json'
+    });
 
-  let averageConfidence;
-  if (Array.isArray(transcription.segments) && transcription.segments.length > 0) {
-    const confidences = transcription.segments
-      .map(segment => segment.confidence)
-      .filter(value => typeof value === 'number');
+    console.log('✅ Transcription complete:', {
+      textLength: transcription.text?.length || 0,
+      language: transcription.language,
+      duration: transcription.duration,
+      segments: transcription.segments?.length || 0
+    });
 
-    if (confidences.length > 0) {
-      averageConfidence = confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+    let averageConfidence;
+    if (Array.isArray(transcription.segments) && transcription.segments.length > 0) {
+      const confidences = transcription.segments
+        .map(segment => segment.confidence)
+        .filter(value => typeof value === 'number');
+
+      if (confidences.length > 0) {
+        averageConfidence = confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+      }
     }
-  }
 
-  return {
-    text: transcription.text || '',
-    language: transcription.language,
-    duration: transcription.duration,
-    confidence: averageConfidence,
-    segments: Array.isArray(transcription.segments)
-      ? transcription.segments.map(segment => ({
-          start: segment.start,
-          end: segment.end,
-          text: segment.text,
-          confidence: segment.confidence
-        }))
-      : []
-  };
+    return {
+      text: transcription.text || '',
+      language: transcription.language,
+      duration: transcription.duration,
+      confidence: averageConfidence,
+      segments: Array.isArray(transcription.segments)
+        ? transcription.segments.map(segment => ({
+            start: segment.start,
+            end: segment.end,
+            text: segment.text,
+            confidence: segment.confidence
+          }))
+        : []
+    };
+  } catch (error) {
+    console.error('❌ Audio transcription failed:', {
+      error: error.message,
+      code: error.code,
+      type: error.type,
+      status: error.status
+    });
+    throw new Error(`Audio transcription failed: ${error.message}`);
+  }
 }
 
 function createChunks(text, chunkSize = 150, overlap = 25) {
