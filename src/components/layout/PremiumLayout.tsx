@@ -28,6 +28,7 @@ import { cn } from '../../utils/cn';
 import { GlobalSearch } from './GlobalSearch';
 import { useTheme } from '../../context/ThemeContextNew';
 import { useCredits } from '../../hooks/useCredits';
+import { useAuthStore } from '../../store/authStore';
 
 // UI Components
 const Input = ({ className = '', ...props }: { className?: string; [key: string]: any }) => (
@@ -316,7 +317,7 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
         </div>
         
         {/* Super Admin Section */}
-        {creditInfo?.role === 'super_admin' && (
+        {(creditInfo?.role === 'super_admin' || user?.role === 'super_admin') && (
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="px-3 mb-2">
               <span className="inline-flex items-center gap-1 rounded-full border border-yellow-200 bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:border-yellow-500/40 dark:bg-yellow-500/10 dark:text-yellow-200">
@@ -384,12 +385,12 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
               variant="outline"
               className={cn(
                 'text-xs',
-                creditInfo?.role === 'super_admin'
+                (creditInfo?.role === 'super_admin' || user?.role === 'super_admin')
                   ? 'border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-500/40 dark:bg-yellow-500/10 dark:text-yellow-100'
                   : ''
               )}
             >
-              {creditInfo?.role === 'super_admin' ? 'Super Admin' :
+              {(creditInfo?.role === 'super_admin' || user?.role === 'super_admin') ? 'Super Admin' :
                creditInfo?.role === 'agency_owner' ? 'Agency Owner' :
                creditInfo?.plan_type === 'agency' ? 'Agency' : 'Agent'}
             </Badge>
@@ -408,8 +409,9 @@ export const PremiumLayout = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const location = useLocation();
   
-  // Use the credits hook
+  // Use the credits hook and auth store
   const { creditInfo, loading: creditsLoading } = useCredits();
+  const { user } = useAuthStore();
 
   const envVars = import.meta.env as Record<string, string | boolean | undefined>;
   const isProduction = envVars.VITE_ENV === 'production';

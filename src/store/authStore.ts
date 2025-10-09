@@ -15,7 +15,7 @@ const mockUsers: Record<string, { user: User; password: string }> = {
     user: {
       id: 'will-1',
       email: 'will@weareapexcreatives.com',
-      role: 'admin',
+      role: 'super_admin',
       name: 'Will',
       createdAt: new Date('2024-01-01')
     }
