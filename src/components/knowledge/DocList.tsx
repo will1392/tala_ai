@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { FileText, FileSpreadsheet, FileCode, FileType, Presentation } from 'lucide-react';
+import { FileText, FileSpreadsheet, FileCode, FileType, Presentation, FileAudio } from 'lucide-react';
 import type { Doc } from '../../types/knowledge';
 
 type Props = {
@@ -14,6 +14,7 @@ const getDocIcon = (type: Doc['type']) => {
     case 'Presentation': return Presentation;
     case 'Markdown': return FileCode;
     case 'PDF': return FileType;
+    case 'Audio': return FileAudio;
     default: return FileText;
   }
 };

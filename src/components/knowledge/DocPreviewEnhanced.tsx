@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Maximize2, X, CheckCircle2, Trash2, Tag, Link2, Calendar, Loader2 } from 'lucide-react';
+import { BookOpen, Maximize2, X, CheckCircle2, Trash2, Tag, Link2, Calendar, Loader2, FileAudio } from 'lucide-react';
 import type { Doc } from '../../types/knowledge';
 import { buildApiUrl } from '../../utils/api';
 import Markdown from '../shared/Markdown';
@@ -91,6 +91,9 @@ export default function DocPreviewEnhanced({ doc, onUseInChat, onRemove }: Props
   
   const previewUrl = getPreviewUrl();
   const isPdf = doc.type === 'PDF' || doc.previewUrl?.toLowerCase().includes('.pdf');
+  const isAudio = doc.type === 'Audio' || 
+                  doc.previewUrl?.match(/\.(mp3|wav|m4a|mp4|aac|ogg|flac|webm)$/i) ||
+                  doc.metadata?.mediaType === 'audio';
   
   const previewContent = (
     <div className="w-full h-full">
@@ -104,7 +107,47 @@ export default function DocPreviewEnhanced({ doc, onUseInChat, onRemove }: Props
           </div>
         </div>
       ) : previewUrl ? (
-        isPdf ? (
+        isAudio ? (
+          <div className="w-full h-full overflow-auto p-6 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-6">
+            {/* Audio Player */}
+            <div className="p-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10">
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium mb-3">
+                <FileAudio size={18} />
+                Audio File
+              </div>
+              <audio controls src={previewUrl} className="w-full rounded">
+                Your browser does not support the audio element.
+              </audio>
+              {doc.metadata && (
+                <div className="mt-3 grid gap-2 text-sm text-gray-600 dark:text-gray-400 sm:grid-cols-2">
+                  {doc.metadata.audioDuration && (
+                    <span>Duration: {Math.round(doc.metadata.audioDuration)} seconds</span>
+                  )}
+                  {doc.metadata.audioLanguage && (
+                    <span>Language: {doc.metadata.audioLanguage.toUpperCase()}</span>
+                  )}
+                  {typeof doc.metadata.audioConfidence === 'number' && (
+                    <span>
+                      Confidence: {Math.round((doc.metadata.audioConfidence || 0) * 100)}%
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Transcription */}
+            {doc.content && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Transcription</h4>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <pre className="whitespace-pre-wrap text-sm bg-white dark:bg-gray-900 p-4 rounded-lg">
+                    {doc.content}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : isPdf ? (
           <iframe 
             title={`Preview of ${doc.title}`}
             src={previewUrl} 
@@ -139,7 +182,7 @@ export default function DocPreviewEnhanced({ doc, onUseInChat, onRemove }: Props
               Document preview not available
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-              Supported formats: PDF, Images, Text
+              Supported formats: PDF, Audio, Images, Text
             </p>
           </div>
         </div>
