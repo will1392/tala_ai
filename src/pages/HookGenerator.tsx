@@ -534,41 +534,57 @@ const HookGenerator = () => {
               </p>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {results.map((hook) => (
-                <article key={hook.id} className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-white/50">{hook.type}</p>
-                      <h3 className="font-semibold text-white leading-snug">{hook.text}</h3>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(hook)}
-                      className="rounded-full border border-white/10 p-2 text-white/60 hover:text-white hover:border-cyan-400"
-                      aria-label="Copy hook to clipboard"
-                    >
-                      {copiedId === hook.id ? <ClipboardCheck size={16} className="text-cyan-300" /> : <Clipboard size={16} />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-cyan-200">{hook.awareness}</p>
-                  <p className="text-sm text-white/70 leading-relaxed">{hook.rationale}</p>
-                  <p className="text-xs text-white/50 italic">{hook.channelNote}</p>
-                  <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-white/40">
-                    {hook.supportingInsights?.length
-                      ? hook.supportingInsights.map((insight) => (
-                          <span key={insight} className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                            {insight}
-                          </span>
-                        ))
-                      : buildSupportingInsights(lastRequest || buildRequestFromDiscovery(initialDiscoveryState)).map((insight) => (
-                          <span key={insight} className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-                            {insight}
-                          </span>
+            <div className="space-y-8">
+              {(() => {
+                const grouped = results.reduce((acc, hook) => {
+                  const key = hook.awareness;
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(hook);
+                  return acc;
+                }, {} as Record<string, GeneratedHook[]>);
+
+                const awarenessOrder = [
+                  { key: 'Problem Aware', label: 'Problem-Aware Hooks (Pain-Driven)' },
+                  { key: 'Solution Aware', label: 'Solution-Aware Hooks (Promise-Driven)' },
+                  { key: 'Product Aware', label: 'Product-Aware Hooks (Proof-Driven)' },
+                  { key: 'Completely Unaware', label: 'Unaware Hooks (Curiosity-Driven)' },
+                  { key: 'Most Aware', label: 'Most Aware Hooks (Reinforcement-Driven)' }
+                ];
+
+                return awarenessOrder
+                  .filter(({ key }) => grouped[key] && grouped[key].length > 0)
+                  .map(({ key, label }) => (
+                    <div key={key} className="space-y-4">
+                      <h3 className="text-lg font-semibold text-white border-b border-white/10 pb-2">
+                        {label}
+                      </h3>
+                      <div className="space-y-3">
+                        {grouped[key].map((hook) => (
+                          <div
+                            key={hook.id}
+                            className="group flex items-start gap-3 rounded-lg border border-white/5 bg-white/[0.02] p-4 hover:border-white/10 hover:bg-white/5 transition"
+                          >
+                            <p className="flex-1 text-white/90 leading-relaxed">
+                              "{hook.text}"
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(hook)}
+                              className="flex-shrink-0 rounded-md border border-white/10 p-2 text-white/60 hover:text-white hover:border-cyan-400 transition opacity-0 group-hover:opacity-100"
+                              aria-label="Copy hook to clipboard"
+                            >
+                              {copiedId === hook.id ? (
+                                <ClipboardCheck size={16} className="text-cyan-300" />
+                              ) : (
+                                <Clipboard size={16} />
+                              )}
+                            </button>
+                          </div>
                         ))}
-                  </div>
-                </article>
-              ))}
+                      </div>
+                    </div>
+                  ));
+              })()}
             </div>
           )}
         </section>
