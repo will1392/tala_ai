@@ -212,7 +212,7 @@ const sidebarFeatureFlagMap: Record<string, string> = {
 };
 
 // Sidebar Content Component
-const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, activeTab, onNavigate, userProfile, creditInfo, creditsLoading, formatCredits, onClose }: any) => {
+const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, activeTab, onNavigate, userProfile, creditInfo, creditsLoading, formatCredits, user, onClose }: any) => {
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -515,6 +515,7 @@ export const PremiumLayout = () => {
           creditInfo={creditInfo}
           creditsLoading={creditsLoading}
           formatCredits={formatCredits}
+          user={user}
           onClose={() => setMobileMenuOpen(false)}
         />
       </div>
@@ -535,6 +536,7 @@ export const PremiumLayout = () => {
           creditInfo={creditInfo}
           creditsLoading={creditsLoading}
           formatCredits={formatCredits}
+          user={user}
         />
       </div>
 
