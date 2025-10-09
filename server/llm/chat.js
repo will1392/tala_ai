@@ -4,7 +4,7 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const DEFAULT_MODEL = process.env.OPENAI_HOOK_MODEL || 'gpt-4.1-mini';
+const DEFAULT_MODEL = process.env.OPENAI_HOOK_MODEL || 'gpt-5-nano-2025-08-07';
 
 export async function chat({ system, user, temperature = 0.4, maxTokens = 200 }) {
   const messages = [];
