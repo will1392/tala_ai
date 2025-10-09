@@ -324,28 +324,44 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             message: `Uploaded ${fileStatus.file.name}`
           });
         } else {
-          throw new Error(result.error || 'Upload failed');
+          // Extract error message from response
+          const errorMsg = result.error || result.message || 'Upload failed';
+          const errorDetails = result.details ? ` - ${result.details}` : '';
+          throw new Error(errorMsg + errorDetails);
         }
       } catch (error) {
         console.error('Upload error:', error);
+        console.error('Error details:', {
+          type: typeof error,
+          isError: error instanceof Error,
+          message: error instanceof Error ? error.message : JSON.stringify(error),
+          response: error
+        });
+        
         hasErrors = true;
+        
+        // Extract error message properly
+        let errorMessage = 'Upload failed';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error && typeof error === 'object') {
+          errorMessage = (error as any).message || (error as any).error || JSON.stringify(error);
+        }
+        
         setFileStatuses(prev => prev.map((fs, idx) =>
           idx === i ? {
             ...fs,
             status: 'error',
-            error: error instanceof Error ? error.message : 'Upload failed'
+            error: errorMessage
           } : fs
         ));
-        const normalizedError = normalizeError(error);
-        const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : 'Upload failed');
+        
         pushToast({
           kind: 'error',
-          title: normalizedError.title || 'Upload Error',
-          message: `Failed to upload ${fileStatus.file.name}: ${errorMessage}`,
-          action: normalizedError.docsHref ? {
-            label: 'View troubleshooting',
-            onClick: () => window.open(normalizedError.docsHref, '_blank')
-          } : undefined
+          title: 'Upload Error',
+          message: `Failed to upload ${fileStatus.file.name}: ${errorMessage}`
         });
       }
     }
