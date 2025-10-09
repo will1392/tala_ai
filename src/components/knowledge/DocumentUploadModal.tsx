@@ -300,7 +300,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         }
 
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-        const response = await fetch(`${baseUrl}/documents/upload`, {
+        const uploadUrl = `${baseUrl}/documents/upload`;
+        
+        console.log('📤 Uploading to:', uploadUrl);
+        console.log('📋 Upload details:', {
+          userId,
+          isAdmin,
+          fileName: fileStatus.file.name,
+          fileType: fileStatus.file.type,
+          fileSize: fileStatus.file.size
+        });
+        
+        const response = await fetch(uploadUrl, {
           method: 'POST',
           headers: {
             'x-user-id': userId
@@ -308,6 +319,24 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           body: formData
         });
 
+        console.log('📡 Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          // Try to parse error response
+          let errorData;
+          try {
+            errorData = await response.json();
+          } catch (parseError) {
+            // Response is not JSON
+            const textError = await response.text();
+            throw new Error(`HTTP ${response.status}: ${textError || response.statusText}`);
+          }
+          
+          const errorMsg = errorData.error || errorData.message || `HTTP ${response.status}`;
+          const errorDetails = errorData.details ? ` - ${errorData.details}` : '';
+          throw new Error(errorMsg + errorDetails);
+        }
+        
         const result = await response.json();
         
         if (response.ok) {
