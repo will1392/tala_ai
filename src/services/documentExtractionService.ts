@@ -1,3 +1,5 @@
+import { buildApiUrl } from '../utils/api';
+
 interface ExtractionResult {
   success: boolean;
   data: {
@@ -27,15 +29,15 @@ export class DocumentExtractionService {
       const formData = new FormData();
       
       // Add files to form data
-      files.forEach((file, index) => {
-        formData.append(`document_${index}`, file);
+      files.forEach((file) => {
+        formData.append('document', file);
       });
       
       // Add extraction type
       formData.append('extractType', extractType);
       formData.append('userId', 'admin-1');
 
-      const response = await fetch('http://localhost:3001/api/documents/extract', {
+      const response = await fetch(buildApiUrl('/documents/extract'), {
         method: 'POST',
         body: formData,
       });
@@ -99,7 +101,7 @@ export class DocumentExtractionService {
           formData.append('tags', JSON.stringify(options.tags));
         }
 
-        const response = await fetch('http://localhost:3001/api/documents/upload', {
+        const response = await fetch(buildApiUrl('/documents/upload'), {
           method: 'POST',
           body: formData,
         });

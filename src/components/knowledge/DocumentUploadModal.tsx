@@ -13,6 +13,7 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Label } from '../ui/Label';
 import { Card, CardContent } from '../ui/Card';
+import { buildApiUrl } from '../../utils/api';
 
 interface DocumentUploadModalProps {
   isOpen: boolean;
@@ -299,8 +300,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           formData.append('folderId', selectedSubfolder);
         }
 
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-        const uploadUrl = `${baseUrl}/documents/upload`;
+        const uploadUrl = buildApiUrl('/documents/upload');
         
         console.log('📤 Uploading to:', uploadUrl);
         console.log('📋 Upload details:', {
@@ -311,12 +311,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           fileSize: fileStatus.file.size
         });
         
+        const authToken = localStorage.getItem('auth_token');
+        const headers: HeadersInit = {
+          'x-user-id': userId
+        };
+
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
         const response = await fetch(uploadUrl, {
           method: 'POST',
-          headers: {
-            'x-user-id': userId
-          },
-          body: formData
+          headers,
+          body: formData,
+          credentials: 'include'
         });
 
         console.log('📡 Response status:', response.status, response.statusText);
