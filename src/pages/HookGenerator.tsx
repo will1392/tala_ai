@@ -88,7 +88,7 @@ const initialConversation: ConversationMessage[] = [
   {
     id: 'intro',
     speaker: 'tala',
-    text: 'Let's build hooks from scratch. I just need a few quick hits about who you're serving and what they need.'
+    text: 'Let us build hooks from scratch. I just need a few quick hits about who you are serving and what they need.'
   },
   {
     id: `question-${DISCOVERY_QUESTIONS[0].id}`,
@@ -263,7 +263,7 @@ const HookGenerator = () => {
     addMessage({
       id: `handoff-${Date.now()}`,
       speaker: 'tala',
-      text: 'Perfect. Passing this brief to our Hook Agent trained on Hormozi's hooks.'
+      text: 'Perfect. Passing this brief to our Hook Agent trained on Hormozi hooks.'
     });
 
     let hooks: GeneratedHook[] = [];
