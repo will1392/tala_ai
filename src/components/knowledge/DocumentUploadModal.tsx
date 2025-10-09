@@ -6,6 +6,7 @@ import { folderService } from '../../services/folderService';
 import type { PrimaryFolder } from '../../types/primaryFolder';
 import { useToast } from '../toast/ToastProvider';
 import { normalizeError } from '../../lib/errors';
+import { useAuthStore } from '../../store/authStore';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -39,6 +40,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   onUploadComplete
 }) => {
   const { push: pushToast } = useToast();
+  const { user } = useAuthStore();
   
   // Debug: Log what we receive
   useEffect(() => {
@@ -269,9 +271,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
         const formData = new FormData();
         formData.append('document', fileStatus.file);
-        formData.append('userId', 'admin-1');
-        formData.append('isAdmin', 'true');
-        formData.append('visibility', 'global');
+        
+        // Use actual logged-in user
+        const userId = user?.id || 'admin-1';
+        const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+        
+        formData.append('userId', userId);
+        formData.append('isAdmin', isAdmin ? 'true' : 'false');
+        
+        // Set visibility based on user role
+        // Regular agents can only create agency-scoped documents
+        // Admins can create global documents
+        formData.append('visibility', isAdmin ? 'global' : 'agency');
         
         // Use the correct primary folder ID for upload
         // If subfolders are using legacy IDs, we need to use the legacy primary folder ID too
@@ -293,7 +304,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         const response = await fetch(`${baseUrl}/documents/upload`, {
           method: 'POST',
           headers: {
-            'x-user-id': 'admin-1'
+            'x-user-id': userId
           },
           body: formData
         });
@@ -327,10 +338,11 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           } : fs
         ));
         const normalizedError = normalizeError(error);
+        const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : 'Upload failed');
         pushToast({
           kind: 'error',
-          title: normalizedError.title,
-          message: `Failed to upload ${fileStatus.file.name}: ${normalizedError.message}`,
+          title: normalizedError.title || 'Upload Error',
+          message: `Failed to upload ${fileStatus.file.name}: ${errorMessage}`,
           action: normalizedError.docsHref ? {
             label: 'View troubleshooting',
             onClick: () => window.open(normalizedError.docsHref, '_blank')
