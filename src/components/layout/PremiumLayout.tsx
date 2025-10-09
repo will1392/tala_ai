@@ -21,7 +21,8 @@ import {
   Sun,
   Moon,
   CreditCard,
-  Shield
+  Shield,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { GlobalSearch } from './GlobalSearch';
@@ -317,6 +318,12 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
         {/* Super Admin Section */}
         {creditInfo?.role === 'super_admin' && (
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="px-3 mb-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-yellow-200 bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:border-yellow-500/40 dark:bg-yellow-500/10 dark:text-yellow-200">
+                <Sparkles className="h-3 w-3" />
+                Super Admin Mode
+              </span>
+            </div>
             <p className="px-3 text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2">
               Super Admin
             </p>
@@ -373,8 +380,16 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
               </Avatar>
               <span>{userProfile?.name || 'User'}</span>
             </div>
-            <Badge variant="outline" className="text-xs">
-              {creditInfo?.role === 'super_admin' ? 'Super Admin' : 
+            <Badge
+              variant="outline"
+              className={cn(
+                'text-xs',
+                creditInfo?.role === 'super_admin'
+                  ? 'border-yellow-300 bg-yellow-100 text-yellow-800 dark:border-yellow-500/40 dark:bg-yellow-500/10 dark:text-yellow-100'
+                  : ''
+              )}
+            >
+              {creditInfo?.role === 'super_admin' ? 'Super Admin' :
                creditInfo?.role === 'agency_owner' ? 'Agency Owner' :
                creditInfo?.plan_type === 'agency' ? 'Agency' : 'Agent'}
             </Badge>
