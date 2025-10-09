@@ -321,7 +321,7 @@ const HookGenerator = () => {
       } catch (error) {
         console.error('Hook Agent error', error);
         setPipelineStatus({ discovery: 'complete', hookAgent: 'error', verification: 'idle' });
-        toast.error('Hook Agent ran into an issue, generating hooks with Tala's fallback.');
+        toast.error('Hook Agent ran into an issue, generating hooks with Tala fallback.');
         break;
       }
     }
