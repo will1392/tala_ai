@@ -431,7 +431,12 @@ async function extractTextFromFile(buffer, mimetype, filename) {
 }
 
 async function transcribeAudioFile(file) {
-  if (!file?.buffer || !file.mimetype?.startsWith('audio/')) {
+  const isAudioFile = file.mimetype?.startsWith('audio/') || 
+                      file.mimetype === 'video/mp4' || 
+                      file.mimetype === 'video/mpeg' ||
+                      file.originalname?.match(/\.(mp3|wav|m4a|mp4|aac|ogg|flac|webm)$/i);
+  
+  if (!file?.buffer || !isAudioFile) {
     throw new Error('Provided file is not a valid audio buffer');
   }
 
@@ -2199,7 +2204,10 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
     await ensureCollectionExists(collectionName);
     
     const isPdf = file.mimetype === 'application/pdf';
-    const isAudio = file.mimetype.startsWith('audio/');
+    const isAudio = file.mimetype.startsWith('audio/') || 
+                    file.mimetype === 'video/mp4' || 
+                    file.mimetype === 'video/mpeg' ||
+                    file.originalname.match(/\.(mp3|wav|m4a|mp4|aac|ogg|flac|webm)$/i);
     const shouldStoreOriginalFile = isPdf || isAudio;
 
     // Save original file for supported media types (PDF, audio)
