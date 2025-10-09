@@ -237,11 +237,24 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.CORS_ORIGIN === origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Check if CORS_ORIGIN is set and matches
+    if (process.env.CORS_ORIGIN) {
+      const corsOrigins = process.env.CORS_ORIGIN.split(',').map(o => o.trim());
+      if (corsOrigins.includes(origin) || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+    } else if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    
+    // In development or if mock auth is enabled, be more permissive
+    if (process.env.NODE_ENV === 'development' || process.env.MOCK_AUTH === 'true') {
+      console.log('⚠️  CORS: Allowing origin in development mode:', origin);
+      return callback(null, true);
+    }
+    
+    console.warn('❌ CORS: Blocked origin:', origin);
+    callback(null, false);
   },
   credentials: true
 }));
