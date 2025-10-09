@@ -1,5 +1,3 @@
-import { DEFAULT_MARKETING_CHANNELS } from '../data/hookKnowledge';
-
 export interface HookRequest {
   targetAudience: string;
   offering: string;
@@ -24,510 +22,223 @@ export interface GeneratedHook {
   angle?: string | null;
 }
 
-type HookStyle = 'Statement' | 'Question' | 'Command' | 'Conditional' | 'Story seed';
-type HookLabel = '70-core' | '20-adjacent' | '10-experimental';
-type HookAwareness =
-  | 'Most Aware'
-  | 'Product Aware'
-  | 'Solution Aware'
-  | 'Problem Aware'
-  | 'Completely Unaware';
-
-interface GeneratorContext {
-  audience: string;
-  audiencePlural: string;
-  offering: string;
-  primaryPain: string;
-  pains: string[];
-  outcome: string;
-  marketingChannels: string[];
-  tone: string;
-  campaignGoal: string;
-  notes: string;
+export interface HookVerificationResult {
+  passed: boolean;
+  issues: string[];
 }
 
-interface HookContext extends GeneratorContext {
-  callout: string;
-  audiencePluralLower: string;
-  painSnippet: string;
-  outcomeSnippet: string;
-  offeringSnippet: string;
-  goalSnippet: string;
-  planAsset: string;
-  stressPromise: string;
-  upgradeCue: string;
-  skipCue: string;
-  speedVerb: string;
-}
+const DEFAULT_CHANNEL_NOTE = 'Deploy as the opening line across channels.';
+const MIN_HOOKS_REQUIRED = 20;
+const MIN_WORD_COUNT = 6;
 
-interface HookBlueprint {
-  id: string;
-  style: HookStyle;
-  awareness: HookAwareness;
-  label: HookLabel;
-  angle: string;
+interface HookTemplate {
+  label: string;
+  awareness: string;
+  rationale: string;
   build: (context: HookContext) => string;
-  rationale: (context: HookContext) => string;
+}
+
+interface HookContext {
+  audience: string;
+  shortAudience: string;
+  pain: string;
+  outcome: string;
+  offering: string;
 }
 
 const sanitize = (value: string) => value.trim();
 
-const capitalizeFirst = (value: string) => {
-  const trimmed = sanitize(value);
-  if (!trimmed) return '';
-  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
-};
+const toWords = (value: string) =>
+  sanitize(value)
+    .replace(/[–—]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
 
-const toWords = (value: string) => sanitize(value).replace(/[–—]/g, ' ').split(/\s+/).filter(Boolean);
-
-const shortenPhrase = (value: string, maxWords: number, fallback: string) => {
+const shorten = (value: string, fallback: string, maxWords = 4) => {
   const words = toWords(value);
-  if (!words.length) return fallback;
+  if (words.length === 0) return fallback;
   return words.slice(0, maxWords).join(' ');
 };
 
-const normalizePain = (value: string) => {
-  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
-  const withoutLead = trimmed.replace(/^\b(feeling|being|getting)\b\s+/i, '');
-  return shortenPhrase(withoutLead, 4, 'planning stress').toLowerCase();
-};
-
-const normalizeOutcome = (value: string) => {
-  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
-  return shortenPhrase(trimmed, 4, 'dream trip');
-};
-
-const normalizeOffering = (value: string) => {
-  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
-  return shortenPhrase(trimmed, 4, 'our plan');
-};
-
-const normalizeGoal = (value: string) => {
-  const trimmed = sanitize(value).replace(/[.!?,]/g, '');
-  return shortenPhrase(trimmed, 4, 'win bookings');
-};
-
-const toAudiencePlural = (audience: string) => {
-  const trimmed = sanitize(audience);
-  if (!trimmed) return 'travelers';
-  if (trimmed.toLowerCase().endsWith('s')) return trimmed;
-  if (trimmed.toLowerCase().endsWith('y')) {
-    return `${trimmed.slice(0, -1)}ies`;
-  }
-  return `${trimmed}s`;
-};
-
-const ensureMarketingChannels = (channels: string[]) => {
-  if (!channels.length) {
-    return [DEFAULT_MARKETING_CHANNELS[0]];
-  }
-  return channels;
-};
-
-const detectSpeedDescriptor = (context: GeneratorContext) => {
-  const haystack = `${context.notes} ${context.offering} ${context.campaignGoal}`.toLowerCase();
-  if (haystack.includes('24-hour') || haystack.includes('24 hour') || haystack.includes('24hr')) {
-    return '24-hour';
-  }
-  if (haystack.includes('same-day') || haystack.includes('same day')) {
-    return 'same-day';
-  }
-  if (haystack.includes('overnight')) {
-    return 'overnight';
-  }
-  return 'next-day';
-};
-
-const detectAssetNoun = (context: GeneratorContext) => {
-  const haystack = `${context.offering} ${context.notes}`.toLowerCase();
-  if (haystack.includes('blueprint')) return 'blueprint';
-  if (haystack.includes('template')) return 'template';
-  if (haystack.includes('guide')) return 'guide';
-  if (haystack.includes('plan')) return 'plan';
-  if (haystack.includes('map')) return 'map';
-  if (haystack.includes('itinerary')) return 'itinerary';
-  return 'plan';
-};
-
-const buildContext = (request: HookRequest): HookContext => {
-  const pains = request.painPoints.filter((item) => sanitize(item).length > 0);
-  const primaryPain = pains[0] || 'planning stress';
-  const marketingChannels = ensureMarketingChannels(request.marketingChannels);
-
-  const base: GeneratorContext = {
-    audience: sanitize(request.targetAudience) || 'Luxury travelers',
-    audiencePlural: toAudiencePlural(request.targetAudience || 'Luxury traveler'),
-    offering: sanitize(request.offering) || 'concierge team',
-    primaryPain,
-    pains,
-    outcome: sanitize(request.desiredOutcome) || 'dream trip',
-    marketingChannels,
-    tone: sanitize(request.tone) || 'Bold and direct',
-    campaignGoal: sanitize(request.campaignGoal) || 'drive bookings',
-    notes: sanitize(request.additionalNotes),
-  };
-
-  const speedDescriptor = detectSpeedDescriptor(base);
-  const assetNoun = detectAssetNoun(base);
-  const planAsset = `${speedDescriptor} ${assetNoun}`;
-  const painSnippet = normalizePain(base.primaryPain);
-  const outcomeSnippet = normalizeOutcome(base.outcome);
-  const offeringSnippet = normalizeOffering(base.offering);
-  const goalSnippet = normalizeGoal(base.campaignGoal || base.outcome);
-
-  const noteLower = base.notes.toLowerCase();
-  const upgradeCue = noteLower.includes('perk') || noteLower.includes('upgrade')
-    ? 'perks waiting'
-    : 'automatic upgrades';
-
-  const skipCue = noteLower.includes('line') || noteLower.includes('queue')
-    ? 'skip every line'
-    : 'skip lines';
-
-  const stressPromise = `stress-free ${outcomeSnippet}`;
-  const speedVerb =
-    speedDescriptor === '24-hour' ? 'overnight' : speedDescriptor === 'same-day' ? 'same-day' : 'fast';
+const deriveContext = (request: HookRequest): HookContext => {
+  const audience = sanitize(request.targetAudience) || 'growth-focused founders';
+  const pain = request.painPoints.find((point) => sanitize(point).length > 0) || 'losing time repeating answers';
+  const outcome = sanitize(request.desiredOutcome) || 'hit their next growth milestone';
+  const offering = sanitize(request.offering) || 'our system';
 
   return {
-    ...base,
-    callout: `${capitalizeFirst(base.audience)}:`,
-    audiencePluralLower: base.audiencePlural.toLowerCase(),
-    painSnippet,
-    outcomeSnippet,
-    offeringSnippet,
-    goalSnippet,
-    planAsset,
-    stressPromise,
-    upgradeCue,
-    skipCue,
-    speedVerb,
+    audience,
+    shortAudience: shorten(request.targetAudience, 'operators'),
+    pain: shorten(pain, 'stuck in busywork', 6),
+    outcome: shorten(outcome, 'hit their next goal', 6),
+    offering: shorten(offering, 'this playbook', 6)
   };
 };
 
-const buildInsights = (context: HookContext) => {
-  const insights = new Set<string>();
-  insights.add(`Audience: ${capitalizeFirst(context.audiencePlural)}`);
-  insights.add(`Offer: ${capitalizeFirst(context.offeringSnippet)}`);
-  insights.add(`Outcome: ${capitalizeFirst(context.outcomeSnippet)}`);
-  insights.add(`Top pain: ${capitalizeFirst(context.painSnippet)}`);
-  if (context.pains.length > 1) {
-    const rest = context.pains
-      .slice(1)
-      .map((pain) => capitalizeFirst(normalizePain(pain)));
-    if (rest.length) {
-      insights.add(`Also note: ${rest.slice(0, 2).join(', ')}`);
-    }
-  }
-  insights.add(`Goal: ${capitalizeFirst(context.goalSnippet)}`);
-  if (context.notes) {
-    insights.add(
-      `Notes: ${context.notes.length > 70 ? `${context.notes.slice(0, 67)}…` : context.notes}`
-    );
-  }
-  insights.add(`Tone: ${context.tone}`);
-  return Array.from(insights).slice(0, 7);
-};
-
-const countWords = (value: string) => toWords(value).length;
-
-const hasCTAWords = (value: string) => /\b(book|call|click|schedule|consult|consultation)\b/i.test(value);
-
-const hasPassiveVoice = (value: string) => /\b(is being|was being|were being|has been|have been|had been|will be|being)\b/i.test(value);
-
-const hookBlueprints: HookBlueprint[] = [
+const HOOK_TEMPLATES: HookTemplate[] = [
   {
-    id: 'core-callout-speed',
-    style: 'Statement',
+    label: '70-core',
     awareness: 'Problem Aware',
-    label: '70-core',
-    angle: 'Speed',
-    build: (context) =>
-      `${context.callout} ${capitalizeFirst(context.painSnippet)}? Take our ${context.planAsset}.`,
-    rationale: (context) =>
-      `Names ${context.painSnippet} then hands them a ${context.planAsset} so relief feels instant.`,
+    rationale: 'Agitates the pain so relief feels urgent.',
+    build: ({ audience, pain }) => `Still ${pain}? That means ${audience} are stuck in yesterday's systems.`
   },
   {
-    id: 'core-trade-stress',
-    style: 'Statement',
+    label: '70-core',
+    awareness: 'Solution Aware',
+    rationale: 'Shows the path to the promised outcome.',
+    build: ({ shortAudience, outcome }) => `${shortAudience} who ${outcome} start by fixing their first answer-on-demand system.`
+  },
+  {
+    label: '20-adjacent',
+    awareness: 'Completely Unaware',
+    rationale: 'Sparks curiosity for people not yet shopping.',
+    build: ({ pain }) => `What if the question that keeps stealing hours solved itself? ${pain} disappears overnight.`
+  },
+  {
+    label: '20-adjacent',
+    awareness: 'Solution Aware',
+    rationale: 'Shows the path to the promised outcome.',
+    build: ({ audience, offering }) => `${audience} finally have a brain they can copy-paste. ${offering} does the talking.`
+  },
+  {
+    label: '10-experimental',
+    awareness: 'Product Aware',
+    rationale: 'Clarifies why your offer wins the comparison.',
+    build: ({ shortAudience, pain, offering }) => `${shortAudience} still pulling answers from docs? ${offering} replies before Slack even loads.`
+  },
+  {
+    label: '70-core',
     awareness: 'Problem Aware',
-    label: '70-core',
-    angle: 'Stress relief',
-    build: (context) => `${context.callout} Trade ${context.painSnippet} for ${context.stressPromise} now.`,
-    rationale: (context) =>
-      `Contrasts the current stress (${context.painSnippet}) with the promise of ${context.stressPromise}.`,
+    rationale: 'Agitates the pain so relief feels urgent.',
+    build: ({ audience, pain }) => `${audience} lose trust every time they ask "where's that link?" ${pain} is the leak.`
   },
   {
-    id: 'core-outcome-trigger',
-    style: 'Statement',
+    label: '20-adjacent',
+    awareness: 'Completely Unaware',
+    rationale: 'Sparks curiosity for people not yet shopping.',
+    build: ({ outcome }) => `There's a faster way to ${outcome}—it starts by letting answers find your team first.`
+  },
+  {
+    label: '70-core',
     awareness: 'Solution Aware',
-    label: '70-core',
-    angle: 'Transformation',
-    build: (context) => `${context.callout} ${capitalizeFirst(context.outcomeSnippet)} starts once ${context.painSnippet} stops.`,
-    rationale: (context) => `Signals the new reality (${context.outcomeSnippet}) begins when ${context.painSnippet} disappears.`,
+    rationale: 'Shows the path to the promised outcome.',
+    build: ({ offering, outcome }) => `${offering} turns tribal knowledge into a 24/7 coach so your team can ${outcome}.`
   },
   {
-    id: 'core-command-skip',
-    style: 'Command',
-    awareness: 'Solution Aware',
-    label: '70-core',
-    angle: 'Line-skipping',
-    build: (context) => `${context.callout} Skip lines; keep ${context.outcomeSnippet} on schedule.`,
-    rationale: () => 'Turns line-skipping into the opener so the promise is immediate.',
-  },
-  {
-    id: 'core-conditional-plan',
-    style: 'Conditional',
-    awareness: 'Problem Aware',
-    label: '70-core',
-    angle: 'Speed',
-    build: (context) => `If ${context.painSnippet} drains you, grab this ${context.planAsset}.`,
-    rationale: (context) =>
-      `Makes the ${context.planAsset} the obvious fix for anyone stuck in ${context.painSnippet}.`,
-  },
-  {
-    id: 'core-upgrade-signal',
-    style: 'Statement',
-    awareness: 'Product Aware',
-    label: '70-core',
-    angle: 'Upgrades',
-    build: (context) => `${context.callout} Upgrades land once you drop ${context.painSnippet}.`,
-    rationale: (context) => `Links desired perks to eliminating ${context.painSnippet}.`,
-  },
-  {
-    id: 'core-proof',
-    style: 'Statement',
-    awareness: 'Product Aware',
-    label: '70-core',
-    angle: 'Proof',
-    build: (context) => `${context.callout} Clients ditched ${context.painSnippet} and kept ${context.outcomeSnippet}.`,
-    rationale: (context) => `Shows real people escaping ${context.painSnippet} while holding onto ${context.outcomeSnippet}.`,
-  },
-  {
-    id: 'core-plan-vs-tabs',
-    style: 'Statement',
-    awareness: 'Solution Aware',
-    label: '70-core',
-    angle: 'Speed',
-    build: (context) => `${context.callout} ${capitalizeFirst(context.planAsset)} beats endless tabs every time.`,
-    rationale: () => 'Frames the asset as the shortcut compared to chaotic tab-juggling.',
-  },
-  {
-    id: 'core-question-proof',
-    style: 'Question',
-    awareness: 'Product Aware',
-    label: '70-core',
-    angle: 'Proof',
-    build: (context) =>
-      `Why do ${context.audiencePluralLower} trust ${context.offeringSnippet} for ${context.outcomeSnippet}?`,
-    rationale: (context) =>
-      `Uses social proof—others trust ${context.offeringSnippet} to reach ${context.outcomeSnippet}.`,
-  },
-  {
-    id: 'core-stressfree-plan',
-    style: 'Statement',
-    awareness: 'Solution Aware',
-    label: '70-core',
-    angle: 'Stress relief',
-    build: (context) => `${context.callout} Stress-free ${context.outcomeSnippet} lives inside this ${context.planAsset}.`,
-    rationale: (context) => `Pairs the stress-free promise with the tangible ${context.planAsset}.`,
-  },
-  {
-    id: 'core-speed-verb',
-    style: 'Statement',
-    awareness: 'Solution Aware',
-    label: '70-core',
-    angle: 'Speed',
-    build: (context) => `${context.callout} ${capitalizeFirst(context.speedVerb)} planning starts with our ${context.planAsset}.`,
-    rationale: (context) => `Signals how quickly momentum returns once they use the ${context.planAsset}.`,
-  },
-  {
-    id: 'core-upgrade-follow',
-    style: 'Statement',
-    awareness: 'Product Aware',
-    label: '70-core',
-    angle: 'Upgrades',
-    build: (context) => `${context.callout} ${capitalizeFirst(context.upgradeCue)} follow our ${context.offeringSnippet}.`,
-    rationale: () => 'Connects perks to the offer so upgrades feel automatic.',
-  },
-  {
-    id: 'core-queue-command',
-    style: 'Command',
-    awareness: 'Solution Aware',
-    label: '70-core',
-    angle: 'Line-skipping',
-    build: (context) => `${context.callout} Breeze past queues with this ${context.planAsset}.`,
-    rationale: () => 'Invites them to skip queues by deploying the plan asset immediately.',
-  },
-  {
-    id: 'core-goal-link',
-    style: 'Statement',
+    label: '10-experimental',
     awareness: 'Most Aware',
-    label: '70-core',
-    angle: 'Goal tie-in',
-    build: (context) => `${context.callout} ${capitalizeFirst(context.goalSnippet)} needs less ${context.painSnippet}.`,
-    rationale: (context) => `Links the campaign goal to removing ${context.painSnippet}.`,
+    rationale: 'Targets warm audience already sold on you.',
+    build: ({ offering, outcome }) => `You said "yes" to ${offering}—here's how day one delivers ${outcome}.`
   },
   {
-    id: 'adjacent-concierge-script',
-    style: 'Command',
+    label: '20-adjacent',
     awareness: 'Product Aware',
-    label: '20-adjacent',
-    angle: 'Upgrades',
-    build: (context) => `${context.callout} Borrow our concierge script; watch upgrades stack.`,
-    rationale: () => 'Gives a directive that promises visible perks fast.',
-  },
-  {
-    id: 'adjacent-speed-question',
-    style: 'Question',
-    awareness: 'Solution Aware',
-    label: '20-adjacent',
-    angle: 'Speed',
-    build: (context) =>
-      `What if ${context.audiencePluralLower} planned ${context.outcomeSnippet} in minutes?`,
-    rationale: (context) => `Opens a curiosity loop about faster planning toward ${context.outcomeSnippet}.`,
-  },
-  {
-    id: 'adjacent-swap-tabs',
-    style: 'Command',
-    awareness: 'Problem Aware',
-    label: '20-adjacent',
-    angle: 'Stress relief',
-    build: (context) => `${context.callout} Swap midnight spreadsheets for guided ${context.outcomeSnippet}.`,
-    rationale: () => 'Paints the relief of dropping chaotic spreadsheets for a guided path.',
-  },
-  {
-    id: 'adjacent-calm-outcome',
-    style: 'Statement',
-    awareness: 'Solution Aware',
-    label: '20-adjacent',
-    angle: 'Stress relief',
-    build: (context) => `${context.callout} ${capitalizeFirst(context.outcomeSnippet)} without panic lives here.`,
-    rationale: () => 'Promises the desired outcome minus the panic.',
-  },
-  {
-    id: 'adjacent-upgrade-shortcut',
-    style: 'Conditional',
-    awareness: 'Product Aware',
-    label: '20-adjacent',
-    angle: 'Upgrades',
-    build: (context) => `If upgrades matter, our ${context.planAsset} is your shortcut.`,
-    rationale: () => 'Reframes the asset as the lever for people chasing perks.',
-  },
-  {
-    id: 'experimental-story-customs',
-    style: 'Story seed',
-    awareness: 'Completely Unaware',
-    label: '10-experimental',
-    angle: 'Story',
-    build: (context) =>
-      `Story seed: ${capitalizeFirst(context.audiencePluralLower)} breezed past customs with one map.`,
-    rationale: () => 'Teases a vivid story about stress-free travel moments.',
-  },
-  {
-    id: 'experimental-story-upgrades',
-    style: 'Story seed',
-    awareness: 'Completely Unaware',
-    label: '10-experimental',
-    angle: 'Upgrades',
-    build: (context) =>
-      `Story seed: ${capitalizeFirst(context.audiencePluralLower)} cheered when upgrades greeted them.`,
-    rationale: () => 'Hints at a celebration scene to spark curiosity.',
-  },
+    rationale: 'Clarifies why your offer wins the comparison.',
+    build: ({ audience, pain, offering }) => `${audience} hire ${offering} when "check the doc" becomes the slowest answer on the team.`
+  }
 ];
 
-const buildChannelNote = (
-  channels: string[],
-  angle: string,
-  primaryPain: string,
-  outcome: string
-) => {
-  const angleLower = angle.toLowerCase();
-  if (!channels.length) {
-    return `Use this ${angleLower} hook wherever attention is scarce to trade ${primaryPain} for ${outcome}.`;
+const channelNoteFromRequest = (request: HookRequest): string => {
+  if (!Array.isArray(request.marketingChannels) || request.marketingChannels.length === 0) {
+    return DEFAULT_CHANNEL_NOTE;
   }
-
-  if (channels.length === 1) {
-    const channel = channels[0];
-    const info = resolveChannelInfo(channel);
-    return `For your ${info.noun}, lead with the ${angleLower} angle so you ${info.action} while moving from ${primaryPain} to ${outcome}.`;
+  if (request.marketingChannels.includes('Paid Ads')) {
+    return 'Lead with this line in paid placements to stop the scroll.';
   }
-
-  return `Thread this ${angleLower} angle through ${channels.join(', ')} so escaping ${primaryPain} always points to ${outcome}.`;
+  if (request.marketingChannels.includes('Email')) {
+    return 'Use as a subject line or opening sentence to earn the open.';
+  }
+  if (request.marketingChannels.includes('Organic Social')) {
+    return 'Pair with motion or bold typography for social feeds.';
+  }
+  return DEFAULT_CHANNEL_NOTE;
 };
 
-const resolveChannelInfo = (channel?: string) => {
-  switch (channel) {
-    case 'Paid Ads':
-      return { noun: 'paid ad opener', action: 'slow the scroll' };
-    case 'Organic Social':
-      return { noun: 'social hook', action: 'stop the thumb' };
-    case 'Email':
-      return { noun: 'subject line', action: 'earn the open' };
-    case 'Webinar':
-      return { noun: 'webinar intro', action: 'keep viewers logged in' };
-    case 'Landing Page':
-      return { noun: 'hero headline', action: 'anchor the page' };
-    case 'Direct Mail':
-      return { noun: 'mailpiece headline', action: 'jump off the page' };
-    case 'Sales Call':
-      return { noun: 'call opener', action: 'reframe the stakes' };
-    default:
-      return { noun: 'campaign opener', action: 'earn the first five seconds' };
+export const buildSupportingInsights = (request: HookRequest): string[] => {
+  const insights = new Set<string>();
+  if (request.targetAudience) insights.add(`Audience: ${request.targetAudience}`);
+  if (request.offering) insights.add(`Offer: ${request.offering}`);
+  if (request.desiredOutcome) insights.add(`Outcome: ${request.desiredOutcome}`);
+  if (request.painPoints[0]) insights.add(`Pain: ${request.painPoints[0]}`);
+  if (request.campaignGoal) insights.add(`Goal: ${request.campaignGoal}`);
+  return Array.from(insights);
+};
+
+export const verifyHookSet = (hooks: GeneratedHook[], request: HookRequest): HookVerificationResult => {
+  const issues: string[] = [];
+
+  if (!Array.isArray(hooks) || hooks.length === 0) {
+    issues.push('No hooks were returned.');
+    return { passed: false, issues };
   }
-};
 
-const qaPasses = (text: string) => {
-  const wordCount = countWords(text);
-  if (wordCount < 6 || wordCount > 14) return false;
-  if (hasCTAWords(text)) return false;
-  if (hasPassiveVoice(text)) return false;
-  if (/\b(unlock|leverage|synergy|synergies|paradigm|disrupt|innovative solution|cutting-edge|game-changing)\b/i.test(text)) return false;
-  return true;
-};
+  if (hooks.length < MIN_HOOKS_REQUIRED) {
+    issues.push(`Expected ${MIN_HOOKS_REQUIRED} hooks, received ${hooks.length}.`);
+  }
 
-const nextId = (() => {
-  let counter = 0;
-  return () => {
-    counter += 1;
-    return `hook-${counter}`;
+  const seen = new Set<string>();
+  hooks.forEach((hook, index) => {
+    const text = sanitize(hook.text || '');
+    if (!text) {
+      issues.push(`Hook ${index + 1} is empty.`);
+      return;
+    }
+
+    const wordCount = toWords(text).length;
+    if (wordCount < MIN_WORD_COUNT) {
+      issues.push(`Hook ${index + 1} is too short (${wordCount} words).`);
+    }
+
+    if (/[\[\]{}<>]/.test(text)) {
+      issues.push(`Hook ${index + 1} still contains placeholder characters.`);
+    }
+
+    const signature = text.toLowerCase();
+    if (seen.has(signature)) {
+      issues.push(`Hook ${index + 1} duplicates another line.`);
+    } else {
+      seen.add(signature);
+    }
+  });
+
+  const audienceFragment = shorten(request.targetAudience, '').toLowerCase();
+  if (audienceFragment && !hooks.some((hook) => hook.text.toLowerCase().includes(audienceFragment))) {
+    issues.push('None of the hooks reference the target audience.');
+  }
+
+  return {
+    passed: issues.length === 0,
+    issues
   };
-})();
+};
 
-export const generateHooks = (request: HookRequest): GeneratedHook[] => {
-  const context = buildContext(request);
-  const insights = buildInsights(context);
+export const generateFallbackHooks = (request: HookRequest, desiredCount = 20): GeneratedHook[] => {
+  const context = deriveContext(request);
+  const channelNote = channelNoteFromRequest(request);
+  const insights = buildSupportingInsights(request);
 
-  const hooks = hookBlueprints
-    .map((blueprint) => {
-      const text = blueprint.build(context);
-      if (!qaPasses(text)) {
-        return null;
-      }
+  const hooks: GeneratedHook[] = [];
+  let index = 0;
 
-      const channelNote = buildChannelNote(
-        context.marketingChannels,
-        blueprint.angle,
-        context.painSnippet,
-        context.outcomeSnippet
-      );
+  while (hooks.length < desiredCount) {
+    const template = HOOK_TEMPLATES[index % HOOK_TEMPLATES.length];
+    const text = template.build(context);
 
-      const supportingInsights = Array.from(
-        new Set([...insights, `Angle: ${blueprint.angle}`])
-      ).slice(0, 7);
+    hooks.push({
+      id: `fallback-${hooks.length + 1}`,
+      text,
+      type: template.label === '10-experimental' ? 'Idea Starter' : template.label === '20-adjacent' ? 'Angle Shift' : 'Core Statement',
+      awareness: template.awareness,
+      rationale: template.rationale,
+      channelNote,
+      supportingInsights: insights,
+      label: template.label,
+      wordCount: toWords(text).length,
+      angle: null
+    });
 
-      return {
-        id: nextId(),
-        text,
-        type: `${blueprint.style} · ${blueprint.angle}`,
-        awareness: blueprint.awareness,
-        rationale: blueprint.rationale(context),
-        channelNote,
-        supportingInsights,
-        label: blueprint.label,
-        angle: blueprint.angle,
-      } satisfies GeneratedHook;
-    })
-    .filter((hook): hook is GeneratedHook => Boolean(hook));
+    index += 1;
+  }
 
   return hooks;
 };
