@@ -24,9 +24,12 @@ import mammoth from 'mammoth';
 import XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import CloudStorageService from './services/cloudStorage.js';
-import documentProcessor from './services/documents/documentProcessor.js';
+import DocumentProcessor from './services/documents/documentProcessor.js';
 import languageService from './services/documents/LanguageService.js';
 import multilingualProcessor from './services/documents/MultilingualProcessor.js';
+
+// Initialize document processor instance
+const documentProcessor = new DocumentProcessor();
 import LLMRouter from './services/llm/LLMRouter.js';
 import metricsRoutes from './api-metrics-endpoint.js';
 import ChatService from './services/chatService.js';
