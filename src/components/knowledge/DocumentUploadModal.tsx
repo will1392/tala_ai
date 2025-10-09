@@ -245,7 +245,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         ));
 
         const formData = new FormData();
-        formData.append('file', fileStatus.file);
+        formData.append('document', fileStatus.file);
         formData.append('userId', 'admin-1');
         formData.append('isAdmin', 'true');
         
