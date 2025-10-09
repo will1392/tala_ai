@@ -22,6 +22,7 @@ import {
 } from '../../components/ui';
 import { useAuthStore } from '../../store/authStore';
 import { useUserManagementStore } from '../../store/userManagementStore';
+import { adminService } from '../../services/adminService';
 import type {
   AdminTeam,
   ManagedUser,
@@ -157,6 +158,7 @@ export function UserManagement() {
   const [editError, setEditError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [creditsError, setCreditsError] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     if (!feedback) return;
@@ -265,19 +267,13 @@ export function UserManagement() {
     setActiveModal('reset');
   };
 
-  const handleCreateSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setCreateError(null);
 
-    const adminId = createForm.adminId || selectedAdmin?.id || '';
     const trimmedName = createForm.name.trim();
     const trimmedEmail = createForm.email.trim();
     const creditsValue = Number(createForm.credits);
-
-    if (!adminId) {
-      setCreateError('Choose an admin for this user.');
-      return;
-    }
 
     if (!trimmedName) {
       setCreateError('Name is required.');
@@ -294,23 +290,36 @@ export function UserManagement() {
       return;
     }
 
-    const created = createUser(adminId, {
-      name: trimmedName,
-      email: trimmedEmail,
-      role: createForm.role,
-      status: createForm.status,
-      credits: creditsValue
-    });
+    setIsCreating(true);
 
-    if (!created) {
-      setCreateError('Unable to create user. Try again.');
-      return;
+    try {
+      const response = await adminService.createUser({
+        email: trimmedEmail,
+        fullName: trimmedName,
+        role: createForm.role,
+        credits: creditsValue,
+        sendInvite: true
+      });
+
+      if (!response.success || !response.data) {
+        setCreateError(response.error || 'Failed to create user. Please try again.');
+        return;
+      }
+
+      const inviteMessage = response.data.invitationSent 
+        ? ` An invitation email has been sent to ${trimmedEmail}.`
+        : '';
+
+      setFeedback({ 
+        type: 'success', 
+        message: `${response.data.fullName} was created successfully.${inviteMessage}` 
+      });
+      closeModal();
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'An unexpected error occurred.');
+    } finally {
+      setIsCreating(false);
     }
-
-    setSelectedAdminId(adminId);
-    setSelectedUserId(created.id);
-    setFeedback({ type: 'success', message: `${created.name} was added to the team.` });
-    closeModal();
   };
 
   const handleEditSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -670,10 +679,12 @@ export function UserManagement() {
           {createError && <p className="text-sm text-rose-500">{createError}</p>}
 
           <div className="flex items-center justify-end gap-3 pt-2">
-            <Button type="button" variant="ghost" onClick={closeModal}>
+            <Button type="button" variant="ghost" onClick={closeModal} disabled={isCreating}>
               Cancel
             </Button>
-            <Button type="submit">Create user</Button>
+            <Button type="submit" disabled={isCreating}>
+              {isCreating ? 'Creating...' : 'Create user'}
+            </Button>
           </div>
         </form>
       </Modal>
