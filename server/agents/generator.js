@@ -23,11 +23,22 @@ export async function generateHook({
     temperature: temperatureForLabel(label),
     maxTokens: 250
   }).catch((error) => {
-    console.warn('⚠️  Hooksmith chat call failed:', error.message);
+    console.error('❌ Hooksmith chat call failed:', error.message);
+    console.error('Request details:', { avatar, topic, style, awareness, label });
     return '';
   });
 
-  return safeJSON(response);
+  if (!response) {
+    console.error('❌ Empty response from chat API');
+    return null;
+  }
+
+  const parsed = safeJSON(response);
+  if (!parsed) {
+    console.error('❌ Failed to parse response:', response.slice(0, 200));
+  }
+  
+  return parsed;
 }
 
 function buildHormoziSystemPrompt() {
