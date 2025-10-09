@@ -1,5 +1,5 @@
 export const HOOK_RULES = {
-  maxWords: 14,
+  maxWords: 25,
   minWords: 6,
   banCTA: [
     'book',

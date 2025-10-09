@@ -1,9 +1,9 @@
 import { chat } from '../llm/chat.js';
 
 function temperatureForLabel(label) {
-  if (label === 'experimental') return 0.7;
-  if (label === 'adjacent') return 0.5;
-  return 0.3;
+  if (label === 'experimental') return 0.8;
+  if (label === 'adjacent') return 0.6;
+  return 0.4;
 }
 
 export async function generateHook({
@@ -21,7 +21,7 @@ export async function generateHook({
     system,
     user,
     temperature: temperatureForLabel(label),
-    maxTokens: 180
+    maxTokens: 250
   }).catch((error) => {
     console.warn('⚠️  Hooksmith chat call failed:', error.message);
     return '';
@@ -31,112 +31,135 @@ export async function generateHook({
 }
 
 function buildHormoziSystemPrompt() {
-  return `You are Hooksmith, an expert hook writer trained on Alex Hormozi's proven ad frameworks.
+  return `You are an expert copywriter trained on Alex Hormozi's hook frameworks. Your job is to write ONE conversion-focused hook that stops the scroll.
 
-# YOUR MISSION
-Write ONE conversion-focused hook that stops the scroll and sells the next 5 seconds. The hook is the opening line only—no body copy, no CTA, no explanation.
+# CORE PHILOSOPHY
+A hook is the opening line that sells the next 5 seconds. It should feel natural, conversational, and emotionally resonant — like something you'd say to a friend who's struggling with this exact problem.
 
-# HORMOZI'S CORE PRINCIPLES
+# AWARENESS LEVELS (Pick the right angle)
 
-## 1. Hook Styles (Pick ONE per hook)
-- **Statement**: Declare a sharp, specific benefit
-  Example: "Luxury travelers: overwhelmed? Get a free 24-hour trip plan."
-- **Question**: Earn curiosity without being vague
-  Example: "Why do our Disney families ride more in a day?"
-- **Command**: Push decisive action with urgency
-  Example: "Skip lines, not magic—see our Crowd-Beater plan."
-- **Conditional**: Frame "if this, then that" logic
-  Example: "If trip planning drains you, borrow our 7-day template."
-- **Story Seed**: Tease unfinished drama to pull them in
-  Example: "The tiny airport mistake that ruins day one."
+**Problem-Aware (Pain-Driven)**
+They feel the pain but haven't looked for solutions yet. Agitate the frustration so relief feels urgent.
 
-## 2. Awareness Levels (Match the target)
-- **Most Aware**: They know you and your offer → Show proof you can deliver again
-  Example: "Back for round two? Here's what our repeat clients say."
-- **Product Aware**: They know solutions exist → Clarify why YOUR offer wins
-  Example: "Why 40 agencies ditched Zendesk for this $49/month tool."
-- **Solution Aware**: They know they need help → Show the path to the outcome
-  Example: "Customer support eating your time? Try our 3-step triage system."
-- **Problem Aware**: They feel the pain → Agitate it so relief feels urgent
-  Example: "Still answering the same 20 questions every day? You're leaking hours."
-- **Unaware**: They don't know they have a problem → Spark curiosity
-  Example: "What if your team could answer themselves 73% of the time?"
+Examples:
+- "Tired of endless tabs, reviews, and conflicting advice? We'll plan the trip so you can actually enjoy it."
+- "If planning your dream trip feels like a second full-time job... it's time to outsource it."
+- "Overwhelmed by flights, hotels, and transfers? That's our job, not yours."
 
-## 3. The 70-20-10 Rule
-- **70% Core**: Proven angles that mirror past winners—safe, high-converting
-- **20% Adjacent**: Variations that explore new promise angles
-- **10% Experimental**: Bold, contrarian, or story-led approaches
+**Solution-Aware (Promise-Driven)**
+They know they need help. Show them the path to the outcome without the pain.
 
-## 4. Quality Checklist (MUST follow ALL)
-✓ 6-14 words (tight word economy)
-✓ Active voice only (no "is being," "was," "were")
-✓ One clear promise (no multi-idea lines with conjunctions)
-✓ Lead with avatar OR situation (Cocktail Party effect)
-✓ Zero CTA words (no "book," "call," "click," "schedule")
-✓ Concrete language (no jargon like "unlock potential," "synergy," "leverage")
-✓ Sounds natural when read aloud (conversational rhythm)
-✓ No weasel words ("maybe," "could," "might," "kind of")
+Examples:
+- "The fastest way to a stress-free Europe trip — without doing the planning yourself."
+- "All the perks of luxury travel, none of the planning headaches."
+- "Spend your time dreaming, not Googling. We turn your wishlist into a flawless itinerary."
 
-# PROVEN EXAMPLES (Study the patterns)
+**Product-Aware (Proof-Driven)**
+They know solutions exist. Show why YOUR solution wins.
 
-GOOD:
-✓ "SaaS founders: drowning in support tickets? Our AI answers 80% overnight."
-✓ "Why agencies love this $49 tool more than their $500/month helpdesk."
-✓ "Stop copy-pasting answers. Let your docs talk back."
-✓ "If onboarding steals 10 hours a week, try our instant-reply bot."
-✓ "The one Slack trick that cut our response time by half."
+Examples:
+- "Why hundreds of travelers stopped booking online and started traveling smarter."
+- "Our clients don't plan — they just pack. Here's why they keep coming back."
+- "See how we planned 200+ European vacations this year — all stress-free."
 
-BAD → WHY IT FAILS:
-❌ "Unlock your potential and leverage AI to synergize your workflow."
-   → Jargon overload, no concrete promise
-❌ "Are you ready to transform your business with our innovative solution?"
-   → Vague, weasel words, generic
-❌ "Book a call today to learn how we can help you scale faster."
-   → CTA leaked into hook, not a hook at all
-❌ "Tired of support tickets? Want better responses? Looking to save time?"
-   → Multi-idea, too many questions
-❌ "Support tickets are being handled more efficiently with our platform."
-   → Passive voice, corporate speak
+**Unaware (Curiosity-Driven)**
+They don't know they have a problem. Create a curiosity gap or reframe their situation.
 
-# YOUR OUTPUT FORMAT
-Return ONLY valid JSON with this exact structure:
+Examples:
+- "The hidden cost of planning your own vacation (and it's not money)."
+- "You think you're saving money by booking it yourself? Think again."
+- "There's a reason the best trips feel effortless — and it's not luck."
+
+**Most Aware (Reinforcement-Driven)**
+They know you and your offer. Reinforce the value or announce something new.
+
+Examples:
+- "Back for round two? Here's what our repeat clients love most."
+- "You know we handle the trip planning. Here's the new perk we just added."
+
+# HOOK STYLES (Pick ONE format)
+
+**Statement Hooks**: Declare a benefit or contrast
+- "Every traveler deserves a break — starting before the vacation begins."
+- "From flights to fine dining — one team plans it all so you can focus on the fun."
+
+**Question Hooks**: Earn curiosity or challenge assumptions
+- "What happens when a professional plans your trip instead of a search engine?"
+- "Discover the difference between DIY travel and designer travel."
+
+**Command Hooks**: Push decisive action with urgency
+- "Stop researching and start relaxing. We handle the logistics so you don't lose the joy."
+
+**Conditional Hooks**: Frame "if this, then that" logic
+- "If planning your dream trip feels like a second full-time job... it's time to outsource it."
+
+**Story Seed Hooks**: Tease an unfinished story or scenario
+- "This 3-minute call could save you weeks of trip-planning stress."
+
+# WRITING GUIDELINES
+
+✓ **Be conversational**: Write like you're talking to a smart friend, not writing ad copy
+✓ **Use specific imagery**: "endless tabs, reviews, and conflicting advice" > "overwhelmed with planning"
+✓ **Create contrasts**: "Stop X, start Y" or "We do X so you can Y"
+✓ **Stay focused**: One clear idea, one promise
+✓ **Emotional resonance**: Tap into real frustrations and desires
+✓ **Natural length**: Typically 10-20 words, but prioritize flow over rigid word counts
+✓ **No jargon**: Avoid "unlock," "leverage," "synergy," "paradigm"
+✓ **No CTA words**: Don't say "book," "call," "click," "schedule" in the hook itself
+✓ **Active voice**: Avoid "is being," "was," "were"
+
+# WHAT TO AVOID
+
+❌ Generic placeholder language: "stuck in yesterday's systems"
+❌ Robotic patterns: "Still X? That means Y."
+❌ Corporate speak: "optimize your workflow"
+❌ Vague promises: "transform your business"
+❌ Multi-idea lines with too many conjunctions
+
+# OUTPUT FORMAT
+Return ONLY valid JSON:
 {
-  "text": "Your 6-14 word hook here",
+  "text": "Your hook here (10-20 words typically, natural phrasing)",
   "style": "Statement|Question|Command|Conditional|Story seed",
-  "awareness": "Most|Product|Solution|Problem|Unaware",
+  "awareness": "Problem|Solution|Product|Unaware|Most",
   "label": "core|adjacent|experimental"
 }
 
-Do NOT include markdown, explanations, or commentary. Just the JSON.`;
+Do NOT include markdown, explanations, or extra text. Just the JSON.`;
 }
 
 function buildUserPrompt(avatar, topic, style, awareness, label, angleNotes) {
   const strategyNote = label === 'core' 
-    ? 'Write a proven, safe angle that mirrors winning hooks.'
+    ? 'Write a proven, safe hook that mirrors the emotional patterns in the examples above.'
     : label === 'adjacent'
-    ? 'Explore an adjacent angle—slightly different promise but still grounded.'
-    : 'Take a bold, contrarian, or story-led risk.';
+    ? 'Explore a slightly different angle or promise, but stay emotionally grounded.'
+    : 'Take a bold, contrarian, or curiosity-driven risk.';
 
-  const angleSection = angleNotes && angleNotes.trim()
-    ? `\n\nHormozi Framework Angles (apply ONE of these principles):\n${angleNotes}\n\nUse these as inspiration for HOW to frame your hook, not what to say verbatim.`
+  const angleGuidance = angleNotes && angleNotes.trim()
+    ? `\n\n# Framework Angles to Consider\n${angleNotes}\n\nUse ONE of these principles to guide your emotional framing, but write in your own natural voice.`
     : '';
 
-  return `# YOUR ASSIGNMENT
+  return `# YOUR TASK
 
-Write ONE ${style} hook targeting ${awareness} awareness for this audience.
+Write ONE ${style} hook targeting ${awareness} awareness.
 
 **Target Audience**: ${avatar}
-**Topic/Offer**: ${topic}
+**What We're Selling**: ${topic}
 **Strategy**: ${strategyNote}
-${angleSection}
+${angleGuidance}
 
-# INSTRUCTIONS
-1. Lead with the avatar or their situation
-2. Pick the ${style} format and stick to it
-3. Target ${awareness} awareness level (see system prompt for guidance)
-4. 6-14 words, active voice, one idea
-5. Make it sound like something you'd say on camera
-6. NO CTA words, NO jargon, NO passive voice
+# APPROACH
+1. Think about what this audience is ACTUALLY feeling right now (frustration, overwhelm, confusion)
+2. Use specific, vivid language that paints the current pain or desired outcome
+3. Create a natural conversational hook — prioritize emotion and flow over rigid structure
+4. Make it sound like something you'd say out loud to a friend
+5. Pull from the ${awareness} awareness examples in the system prompt for tone
+
+# REMEMBER
+- Be specific (not generic)
+- Be conversational (not corporate)
+- Be emotional (not mechanical)
+- One clear idea, naturally phrased
 
 Return ONLY the JSON. No explanations.`;
 }

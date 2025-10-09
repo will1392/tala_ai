@@ -18,10 +18,6 @@ export function critic(raw) {
     return { ok: false, reason: 'cliche' };
   }
 
-  if (/,|;/.test(text) && /\sand\s/i.test(text)) {
-    return { ok: false, reason: 'multi-idea' };
-  }
-
   for (const { bad, fixed } of BAD_TO_FIXED) {
     const snippet = bad.toLowerCase().slice(0, Math.min(18, bad.length));
     if (lower.includes(snippet)) {
@@ -29,7 +25,7 @@ export function critic(raw) {
     }
   }
 
-  if (/\bis being\b|\bwas\b|\bwere\b/.test(lower)) {
+  if (/\bis being\b/.test(lower)) {
     return { ok: false, reason: 'passive' };
   }
 
