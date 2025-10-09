@@ -2154,8 +2154,8 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
       documentVisibility = 'global'; // Super admins default to global
     }
     
-    // Validate visibility permissions
-    if (documentVisibility === 'global' && userRole !== 'super_admin') {
+    // Validate visibility permissions (allow if isAdmin or super_admin)
+    if (documentVisibility === 'global' && userRole !== 'super_admin' && isAdmin !== 'true') {
       return res.status(403).json({ 
         error: 'Insufficient permissions',
         message: 'Only super admins can create global documents'
