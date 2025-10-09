@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileText, Download, ExternalLink, Search, Copy, Eye, Loader2 } from 'lucide-react';
+import { X, FileText, Download, ExternalLink, Search, Copy, Eye, Loader2, FileAudio, Link } from 'lucide-react';
 import { Button } from '../shared/Button';
 import { cn } from '../../utils/cn';
 
@@ -9,6 +9,10 @@ interface DocumentReference {
   type: 'document' | 'website';
   score?: number;
   documentId?: string;
+  fileUrl?: string;
+  mediaType?: string;
+  audioDuration?: number;
+  audioConfidence?: number;
 }
 
 interface DocumentContent {
@@ -20,8 +24,19 @@ interface DocumentContent {
     uploadedAt?: string;
     pages?: number;
     author?: string;
+    mediaType?: string;
+    audioDuration?: number;
+    audioConfidence?: number;
+    audioLanguage?: string;
   };
   url?: string;
+  fileUrl?: string;
+  transcription?: {
+    text: string;
+    language?: string;
+    duration?: number;
+    confidence?: number;
+  } | null;
 }
 
 interface ReferenceDocumentModalProps {
@@ -180,7 +195,9 @@ export const ReferenceDocumentModal = ({ isOpen, onClose, reference }: Reference
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-white/10">
               <div className="flex items-center gap-3">
-                {reference?.type === 'document' ? (
+                {reference?.mediaType === 'audio' ? (
+                  <FileAudio size={24} className="text-primary" />
+                ) : reference?.type === 'document' ? (
                   <FileText size={24} className="text-primary" />
                 ) : (
                   <ExternalLink size={24} className="text-primary" />
@@ -190,7 +207,7 @@ export const ReferenceDocumentModal = ({ isOpen, onClose, reference }: Reference
                     {reference?.title || 'Document'}
                   </h2>
                   {documentContent?.metadata && (
-                    <div className="flex items-center gap-4 text-sm text-white/60 mt-1">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-white/60 mt-1">
                       {documentContent.metadata.fileType && (
                         <span>{documentContent.metadata.fileType.toUpperCase()}</span>
                       )}
@@ -199,6 +216,18 @@ export const ReferenceDocumentModal = ({ isOpen, onClose, reference }: Reference
                       )}
                       {documentContent.metadata.pages && (
                         <span>{documentContent.metadata.pages} pages</span>
+                      )}
+                      {(documentContent.metadata.mediaType === 'audio' || reference?.mediaType === 'audio') && (
+                        <span className="flex items-center gap-1 text-emerald-300">
+                          <FileAudio size={14} />
+                          Audio Clip
+                        </span>
+                      )}
+                      {documentContent.metadata.audioDuration && (
+                        <span>{Math.round(documentContent.metadata.audioDuration)}s</span>
+                      )}
+                      {typeof documentContent.metadata.audioConfidence === 'number' && (
+                        <span>{Math.round((documentContent.metadata.audioConfidence || 0) * 100)}% confidence</span>
                       )}
                     </div>
                   )}
@@ -279,7 +308,41 @@ export const ReferenceDocumentModal = ({ isOpen, onClose, reference }: Reference
                   </div>
                 </div>
               ) : documentContent ? (
-                <div className="h-full overflow-y-auto p-6">
+                <div className="h-full overflow-y-auto p-6 space-y-6">
+                  {documentContent.metadata?.mediaType === 'audio' && documentContent.fileUrl && (
+                    <div className="p-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10">
+                      <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                        <FileAudio size={18} />
+                        Original audio clip
+                      </div>
+                      <audio controls src={documentContent.fileUrl} className="w-full mt-3 rounded">
+                        Your browser does not support the audio element.
+                      </audio>
+                      <div className="mt-3 grid gap-2 text-sm text-white/70 sm:grid-cols-2">
+                        {documentContent.metadata?.audioDuration && (
+                          <span>Duration: {Math.round(documentContent.metadata.audioDuration)} seconds</span>
+                        )}
+                        {documentContent.metadata?.audioLanguage && (
+                          <span>Language: {documentContent.metadata.audioLanguage.toUpperCase()}</span>
+                        )}
+                        {typeof documentContent.metadata?.audioConfidence === 'number' && (
+                          <span>
+                            Confidence: {Math.round((documentContent.metadata.audioConfidence || 0) * 100)}%
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-4 inline-flex items-center gap-2 text-emerald-200 hover:text-emerald-100"
+                        onClick={() => window.open(documentContent.fileUrl, '_blank')}
+                      >
+                        <Link size={14} />
+                        Open audio in new tab
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="prose prose-invert max-w-none">
                     {formatContent(documentContent.content)}
                   </div>

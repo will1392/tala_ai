@@ -399,7 +399,7 @@ async function generateEmbedding(text) {
 
 async function extractTextFromFile(buffer, mimetype, filename) {
   console.log(`🔍 Processing document ${filename} (${mimetype}, ${buffer.length} bytes)`);
-  
+
   try {
     // Use the new document processor for all document types
     const result = await documentProcessor.processDocument({
@@ -428,6 +428,55 @@ async function extractTextFromFile(buffer, mimetype, filename) {
     });
     throw new Error(`Failed to extract text from ${filename}: ${error.message}`);
   }
+}
+
+async function transcribeAudioFile(file) {
+  if (!file?.buffer || !file.mimetype?.startsWith('audio/')) {
+    throw new Error('Provided file is not a valid audio buffer');
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured for audio transcription');
+  }
+
+  if (file.size > 25 * 1024 * 1024) {
+    throw new Error('Audio file exceeds 25MB transcription limit');
+  }
+
+  const audioStream = Readable.from(file.buffer);
+  audioStream.path = file.originalname;
+
+  const transcription = await openai.audio.transcriptions.create({
+    file: audioStream,
+    model: 'gpt-4o-mini-transcribe',
+    response_format: 'verbose_json'
+  });
+
+  let averageConfidence;
+  if (Array.isArray(transcription.segments) && transcription.segments.length > 0) {
+    const confidences = transcription.segments
+      .map(segment => segment.confidence)
+      .filter(value => typeof value === 'number');
+
+    if (confidences.length > 0) {
+      averageConfidence = confidences.reduce((sum, value) => sum + value, 0) / confidences.length;
+    }
+  }
+
+  return {
+    text: transcription.text || '',
+    language: transcription.language,
+    duration: transcription.duration,
+    confidence: averageConfidence,
+    segments: Array.isArray(transcription.segments)
+      ? transcription.segments.map(segment => ({
+          start: segment.start,
+          end: segment.end,
+          text: segment.text,
+          confidence: segment.confidence
+        }))
+      : []
+  };
 }
 
 function createChunks(text, chunkSize = 150, overlap = 25) {
@@ -2149,21 +2198,24 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
     // Ensure collection exists
     await ensureCollectionExists(collectionName);
     
-    // Save original file for PDFs
+    const isPdf = file.mimetype === 'application/pdf';
+    const isAudio = file.mimetype.startsWith('audio/');
+    const shouldStoreOriginalFile = isPdf || isAudio;
+
+    // Save original file for supported media types (PDF, audio)
     let fileUrl = null;
     let storageProvider = process.env.STORAGE_TYPE || 'local';
     let storageKey = null;
     console.log(`📁 Storage provider: ${storageProvider}`);
-    console.log(`📁 Checking mimetype: "${file.mimetype}" === "application/pdf"? ${file.mimetype === 'application/pdf'}`);
-    
-    if (file.mimetype === 'application/pdf') {
-      const filename = `${documentId}-${file.originalname}`;
+    console.log(`📁 Checking mimetype: "${file.mimetype}" - store original? ${shouldStoreOriginalFile}`);
+
+    if (shouldStoreOriginalFile) {
       console.log(`📁 File buffer size: ${file.buffer.length} bytes`);
       
       // ALWAYS use S3 - NO LOCAL FALLBACK
       if (storageProvider !== 's3') {
         console.error(`❌ Invalid storage configuration: ${storageProvider}. S3 is required.`);
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Storage configuration error',
           details: 'System must be configured for S3 storage. Local storage is not supported.',
           storageType: storageProvider,
@@ -2173,11 +2225,11 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
           }
         });
       }
-      
+
       // Check if S3 credentials are configured
       if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_S3_BUCKET) {
         console.error(`❌ S3 configuration missing required credentials`);
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'S3 configuration incomplete',
           details: 'AWS credentials or S3 bucket not configured',
           troubleshooting: {
@@ -2187,7 +2239,7 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
           }
         });
       }
-      
+
       try {
         // Upload to S3 - NO FALLBACK
         const uploadResult = await cloudStorage.uploadFile(
@@ -2196,8 +2248,8 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
           file.mimetype,
           documentId
         );
-        
-        console.log(`✅ PDF uploaded to S3: ${uploadResult.url}`);
+
+        console.log(`✅ File uploaded to S3: ${uploadResult.url}`);
         fileUrl = uploadResult.url;
         storageKey = uploadResult.key; // Use the full S3 key including documents/ prefix
         
@@ -2222,7 +2274,7 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
         });
         
         // Return detailed error to frontend
-        return res.status(500).json({ 
+        return res.status(500).json({
           error: 'Failed to upload document to cloud storage',
           details: saveError.message,
           code: saveError.code || 'S3_UPLOAD_FAILED',
@@ -2235,38 +2287,69 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
         });
       }
     } else {
-      console.log(`⚠️ File is not a PDF, mimetype: ${file.mimetype}`);
+      console.log(`⚠️ File type does not require original storage, mimetype: ${file.mimetype}`);
     }
 
-    // Process document with visual analysis support
-    console.log('📄 About to process document:', {
-      hasBuffer: !!file.buffer,
-      bufferLength: file.buffer?.length,
-      isBuffer: Buffer.isBuffer(file.buffer),
-      mimetype: file.mimetype,
-      filename: file.originalname
-    });
-    
-    const processedDoc = await documentProcessor.processDocument({
-      buffer: file.buffer,
-      mimetype: file.mimetype,
-      filename: file.originalname // Fixed: use 'filename' instead of 'originalname'
-    }, {
-      chunkSize: 1000,
-      extractImages: true,
-      documentType: category // Use category as hint for document type
-    });
-    
-    console.log('🔍 Processed document result:', {
-      hasText: !!processedDoc.text,
-      textLength: processedDoc.text?.length || 0,
-      hasContent: !!processedDoc.content,
-      contentLength: processedDoc.content?.length || 0,
-      success: processedDoc.success,
-      metadata: processedDoc.metadata
-    });
-    
-    const text = processedDoc.text || processedDoc.content; // Support both property names
+    let processedDoc;
+    let text;
+    let transcriptionResult = null;
+
+    if (isAudio) {
+      console.log('🎧 Processing audio document for transcription');
+      try {
+        transcriptionResult = await transcribeAudioFile(file);
+      } catch (transcriptionError) {
+        console.error('❌ Audio transcription failed:', transcriptionError);
+        return res.status(500).json({
+          error: 'Failed to transcribe audio',
+          details: transcriptionError.message
+        });
+      }
+
+      text = transcriptionResult.text;
+      processedDoc = {
+        type: 'audio',
+        text,
+        content: text,
+        chunks: createChunks(text, 180, 40),
+        metadata: {
+          language: transcriptionResult.language,
+          duration: transcriptionResult.duration,
+          confidence: transcriptionResult.confidence,
+          segments: transcriptionResult.segments
+        }
+      };
+    } else {
+      // Process document with visual analysis support
+      console.log('📄 About to process document:', {
+        hasBuffer: !!file.buffer,
+        bufferLength: file.buffer?.length,
+        isBuffer: Buffer.isBuffer(file.buffer),
+        mimetype: file.mimetype,
+        filename: file.originalname
+      });
+
+      processedDoc = await documentProcessor.processDocument({
+        buffer: file.buffer,
+        mimetype: file.mimetype,
+        filename: file.originalname // Fixed: use 'filename' instead of 'originalname'
+      }, {
+        chunkSize: 1000,
+        extractImages: true,
+        documentType: category // Use category as hint for document type
+      });
+
+      console.log('🔍 Processed document result:', {
+        hasText: !!processedDoc.text,
+        textLength: processedDoc.text?.length || 0,
+        hasContent: !!processedDoc.content,
+        contentLength: processedDoc.content?.length || 0,
+        success: processedDoc.success,
+        metadata: processedDoc.metadata
+      });
+
+      text = processedDoc.text || processedDoc.content; // Support both property names
+    }
     
     if (!text || text.trim().length === 0) {
       // For visual documents, we might still want to store them even without text
@@ -2284,22 +2367,31 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
       return res.status(400).json({ error: 'Failed to create chunks from document' });
     }
 
+    const mediaType = isAudio ? 'audio' : (processedDoc.type || 'document');
+    const hasVisualContent = !isAudio && (processedDoc.type === 'visual' || processedDoc.type === 'hybrid');
+
     // Process chunks in batches
     const batchSize = 10;
     const points = [];
-    
+
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize);
-      
+
       // Generate embeddings for batch
       const embeddingPromises = batch.map(chunk => generateEmbedding(chunk.content));
       const embeddings = await Promise.all(embeddingPromises);
-      
+
       // Create vector points
       batch.forEach((chunk, batchIndex) => {
+        const embeddingVector = embeddings[batchIndex];
+        if (!embeddingVector) {
+          console.warn('⚠️  Skipping chunk due to missing embedding vector');
+          return;
+        }
+
         points.push({
           id: uuidv4(), // Use a fresh UUID for each point
-          vector: embeddings[batchIndex],
+          vector: embeddingVector,
           payload: {
             documentId,
             chunkId: chunk.id,
@@ -2321,14 +2413,19 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
               userRole: userRole,
               // Visual document metadata
               documentType: processedDoc.type,
+              mediaType,
+              audioLanguage: transcriptionResult?.language || null,
+              audioDuration: transcriptionResult?.duration || null,
+              audioConfidence: transcriptionResult?.confidence || null,
               visualElements: processedDoc.visualContent?.elements || [],
               extractedEntities: processedDoc.entities || {},
-              hasVisualContent: processedDoc.type === 'visual' || processedDoc.type === 'hybrid',
+              hasVisualContent,
               visualAnalysis: processedDoc.visualContent?.analysis || null
             },
             document: {
               originalName: file.originalname,
               fileType: file.mimetype,
+              mediaType,
               uploadedAt: new Date().toISOString(),
               fileSize: file.size,
               userId: userId,
@@ -2337,7 +2434,12 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
               storageProvider: storageProvider,
               storageKey: storageKey,
               visibility: documentVisibility,
-              organizationId: organizationId
+              organizationId: organizationId,
+              audio: transcriptionResult ? {
+                language: transcriptionResult.language,
+                duration: transcriptionResult.duration,
+                confidence: transcriptionResult.confidence
+              } : null
             }
           }
         });
@@ -2382,12 +2484,21 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
       visibility: documentVisibility,
       organizationId: organizationId,
       uploadedByRole: userRole,
-      // Include visual analysis results
+      // Include media analysis results
       documentType: processedDoc.type,
-      hasVisualContent: processedDoc.type === 'visual' || processedDoc.type === 'hybrid',
-      visualElements: processedDoc.visualContent?.elements?.length || 0,
+      mediaType,
+      fileUrl,
+      hasVisualContent,
+      visualElements: hasVisualContent ? (processedDoc.visualContent?.elements?.length || 0) : 0,
       extractedEntities: processedDoc.entities || {},
-      summary: processedDoc.visualContent?.analysis || null
+      summary: processedDoc.visualContent?.analysis || null,
+      transcription: transcriptionResult ? {
+        text: transcriptionResult.text,
+        language: transcriptionResult.language,
+        duration: transcriptionResult.duration,
+        confidence: transcriptionResult.confidence,
+        segments: transcriptionResult.segments
+      } : null
     });
     
   } catch (error) {
@@ -2480,7 +2591,11 @@ app.post('/api/chat', authenticate, requireCredits('chat_ai'), asyncHandler(asyn
       content: result.payload.content,
       title: result.payload.metadata?.title || 'Unknown Document',
       score: result.score,
-      documentId: result.payload.documentId
+      documentId: result.payload.documentId,
+      fileUrl: result.payload.document?.fileUrl,
+      mediaType: result.payload.metadata?.mediaType || result.payload.document?.mediaType,
+      audioDuration: result.payload.metadata?.audioDuration || result.payload.document?.audio?.duration,
+      audioConfidence: result.payload.metadata?.audioConfidence || result.payload.document?.audio?.confidence
     }));
     
     const context = contextChunks
@@ -2722,7 +2837,11 @@ ${context || 'No relevant documents found in the knowledge base.'}`;
       title: chunk.title,
       type: 'document',
       score: chunk.score,
-      documentId: chunk.documentId
+      documentId: chunk.documentId,
+      fileUrl: chunk.fileUrl,
+      mediaType: chunk.mediaType,
+      audioDuration: chunk.audioDuration,
+      audioConfidence: chunk.audioConfidence
     }));
     
     console.log(`✅ Generated AI response (${aiResponse?.length} chars) with ${sources.length} sources`);
@@ -3461,7 +3580,12 @@ app.get('/api/documents/:documentId', async (req, res) => {
             pages: firstChunk.metadata?.pages,
             author: firstChunk.metadata?.author,
             category: firstChunk.metadata?.category,
-            tags: firstChunk.metadata?.tags || []
+            tags: firstChunk.metadata?.tags || [],
+            mediaType: firstChunk.metadata?.mediaType || firstChunk.document?.mediaType,
+            audioDuration: firstChunk.metadata?.audioDuration || firstChunk.document?.audio?.duration,
+            audioConfidence: firstChunk.metadata?.audioConfidence || firstChunk.document?.audio?.confidence,
+            audioLanguage: firstChunk.metadata?.audioLanguage || firstChunk.document?.audio?.language,
+            fileUrl: firstChunk.document?.fileUrl
           };
           
           // Format file size
@@ -3489,11 +3613,23 @@ app.get('/api/documents/:documentId', async (req, res) => {
     
     console.log(`✅ Found document: ${documentMetadata.title} (${documentContent.length} chars)`);
     
-    res.json({
+    const response = {
       title: documentMetadata.title,
       content: documentContent,
-      metadata: documentMetadata
-    });
+      metadata: documentMetadata,
+      fileUrl: documentMetadata.fileUrl
+    };
+    
+    // Include transcription info if this is an audio file
+    if (documentMetadata.mediaType === 'audio') {
+      response.transcription = {
+        language: documentMetadata.audioLanguage,
+        duration: documentMetadata.audioDuration,
+        confidence: documentMetadata.audioConfidence
+      };
+    }
+    
+    res.json(response);
     
   } catch (error) {
     console.error('📄 Document fetch error:', error);

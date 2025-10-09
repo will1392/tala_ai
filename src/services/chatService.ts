@@ -5,11 +5,15 @@ export interface ChatMessage {
   content: string;
   sender: 'user' | 'tala';
   timestamp: Date;
-  sources?: Array<{ 
-    title: string; 
+  sources?: Array<{
+    title: string;
     type: 'document' | 'website';
     score?: number;
     documentId?: string;
+    fileUrl?: string;
+    mediaType?: string;
+    audioDuration?: number;
+    audioConfidence?: number;
   }>;
   attachments?: Array<{ name: string; size: string; type: string }>;
   isLoading?: boolean;
@@ -23,6 +27,10 @@ export interface ChatResponse {
     type: 'document';
     score: number;
     documentId: string;
+    fileUrl?: string;
+    mediaType?: string;
+    audioDuration?: number;
+    audioConfidence?: number;
   }>;
   contextUsed: boolean;
   conversationId: string;

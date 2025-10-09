@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bot, Copy, ThumbsUp, ThumbsDown, FileText, ExternalLink } from 'lucide-react';
+import { User, Bot, Copy, ThumbsUp, ThumbsDown, FileText, ExternalLink, FileAudio } from 'lucide-react';
 import { GlassCard } from '../layout/GlassCard';
 import { Button } from '../shared/Button';
 import { cn } from '../../utils/cn';
@@ -12,11 +12,15 @@ interface Message {
   content: string;
   sender: 'user' | 'tala' | 'system';
   timestamp: Date;
-  sources?: Array<{ 
-    title: string; 
+  sources?: Array<{
+    title: string;
     type: 'document' | 'website';
     score?: number;
     documentId?: string;
+    fileUrl?: string;
+    mediaType?: string;
+    audioDuration?: number;
+    audioConfidence?: number;
   }>;
   attachments?: Array<{ name: string; size: string; type: string }>;
   isAnnouncement?: boolean;
@@ -29,11 +33,15 @@ interface ChatMessageProps {
 export const ChatMessage = ({ message }: ChatMessageProps) => {
   const isUser = message.sender === 'user';
   const isSystem = message.sender === 'system';
-  const [selectedReference, setSelectedReference] = useState<{ 
-    title: string; 
+  const [selectedReference, setSelectedReference] = useState<{
+    title: string;
     type: 'document' | 'website';
     score?: number;
     documentId?: string;
+    fileUrl?: string;
+    mediaType?: string;
+    audioDuration?: number;
+    audioConfidence?: number;
   } | null>(null);
   const [showReferenceModal, setShowReferenceModal] = useState(false);
 
@@ -154,7 +162,9 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
                       onClick={() => handleReferenceClick(source)}
                       className="flex items-center gap-2 text-xs text-primary hover:text-primary-light transition-colors hover:bg-white/5 rounded px-2 py-1 -mx-2"
                     >
-                      {source.type === 'document' ? (
+                      {source.mediaType === 'audio' ? (
+                        <FileAudio size={14} />
+                      ) : source.type === 'document' ? (
                         <FileText size={14} />
                       ) : (
                         <ExternalLink size={14} />
@@ -163,6 +173,11 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
                       {source.score && (
                         <span className="text-xs text-gray-500 dark:text-white/40 ml-auto" title="Relevance score">
                           {Math.round(source.score * 100)}%
+                        </span>
+                      )}
+                      {source.mediaType === 'audio' && source.audioDuration && (
+                        <span className="text-xs text-emerald-400 ml-2" title="Audio duration">
+                          {Math.round(source.audioDuration)}s
                         </span>
                       )}
                     </button>

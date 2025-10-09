@@ -65,6 +65,11 @@ interface Message {
     title: string;
     type: string;
     score: number;
+    documentId?: string;
+    fileUrl?: string;
+    mediaType?: string;
+    audioDuration?: number;
+    audioConfidence?: number;
   }>;
   failed?: boolean;
   retrying?: boolean;

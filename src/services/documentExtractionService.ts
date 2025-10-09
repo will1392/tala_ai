@@ -64,7 +64,20 @@ export class DocumentExtractionService {
       category?: string;
       tags?: string[];
     }
-  ): Promise<{ success: boolean; results: any[]; error?: string }> {
+  ): Promise<{ success: boolean; results: Array<{
+    fileName: string;
+    success: boolean;
+    documentId: string;
+    chunksStored: number;
+    mediaType?: string;
+    fileUrl?: string | null;
+    transcription?: {
+      text: string;
+      language?: string;
+      duration?: number;
+      confidence?: number;
+    } | null;
+  }>; error?: string }> {
     try {
       const results = [];
       
@@ -100,7 +113,15 @@ export class DocumentExtractionService {
           fileName: file.name,
           success: true,
           documentId: result.documentId,
-          chunksStored: result.chunksStored
+          chunksStored: result.chunksStored,
+          mediaType: result.mediaType,
+          fileUrl: result.fileUrl,
+          transcription: result.transcription ? {
+            text: result.transcription.text,
+            language: result.transcription.language,
+            duration: result.transcription.duration,
+            confidence: result.transcription.confidence
+          } : null
         });
       }
 

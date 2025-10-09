@@ -303,7 +303,26 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
         if (storageResult.success) {
           resultMessage += `✅ **Documents stored successfully!**\n\n`;
           storageResult.results.forEach((result: any) => {
-            resultMessage += `• **${result.fileName}** - ${result.chunksStored} chunks stored\n`;
+            resultMessage += `• **${result.fileName}** - ${result.chunksStored} chunks stored`;
+
+            if (result.mediaType === 'audio') {
+              resultMessage += ' _(audio transcript)_';
+            }
+
+            resultMessage += '\n';
+
+            if (result.mediaType === 'audio') {
+              if (result.transcription?.text) {
+                const preview = result.transcription.text.length > 200
+                  ? `${result.transcription.text.slice(0, 200)}...`
+                  : result.transcription.text;
+                resultMessage += `  - Transcript preview: ${preview}\n`;
+              }
+
+              if (result.fileUrl) {
+                resultMessage += `  - [Listen to audio clip](${result.fileUrl})\n`;
+              }
+            }
           });
         } else {
           resultMessage += `❌ **Storage failed:** ${storageResult.error}`;
