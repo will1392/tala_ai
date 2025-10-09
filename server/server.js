@@ -11,6 +11,13 @@ import { dirname } from 'path';
 import path from 'path';
 import fs from 'fs';
 import { Readable } from 'stream';
+import { File as NodeFile } from 'node:buffer';
+
+// Polyfill File for Node < 20 (required by OpenAI SDK for audio transcription)
+if (typeof globalThis.File === 'undefined') {
+  globalThis.File = NodeFile;
+}
+
 const require = createRequire(import.meta.url);
 const PDFParse = require('pdf-parse');
 import mammoth from 'mammoth';
