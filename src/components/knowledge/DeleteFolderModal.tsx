@@ -70,8 +70,7 @@ export const DeleteFolderModal = ({
             {documentCount > 0 && (
               <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                 <p className="text-sm text-yellow-400">
-                  ⚠️ This folder contains {documentCount} document{documentCount !== 1 ? 's' : ''}. 
-                  The documents will not be deleted but will be moved to "All Documents".
+                  ⚠️ This folder contains documents. The documents will not be deleted but will be moved to "All Documents".
                 </p>
               </div>
             )}

@@ -54,7 +54,7 @@ function NodeRow({
         tabIndex={activeId === node.id ? 0 : -1}
         onKeyDown={handleKeyDown}
         onClick={() => onSelect(node.id)}
-        aria-label={`${node.name} folder${node.documentCount ? `, ${node.documentCount} documents` : ''}`}
+        aria-label={`${node.name} folder`}
       >
         <div className="flex items-center gap-2 flex-1">
           {hasChildren ? (
@@ -69,11 +69,6 @@ function NodeRow({
           ) : <span className="w-4" aria-hidden="true" />}
           <FolderIcon size={14} aria-hidden="true" />
           <span className="text-sm">{node.name}</span>
-          {node.documentCount !== undefined && node.documentCount > 0 && (
-            <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 mr-2" aria-label={`${node.documentCount} documents`}>
-              {node.documentCount}
-            </span>
-          )}
         </div>
 
         <button

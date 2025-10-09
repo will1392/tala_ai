@@ -170,18 +170,12 @@ export const PrimaryFolderCard = ({
           </div>
           
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 gap-4 mb-4">
             <div className="text-center">
               <div className="text-xl font-bold text-white">
                 {primaryFolder.subFolderCount}
               </div>
               <div className="text-xs text-white/50">Sub-folders</div>
-            </div>
-            <div className="text-center">
-              <div className="text-xl font-bold text-white">
-                {primaryFolder.documentCount}
-              </div>
-              <div className="text-xs text-white/50">Documents</div>
             </div>
           </div>
           

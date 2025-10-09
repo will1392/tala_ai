@@ -128,7 +128,7 @@ export const DeletePrimaryFolderModal = ({
                           {primaryFolder.documentCount > 0 && (
                             <div className="flex items-center gap-2">
                               <FileText size={14} />
-                              <span>{primaryFolder.documentCount} document{primaryFolder.documentCount !== 1 ? 's' : ''}</span>
+                              <span>Contains documents</span>
                             </div>
                           )}
                           {primaryFolder.subFolderCount > 0 && (
@@ -167,8 +167,9 @@ export const DeletePrimaryFolderModal = ({
                   )}
 
                   <div className="flex gap-4 text-sm text-white/60">
-                    <span>{primaryFolder.documentCount} documents</span>
-                    <span>{primaryFolder.subFolderCount} sub-folders</span>
+                    <span>
+                      {primaryFolder.subFolderCount} sub-folder{primaryFolder.subFolderCount !== 1 ? 's' : ''}
+                    </span>
                     {primaryFolder.isSystem && (
                       <span className="text-amber-400">System</span>
                     )}

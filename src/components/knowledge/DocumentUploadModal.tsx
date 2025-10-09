@@ -59,7 +59,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [uploadResult, setUploadResult] = useState<'idle' | 'success' | 'error'>('idle');
+  const [successfulUploadCount, setSuccessfulUploadCount] = useState(0);
   
   // Initialize selected folders - handle case where selectedFolderId might be a subfolder
   const getInitialFolders = () => {
@@ -100,6 +101,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const initialFolders = getInitialFolders();
   const [selectedPrimaryFolder, setSelectedPrimaryFolder] = useState<string>(initialFolders.primary);
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>(initialFolders.sub);
+
+  useEffect(() => {
+    if (isOpen) {
+      setUploadResult('idle');
+      setSuccessfulUploadCount(0);
+    } else {
+      setFileStatuses([]);
+      setIsUploading(false);
+      setShowCreateFolder(false);
+      setNewFolderName('');
+      setUploadResult('idle');
+      setSuccessfulUploadCount(0);
+    }
+  }, [isOpen]);
   
   // Get subfolders for selected primary folder
   // Need to handle legacy ID mapping
@@ -202,6 +217,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       file,
       status: 'pending' as const
     }));
+    setUploadResult('idle');
+    setSuccessfulUploadCount(0);
     setFileStatuses(prev => [...prev, ...newStatuses]);
   }, []);
 
@@ -233,8 +250,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       return;
     }
 
+    setUploadResult('idle');
+    setSuccessfulUploadCount(0);
     setIsUploading(true);
-    
+
+    let hasErrors = false;
+    let successCount = 0;
+
     for (let i = 0; i < fileStatuses.length; i++) {
       const fileStatus = fileStatuses[i];
       if (fileStatus.status !== 'pending') continue;
@@ -279,13 +301,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         const result = await response.json();
         
         if (response.ok) {
-          setFileStatuses(prev => prev.map((fs, idx) => 
-            idx === i ? { 
-              ...fs, 
+          setFileStatuses(prev => prev.map((fs, idx) =>
+            idx === i ? {
+              ...fs,
               status: 'success',
-              documentId: result.documentId 
+              documentId: result.documentId
             } : fs
           ));
+          successCount += 1;
           pushToast({
             kind: 'success',
             message: `Uploaded ${fileStatus.file.name}`
@@ -295,9 +318,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         }
       } catch (error) {
         console.error('Upload error:', error);
-        setFileStatuses(prev => prev.map((fs, idx) => 
-          idx === i ? { 
-            ...fs, 
+        hasErrors = true;
+        setFileStatuses(prev => prev.map((fs, idx) =>
+          idx === i ? {
+            ...fs,
             status: 'error',
             error: error instanceof Error ? error.message : 'Upload failed'
           } : fs
@@ -316,18 +340,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     }
     
     setIsUploading(false);
-    
-    // Check if all uploads completed successfully
-    const allSuccess = fileStatuses.every(fs => fs.status === 'success');
-    if (allSuccess) {
-      setShowSuccessModal(true);
-      setTimeout(() => {
-        setShowSuccessModal(false);
-        onUploadComplete();
-        onClose();
-        // Reset state
-        setFileStatuses([]);
-      }, 2000);
+
+    if (!hasErrors && successCount > 0) {
+      setSuccessfulUploadCount(successCount);
+      setUploadResult('success');
+      setFileStatuses([]);
+      onUploadComplete();
+    } else if (hasErrors) {
+      setUploadResult('error');
     }
   };
 
@@ -339,6 +359,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     setFileStatuses([]);
     setSelectedPrimaryFolder('');
     setSelectedSubfolder('');
+    setUploadResult('idle');
+    setSuccessfulUploadCount(0);
+  };
+
+  const handleCloseModal = () => {
+    onClose();
+  };
+
+  const handleStartAnotherUpload = () => {
+    setUploadResult('idle');
+    setSuccessfulUploadCount(0);
+    setFileStatuses([]);
   };
   
   // Create new subfolder
@@ -418,17 +450,48 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleCloseModal}
       title="Upload Documents"
       size="lg"
       showCloseButton={true}
       role="dialog"
       aria-labelledby="upload-modal-title"
     >
-
-      <div className="overflow-y-auto max-h-[calc(80vh-180px)]">
-        {/* Folder Selection */}
-        <div className="mb-6 space-y-3" role="group" aria-labelledby="folder-selection-group">
+      {uploadResult === 'success' ? (
+        <div className="flex flex-col items-center justify-center text-center py-12 px-6 space-y-4">
+          <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
+            <CheckCircle size={36} className="text-green-500" aria-hidden="true" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold">Upload successful</h3>
+            <p className="text-sm text-[var(--muted)]">
+              {successfulUploadCount === 1
+                ? 'Your document was uploaded successfully.'
+                : `${successfulUploadCount} documents were uploaded successfully.`}
+            </p>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={handleStartAnotherUpload}
+            >
+              Upload more
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleCloseModal}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-y-auto max-h-[calc(80vh-180px)]">
+            {/* Folder Selection */}
+            <div className="mb-6 space-y-3" role="group" aria-labelledby="folder-selection-group">
           <h3 id="folder-selection-group" className="sr-only">Folder Selection</h3>
           <div>
             <Label htmlFor="primary-folder-select" required>Primary Folder</Label>
@@ -650,53 +713,38 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[var(--border)]" role="group" aria-label="Modal actions">
-        <Button
-          onClick={onClose}
-          variant="secondary"
-          size="md"
-          disabled={isUploading}
-          aria-label="Cancel upload"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={uploadFiles}
-          disabled={fileStatuses.length === 0 || !selectedPrimaryFolder || isUploading}
-          variant="primary"
-          size="md"
-          aria-label={isUploading ? 'Uploading files' : `Upload ${fileStatuses.length} files`}
-        >
-          {isUploading ? (
-            <>
-              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-              Uploading...
-            </>
-          ) : (
-            <>
-              <Upload size={16} aria-hidden="true" />
-              Upload {fileStatuses.length > 0 ? `(${fileStatuses.length})` : ''}
-            </>
-          )}
-        </Button>
-      </div>
-
-      {/* Success Modal Overlay */}
-      {showSuccessModal && (
-        <div className="absolute inset-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-lg flex items-center justify-center z-50">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle size={32} className="text-green-600 dark:text-green-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Upload Complete!
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              {fileStatuses.length} file{fileStatuses.length !== 1 ? 's' : ''} uploaded successfully
-            </p>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[var(--border)]" role="group" aria-label="Modal actions">
+            <Button
+              onClick={handleCloseModal}
+              variant="secondary"
+              size="md"
+              disabled={isUploading}
+              aria-label="Cancel upload"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={uploadFiles}
+              disabled={fileStatuses.length === 0 || !selectedPrimaryFolder || isUploading}
+              variant="primary"
+              size="md"
+              aria-label={isUploading ? 'Uploading files' : `Upload ${fileStatuses.length} files`}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload size={16} aria-hidden="true" />
+                  Upload {fileStatuses.length > 0 ? `(${fileStatuses.length})` : ''}
+                </>
+              )}
+            </Button>
           </div>
-        </div>
+        </>
       )}
     </Modal>
   );
