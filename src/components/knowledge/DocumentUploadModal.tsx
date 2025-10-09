@@ -279,10 +279,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         formData.append('userId', userId);
         formData.append('isAdmin', isAdmin ? 'true' : 'false');
         
-        // Set visibility based on user role
-        // Regular agents can only create agency-scoped documents
-        // Admins can create global documents
-        formData.append('visibility', isAdmin ? 'global' : 'agency');
+        // Use 'public' visibility for all users
+        // This allows uploads without requiring organization membership
+        formData.append('visibility', 'public');
         
         // Use the correct primary folder ID for upload
         // If subfolders are using legacy IDs, we need to use the legacy primary folder ID too

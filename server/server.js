@@ -2141,15 +2141,16 @@ app.post('/api/documents/upload', upload.single('document'), requireCredits('doc
     console.log(`📄 Processing upload for user ${userId} (role: ${userRole}, admin: ${isAdmin}) to folder: ${folderId || 'none'}, primaryFolder: ${primaryFolderId || 'none'}`);
     
     // Check upload permissions based on role
-    if (userRole === 'agent' && !isAdmin) {
+    // Allow agents to upload with 'public' visibility
+    if (userRole === 'agent' && !isAdmin && visibility !== 'public') {
       return res.status(403).json({ 
         error: 'Insufficient permissions',
-        message: 'Only agency owners and super admins can upload documents'
+        message: 'Agents can only upload documents with public visibility'
       });
     }
     
     // Determine document visibility
-    let documentVisibility = visibility || 'agency'; // Default to agency visibility
+    let documentVisibility = visibility || 'public'; // Default to public visibility
     if (userRole === 'super_admin' && !visibility) {
       documentVisibility = 'global'; // Super admins default to global
     }
