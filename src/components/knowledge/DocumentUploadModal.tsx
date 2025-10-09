@@ -248,6 +248,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         formData.append('document', fileStatus.file);
         formData.append('userId', 'admin-1');
         formData.append('isAdmin', 'true');
+        formData.append('visibility', 'global');
         
         // Use the correct primary folder ID for upload
         // If subfolders are using legacy IDs, we need to use the legacy primary folder ID too
