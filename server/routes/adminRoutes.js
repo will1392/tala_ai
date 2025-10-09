@@ -15,7 +15,18 @@ router.use(requireRole('super_admin'));
  */
 router.post('/users/create', async (req, res) => {
   try {
-    const { email, password, fullName, role = 'agent', organizationId, organizationName, planType = 'agent', initialCredits } = req.body;
+    const {
+      email,
+      password,
+      fullName,
+      role = 'agent',
+      organizationId,
+      organizationName,
+      planType = 'agent',
+      initialCredits,
+      sendInvite = true,
+      inviteRedirectUrl
+    } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({
@@ -36,16 +47,26 @@ router.post('/users/create', async (req, res) => {
     const supabase = getSupabaseService();
     
     // 1. Create auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    const createUserPayload = {
       email: email,
       password: password,
-      email_confirm: true, // Auto-confirm email
       user_metadata: {
         role: role,
         full_name: fullName || email.split('@')[0], // Use email prefix if no name provided
         created_by: req.userId
       }
-    });
+    };
+
+    if (!sendInvite) {
+      createUserPayload.email_confirm = true; // Maintain legacy flow when invites are disabled
+    } else {
+      const redirectUrl = inviteRedirectUrl || process.env.SUPABASE_INVITE_REDIRECT_URL;
+      if (redirectUrl) {
+        createUserPayload.emailRedirectTo = redirectUrl;
+      }
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser(createUserPayload);
     
     if (authError) {
       console.error('Error creating auth user:', authError);
@@ -174,7 +195,8 @@ router.post('/users/create', async (req, res) => {
         credits: creditsToAllocate,
         organizationId: finalOrganizationId,
         organizationName: organization?.name || organizationName,
-        message: 'User created successfully'
+        message: 'User created successfully',
+        invitationSent: sendInvite
       }
     });
     
