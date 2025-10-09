@@ -298,9 +298,6 @@ export const DocumentExplorer: React.FC<DocumentExplorerProps> = ({
             <Folder className="w-6 h-6 text-muted-foreground" />
             <div>
               <h2 className="font-semibold text-lg">{folderName}</h2>
-              <p className="text-sm text-muted-foreground">
-                {filteredDocuments.length} documents
-              </p>
             </div>
           </div>
 

@@ -63,11 +63,6 @@ export default function FolderTreeEnhanced({
           
           <FolderIcon size={16} className="shrink-0" />
           <span className="truncate flex-1">{folder.name}</span>
-          {folder.documentCount !== undefined && folder.documentCount > 0 && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {folder.documentCount}
-            </span>
-          )}
         </button>
         
         {hasChildren && isExpanded && (

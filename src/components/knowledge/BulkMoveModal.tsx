@@ -171,8 +171,7 @@ export const BulkMoveModal = ({
                       <div className="flex-1 min-w-0">
                         <div className="font-medium truncate">{folder.name}</div>
                         <div className="text-xs text-gray-500">
-                          {folder.documentCount} document{folder.documentCount !== 1 ? 's' : ''}
-                          {currentFolders.includes(folder.id) && ' (current location)'}
+                          {currentFolders.includes(folder.id) ? 'Current location' : 'Destination folder'}
                         </div>
                       </div>
                     </div>

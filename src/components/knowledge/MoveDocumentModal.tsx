@@ -114,7 +114,7 @@ export const MoveDocumentModal = ({
                         <p className="text-xs text-white/60">
                           {primaryFolder.id === currentPrimaryFolderId && !currentFolderId 
                             ? 'Current location' 
-                            : `${primaryFolder.subFolderCount} sub-folders`}
+                            : 'Destination folder'}
                         </p>
                       </div>
                     </button>
@@ -147,7 +147,7 @@ export const MoveDocumentModal = ({
                         <div className="text-left">
                           <p className="font-medium">{folder.name}</p>
                           <p className="text-xs text-white/60">
-                            {folder.id === currentFolderId ? 'Current location' : `${folder.documentCount} documents`}
+                            {folder.id === currentFolderId ? 'Current location' : 'Destination folder'}
                           </p>
                         </div>
                       </button>

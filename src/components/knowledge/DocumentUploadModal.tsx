@@ -59,6 +59,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   // Initialize selected folders - handle case where selectedFolderId might be a subfolder
   const getInitialFolders = () => {
@@ -319,10 +320,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     // Check if all uploads completed successfully
     const allSuccess = fileStatuses.every(fs => fs.status === 'success');
     if (allSuccess) {
+      setShowSuccessModal(true);
       setTimeout(() => {
+        setShowSuccessModal(false);
         onUploadComplete();
         onClose();
-      }, 1000);
+        // Reset state
+        setFileStatuses([]);
+      }, 2000);
     }
   };
 
@@ -676,6 +681,23 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           )}
         </Button>
       </div>
+
+      {/* Success Modal Overlay */}
+      {showSuccessModal && (
+        <div className="absolute inset-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-lg flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle size={32} className="text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Upload Complete!
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              {fileStatuses.length} file{fileStatuses.length !== 1 ? 's' : ''} uploaded successfully
+            </p>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };
