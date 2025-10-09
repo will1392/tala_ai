@@ -42,8 +42,11 @@ interface HookContext {
   audience: string;
   shortAudience: string;
   pain: string;
+  shortPain: string;
   outcome: string;
+  shortOutcome: string;
   offering: string;
+  shortOffering: string;
 }
 
 const sanitize = (value: string) => value.trim();
@@ -61,17 +64,20 @@ const shorten = (value: string, fallback: string, maxWords = 4) => {
 };
 
 const deriveContext = (request: HookRequest): HookContext => {
-  const audience = sanitize(request.targetAudience) || 'growth-focused founders';
-  const pain = request.painPoints.find((point) => sanitize(point).length > 0) || 'losing time repeating answers';
-  const outcome = sanitize(request.desiredOutcome) || 'hit their next growth milestone';
+  const audience = sanitize(request.targetAudience) || 'founders';
+  const pain = request.painPoints.find((point) => sanitize(point).length > 0) || 'losing time on repetitive work';
+  const outcome = sanitize(request.desiredOutcome) || 'scale faster';
   const offering = sanitize(request.offering) || 'our system';
 
   return {
     audience,
-    shortAudience: shorten(request.targetAudience, 'operators'),
-    pain: shorten(pain, 'stuck in busywork', 6),
-    outcome: shorten(outcome, 'hit their next goal', 6),
-    offering: shorten(offering, 'this playbook', 6)
+    shortAudience: shorten(audience, 'founders', 2),
+    pain,
+    shortPain: shorten(pain, 'wasting time', 4),
+    outcome,
+    shortOutcome: shorten(outcome, 'grow faster', 3),
+    offering,
+    shortOffering: shorten(offering, 'this tool', 3)
   };
 };
 
@@ -80,61 +86,121 @@ const HOOK_TEMPLATES: HookTemplate[] = [
     label: '70-core',
     awareness: 'Problem Aware',
     rationale: 'Agitates the pain so relief feels urgent.',
-    build: ({ audience, pain }) => `Still ${pain}? That means ${audience} are stuck in yesterday's systems.`
+    build: ({ audience, shortPain }) => `${audience}: still ${shortPain}? There's a faster way.`
   },
   {
     label: '70-core',
     awareness: 'Solution Aware',
     rationale: 'Shows the path to the promised outcome.',
-    build: ({ shortAudience, outcome }) => `${shortAudience} who ${outcome} start by fixing their first answer-on-demand system.`
+    build: ({ shortAudience, shortOutcome, shortOffering }) => `${shortAudience} who ${shortOutcome} start with ${shortOffering}.`
+  },
+  {
+    label: '70-core',
+    awareness: 'Product Aware',
+    rationale: 'Clarifies why your offer wins the comparison.',
+    build: ({ shortAudience, shortOffering }) => `Why ${shortAudience} choose ${shortOffering} over the alternatives.`
   },
   {
     label: '20-adjacent',
     awareness: 'Completely Unaware',
     rationale: 'Sparks curiosity for people not yet shopping.',
-    build: ({ pain }) => `What if the question that keeps stealing hours solved itself? ${pain} disappears overnight.`
+    build: ({ shortPain, shortOutcome }) => `What if ${shortPain} turned into ${shortOutcome} overnight?`
   },
   {
     label: '20-adjacent',
     awareness: 'Solution Aware',
     rationale: 'Shows the path to the promised outcome.',
-    build: ({ audience, offering }) => `${audience} finally have a brain they can copy-paste. ${offering} does the talking.`
+    build: ({ audience, shortOffering, shortOutcome }) => `${audience} use ${shortOffering} to ${shortOutcome} without the chaos.`
   },
   {
     label: '10-experimental',
     awareness: 'Product Aware',
     rationale: 'Clarifies why your offer wins the comparison.',
-    build: ({ shortAudience, pain, offering }) => `${shortAudience} still pulling answers from docs? ${offering} replies before Slack even loads.`
+    build: ({ shortAudience, shortPain, shortOffering }) => `${shortAudience} ditched ${shortPain} for ${shortOffering}. Here's why.`
   },
   {
     label: '70-core',
     awareness: 'Problem Aware',
     rationale: 'Agitates the pain so relief feels urgent.',
-    build: ({ audience, pain }) => `${audience} lose trust every time they ask "where's that link?" ${pain} is the leak.`
+    build: ({ audience, shortPain }) => `${audience}: ${shortPain} is the leak. Plug it today.`
   },
   {
     label: '20-adjacent',
     awareness: 'Completely Unaware',
     rationale: 'Sparks curiosity for people not yet shopping.',
-    build: ({ outcome }) => `There's a faster way to ${outcome}—it starts by letting answers find your team first.`
+    build: ({ shortOutcome }) => `The one move that gets ${shortOutcome} without the grind.`
   },
   {
     label: '70-core',
     awareness: 'Solution Aware',
     rationale: 'Shows the path to the promised outcome.',
-    build: ({ offering, outcome }) => `${offering} turns tribal knowledge into a 24/7 coach so your team can ${outcome}.`
+    build: ({ shortOffering, shortOutcome }) => `${shortOffering} delivers ${shortOutcome}. No fluff, just results.`
   },
   {
     label: '10-experimental',
     awareness: 'Most Aware',
     rationale: 'Targets warm audience already sold on you.',
-    build: ({ offering, outcome }) => `You said "yes" to ${offering}—here's how day one delivers ${outcome}.`
+    build: ({ shortOffering, shortOutcome }) => `Back for more? ${shortOffering} just made ${shortOutcome} even easier.`
+  },
+  {
+    label: '70-core',
+    awareness: 'Problem Aware',
+    rationale: 'Agitates the pain so relief feels urgent.',
+    build: ({ shortAudience, shortPain }) => `${shortAudience} lose hours to ${shortPain}. Stop the bleed.`
   },
   {
     label: '20-adjacent',
     awareness: 'Product Aware',
     rationale: 'Clarifies why your offer wins the comparison.',
-    build: ({ audience, pain, offering }) => `${audience} hire ${offering} when "check the doc" becomes the slowest answer on the team.`
+    build: ({ audience, shortOffering }) => `${audience} who tried everything picked ${shortOffering}. Here's the proof.`
+  },
+  {
+    label: '70-core',
+    awareness: 'Solution Aware',
+    rationale: 'Shows the path to the promised outcome.',
+    build: ({ shortPain, shortOutcome }) => `From ${shortPain} to ${shortOutcome} in under 30 days.`
+  },
+  {
+    label: '20-adjacent',
+    awareness: 'Completely Unaware',
+    rationale: 'Sparks curiosity for people not yet shopping.',
+    build: ({ shortAudience, shortOutcome }) => `${shortAudience} found a shortcut to ${shortOutcome}. It's not what you think.`
+  },
+  {
+    label: '10-experimental',
+    awareness: 'Problem Aware',
+    rationale: 'Agitates the pain so relief feels urgent.',
+    build: ({ audience, shortPain }) => `${audience}: every minute you spend on ${shortPain} costs you money.`
+  },
+  {
+    label: '70-core',
+    awareness: 'Product Aware',
+    rationale: 'Clarifies why your offer wins the comparison.',
+    build: ({ shortOffering, shortOutcome }) => `${shortOffering} beats the competition on ${shortOutcome}. See how.`
+  },
+  {
+    label: '20-adjacent',
+    awareness: 'Solution Aware',
+    rationale: 'Shows the path to the promised outcome.',
+    build: ({ shortAudience, shortPain, shortOutcome }) => `${shortAudience} trade ${shortPain} for ${shortOutcome}. No tricks.`
+  },
+  {
+    label: '10-experimental',
+    awareness: 'Most Aware',
+    rationale: 'Targets warm audience already sold on you.',
+    build: ({ shortOffering }) => `You know ${shortOffering} works. Here's what's new.`
+  },
+  {
+    label: '70-core',
+    awareness: 'Problem Aware',
+    rationale: 'Agitates the pain so relief feels urgent.',
+    build: ({ audience, shortPain }) => `${audience}: if ${shortPain} drains you, try this.`
+  },
+  {
+    label: '20-adjacent',
+    awareness: 'Completely Unaware',
+    rationale: 'Sparks curiosity for people not yet shopping.',
+    build: ({ shortAudience, shortOutcome }) => `The ${shortAudience} secret to ${shortOutcome} nobody talks about.`
   }
 ];
 
@@ -227,7 +293,7 @@ export const generateFallbackHooks = (request: HookRequest, desiredCount = 20): 
     hooks.push({
       id: `fallback-${hooks.length + 1}`,
       text,
-      type: template.label === '10-experimental' ? 'Idea Starter' : template.label === '20-adjacent' ? 'Angle Shift' : 'Core Statement',
+      type: template.label === '10-experimental' ? 'Experimental' : template.label === '20-adjacent' ? 'Adjacent Angle' : 'Core Hook',
       awareness: template.awareness,
       rationale: template.rationale,
       channelNote,
