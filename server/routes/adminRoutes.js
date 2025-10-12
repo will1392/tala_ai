@@ -6,14 +6,23 @@ import creditSystem from '../services/creditSystem.js';
 
 const router = express.Router();
 
+console.log('✅ Admin routes module loaded');
+
 // All admin routes require authentication and super_admin role
 router.use(authenticate);
 router.use(requireRole('super_admin'));
+
+console.log('✅ Admin routes middleware configured');
 
 /**
  * Create a new user account
  */
 router.post('/users/create', async (req, res) => {
+  console.log('🔵 POST /api/admin/users/create called');
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  console.log('User ID:', req.userId);
+  console.log('User Role:', req.userRole);
+  
   try {
     const {
       email,
