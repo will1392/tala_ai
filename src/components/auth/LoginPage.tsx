@@ -47,16 +47,18 @@ export const LoginPage = () => {
         throw new Error('Login failed');
       }
 
-      // Get user role directly from Supabase user_credits
+      // Get user role and organization from Supabase user_credits
       const { data: creditsData, error: creditsError } = await supabase
         .from('user_credits')
-        .select('role')
+        .select('role, organization_id')
         .eq('user_id', data.user.id)
         .single();
 
       let role = 'agent';
+      let organizationId = null;
       if (!creditsError && creditsData) {
         role = creditsData.role || 'agent';
+        organizationId = creditsData.organization_id;
       }
 
       // Set user in auth store
@@ -64,6 +66,7 @@ export const LoginPage = () => {
         id: data.user.id,
         email: data.user.email || email,
         role: role as any,
+        organizationId: organizationId,
         name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
         createdAt: new Date(data.user.created_at)
       });

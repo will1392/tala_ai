@@ -30,9 +30,18 @@ router.post('/test', (req, res) => {
   });
 });
 
-// All other admin routes require authentication and super_admin role
+// All other admin routes require authentication and admin or super_admin role
 router.use(authenticate);
-router.use(requireRole('super_admin'));
+router.use((req, res, next) => {
+  if (req.userRole === 'super_admin' || req.userRole === 'admin') {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      error: 'Access denied. Admin or Super Admin role required.'
+    });
+  }
+});
 
 console.log('✅ Admin routes middleware configured');
 
@@ -61,6 +70,21 @@ router.post('/users/create', async (req, res) => {
 
     console.log('📋 Creating user with role:', role);
     console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
+    
+    const supabase = getSupabaseService();
+    
+    // For admin users (non-super_admin), enforce their organization
+    let finalOrganizationId = organizationId;
+    if (req.userRole === 'admin') {
+      const { data: userData } = await supabase
+        .from('user_credits')
+        .select('organization_id')
+        .eq('user_id', req.userId)
+        .single();
+      
+      finalOrganizationId = userData?.organization_id || organizationId;
+      console.log('📋 Admin user creating user in organization:', finalOrganizationId);
+    }
 
     if (!email) {
       return res.status(400).json({
@@ -92,7 +116,7 @@ router.post('/users/create', async (req, res) => {
       full_name: fullName || email.split('@')[0],
       created_by: req.userId,
       plan_type: planType,
-      organization_id: organizationId || null
+      organization_id: finalOrganizationId || null
     };
 
     const redirectUrl = inviteRedirectUrl || process.env.SUPABASE_INVITE_REDIRECT_URL;
@@ -173,7 +197,7 @@ router.post('/users/create', async (req, res) => {
           plan_type: planType,
           role: role,
           full_name: fullName || email.split('@')[0],
-          organization_id: organizationId || null,
+          organization_id: finalOrganizationId || null,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', newUserId)
@@ -190,7 +214,7 @@ router.post('/users/create', async (req, res) => {
           id: crypto.randomUUID(),
           user_id: newUserId,
           full_name: fullName || email.split('@')[0],
-          organization_id: organizationId || null,
+          organization_id: finalOrganizationId || null,
           total_credits: creditsToAllocate,
           used_credits: 0,
           bonus_credits: 0,
@@ -230,9 +254,9 @@ router.post('/users/create', async (req, res) => {
     
     // 3. If creating an agency owner, create an organization if name provided
     let organization = null;
-    let finalOrganizationId = organizationId;
+    let createdOrganizationId = finalOrganizationId;
     
-    if (role === 'agency_owner' && !organizationId && organizationName) {
+    if (role === 'agency_owner' && !finalOrganizationId && organizationName) {
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .insert({
@@ -248,7 +272,7 @@ router.post('/users/create', async (req, res) => {
         
       if (orgData && !orgError) {
         organization = orgData;
-        finalOrganizationId = orgData.id;
+        createdOrganizationId = orgData.id;
         
         // Update user_credits with the new organization ID
         await supabase
@@ -267,7 +291,7 @@ router.post('/users/create', async (req, res) => {
         role: role,
         planType: planType,
         credits: creditsToAllocate,
-        organizationId: finalOrganizationId,
+        organizationId: createdOrganizationId,
         organizationName: organization?.name || organizationName,
         message: 'User created successfully',
         invitationSent: invitationSent
@@ -353,10 +377,26 @@ router.delete('/users/:userId', async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     console.log('Admin users endpoint called');
+    console.log('User role:', req.userRole);
+    console.log('User ID:', req.userId);
+    
     const { page = 1, limit = 20, role, organizationId } = req.query;
     const offset = (page - 1) * limit;
     
     const supabase = getSupabaseService();
+    
+    // For non-super_admin, get their organization_id
+    let userOrgId = null;
+    if (req.userRole === 'admin') {
+      const { data: userData } = await supabase
+        .from('user_credits')
+        .select('organization_id')
+        .eq('user_id', req.userId)
+        .single();
+      
+      userOrgId = userData?.organization_id;
+      console.log('Admin user organization_id:', userOrgId);
+    }
     
     // Build query - explicitly select all fields including full_name
     let query = supabase
@@ -367,7 +407,12 @@ router.get('/users', async (req, res) => {
     if (role) {
       query = query.eq('role', role);
     }
-    if (organizationId) {
+    
+    // For admin users (non-super_admin), only show users in their organization
+    if (req.userRole === 'admin' && userOrgId) {
+      query = query.eq('organization_id', userOrgId);
+    } else if (organizationId) {
+      // For super_admin, allow filtering by organizationId from query params
       query = query.eq('organization_id', organizationId);
     }
     

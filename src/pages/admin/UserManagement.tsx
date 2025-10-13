@@ -190,7 +190,13 @@ export function UserManagement() {
   const loadUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const response = await adminService.listUsers();
+      // For admins, filter by their organization
+      const filters: any = {};
+      if (isAdmin && !isSuperAdmin && user?.organizationId) {
+        filters.organizationId = user.organizationId;
+      }
+      
+      const response = await adminService.listUsers(filters);
       if (response.success && response.data) {
         console.log('Loaded users from API:', response.data);
         const users = Array.isArray(response.data) ? response.data : response.data.users || [];
@@ -204,8 +210,6 @@ export function UserManagement() {
   };
 
   const loadOrganizations = async () => {
-    if (!isSuperAdmin) return;
-    
     setIsLoadingOrganizations(true);
     try {
       const response = await organizationService.listOrganizations({
@@ -297,6 +301,8 @@ export function UserManagement() {
 
   const handleOpenCreate = () => {
     const defaultAdminId = selectedAdmin?.id ?? accessibleAdmins[0]?.id ?? '';
+    // For admins (non-super_admin), pre-fill their organization
+    const defaultOrgId = isAdmin && !isSuperAdmin && user?.organizationId ? user.organizationId : '';
 
     setCreateForm({
       adminId: defaultAdminId,
@@ -305,7 +311,7 @@ export function UserManagement() {
       role: roleOptions[0]?.value ?? 'agent',
       status: statusOptions[1]?.value ?? 'invited',
       credits: '0',
-      organizationId: ''
+      organizationId: defaultOrgId
     });
     setCreateError(null);
     setActiveModal('create');
@@ -766,6 +772,20 @@ export function UserManagement() {
                 />
                 <p className="text-xs text-[var(--muted)]">
                   Assign user to an organization for data isolation
+                </p>
+              </div>
+            )}
+            {isAdmin && !isSuperAdmin && user?.organizationId && (
+              <div className="space-y-2">
+                <Label htmlFor="create-organization-readonly">Organization</Label>
+                <Input
+                  id="create-organization-readonly"
+                  value={organizations.find(org => org.id === user.organizationId)?.name || 'Your Organization'}
+                  disabled
+                  className="bg-gray-100 dark:bg-gray-800"
+                />
+                <p className="text-xs text-[var(--muted)]">
+                  Users will be created in your organization
                 </p>
               </div>
             )}
