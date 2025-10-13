@@ -13,7 +13,7 @@ const mockUsers: Record<string, { user: User; password: string }> = {
   'will@weareapexcreatives.com': {
     password: 'tala$1111',
     user: {
-      id: 'will-1',
+      id: '59b70373-ba68-4d89-8420-5c3723aef01f',
       email: 'will@weareapexcreatives.com',
       role: 'super_admin',
       name: 'Will',
