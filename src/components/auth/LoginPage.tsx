@@ -47,19 +47,16 @@ export const LoginPage = () => {
         throw new Error('Login failed');
       }
 
-      // Get user role from user_credits
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/users?limit=1`, {
-        headers: {
-          'x-user-id': data.user.id
-        }
-      });
+      // Get user role directly from Supabase user_credits
+      const { data: creditsData, error: creditsError } = await supabase
+        .from('user_credits')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .single();
 
       let role = 'agent';
-      if (response.ok) {
-        const userData = await response.json();
-        if (userData.success && userData.data && userData.data.length > 0) {
-          role = userData.data[0].role || 'agent';
-        }
+      if (!creditsError && creditsData) {
+        role = creditsData.role || 'agent';
       }
 
       // Set user in auth store
