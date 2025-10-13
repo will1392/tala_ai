@@ -7,6 +7,7 @@ import { Input } from '../shared/Input';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContextNew';
+import { useNavigate } from 'react-router-dom';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -14,6 +15,7 @@ export const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { login, isLoading } = useAuthStore();
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (theme !== 'dark') {
@@ -27,6 +29,7 @@ export const LoginPage = () => {
     try {
       const user = await login(email, password);
       toast.success(`Welcome back, ${user.name}!`);
+      navigate('/chat');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Login failed');
     }
