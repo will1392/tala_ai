@@ -217,6 +217,58 @@ Let's begin with understanding your business. What type of travel experiences do
     }
   }, [location.search]); // Re-run when URL changes
 
+  // Restore previous conversation when page reloads
+  useEffect(() => {
+    if (hasLoadedInitialConversation) return;
+    if (location.state) return; // Let navigation-based context load instead
+
+    const storedConversation = localStorage.getItem('tala_current_conversation');
+
+    if (!storedConversation) {
+      setHasLoadedInitialConversation(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(storedConversation);
+
+      if (parsed?.id) {
+        setConversationId(parsed.id);
+
+        const isMarketing = parsed.mode === 'marketing' || parsed.mode === 'cmo';
+        setIsMarketingMode(isMarketing);
+
+        const cachedMessagesRaw = localStorage.getItem(`tala_messages_${parsed.id}`);
+
+        if (cachedMessagesRaw) {
+          const cachedMessages: Message[] = JSON.parse(cachedMessagesRaw);
+          setMessages(cachedMessages);
+
+          const hasMarketingMessages = cachedMessages.some((msg) =>
+            msg.mode === 'marketing' || msg.mode === 'cmo' || msg.marketingMode
+          );
+
+          if (hasMarketingMessages) {
+            setIsMarketingMode(true);
+            const marketingMsg = cachedMessages.find((msg) => msg.marketingMode);
+            if (marketingMsg?.marketingMode) {
+              setCurrentMarketingMode(marketingMsg.marketingMode);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to restore conversation from localStorage:', error);
+    } finally {
+      setHasLoadedInitialConversation(true);
+    }
+  }, [
+    hasLoadedInitialConversation,
+    location.state,
+    setConversationId,
+    setHasLoadedInitialConversation
+  ]);
+
   useEffect(() => {
     if (isHistoryOpen) {
       loadConversationList();
