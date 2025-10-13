@@ -20,6 +20,7 @@ export const SetPassword = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [error, setError] = useState('');
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
@@ -30,6 +31,36 @@ export const SetPassword = () => {
       setTheme('dark');
     }
   }, [theme, setTheme]);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          setError('Invalid or expired invitation link. Please request a new invitation.');
+          setIsCheckingSession(false);
+          return;
+        }
+
+        if (!session) {
+          setError('No active session found. Please use the invitation link from your email.');
+          setIsCheckingSession(false);
+          return;
+        }
+
+        console.log('Session found:', session.user.email);
+        setIsCheckingSession(false);
+      } catch (err) {
+        console.error('Error checking session:', err);
+        setError('Failed to verify invitation. Please try again.');
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkSession();
+  }, []);
 
   const validatePassword = (pwd: string): string | null => {
     if (pwd.length < 8) {
@@ -122,12 +153,18 @@ export const SetPassword = () => {
         </div>
 
         <GlassCard>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
-                {error}
-              </div>
-            )}
+          {isCheckingSession ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-white/70">Verifying invitation...</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+                  {error}
+                </div>
+              )}
 
             <div>
               <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-white">New Password</label>
@@ -195,15 +232,16 @@ export const SetPassword = () => {
               </ul>
             </div>
 
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Setting password...' : 'Set Password'}
-            </Button>
-          </form>
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Setting password...' : 'Set Password'}
+              </Button>
+            </form>
+          )}
         </GlassCard>
       </motion.div>
     </div>
