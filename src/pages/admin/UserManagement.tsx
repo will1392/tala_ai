@@ -6,7 +6,8 @@ import {
   PencilLine,
   RefreshCw,
   Mail,
-  Coins
+  Coins,
+  Trash2
 } from 'lucide-react';
 import {
   Button,
@@ -31,7 +32,7 @@ import type {
 } from '../../types/userManagement';
 import { cn } from '../../utils/cn';
 
-type ModalType = 'create' | 'edit' | 'email' | 'credits' | 'reset' | null;
+type ModalType = 'create' | 'edit' | 'email' | 'credits' | 'reset' | 'delete' | null;
 
 type ModalContext = {
   adminId: string | null;
@@ -284,6 +285,11 @@ export function UserManagement() {
     setActiveModal('credits');
   };
 
+  const handleOpenDelete = (admin: AdminTeam, userToDelete: ManagedUser) => {
+    setContext({ adminId: admin.id, user: userToDelete });
+    setActiveModal('delete');
+  };
+
   const handleOpenReset = (admin: AdminTeam, userToReset: ManagedUser) => {
     setContext({ adminId: admin.id, user: userToReset });
     setActiveModal('reset');
@@ -423,6 +429,31 @@ export function UserManagement() {
     resetUserPassword(context.adminId, context.user.id);
     setFeedback({ type: 'success', message: 'Password reset email sent.' });
     closeModal();
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!context.user) {
+      setFeedback({ type: 'error', message: 'No user selected.' });
+      closeModal();
+      return;
+    }
+
+    try {
+      const response = await adminService.deleteUser(context.user.id);
+      
+      if (!response.success) {
+        setFeedback({ type: 'error', message: response.error || 'Failed to delete user.' });
+        closeModal();
+        return;
+      }
+
+      setFeedback({ type: 'success', message: `${context.user.name} was deleted successfully.` });
+      closeModal();
+      loadUsers();
+    } catch (error) {
+      setFeedback({ type: 'error', message: 'An unexpected error occurred.' });
+      closeModal();
+    }
   };
 
   return (
@@ -626,6 +657,13 @@ export function UserManagement() {
                   >
                     <RefreshCw className="h-4 w-4" /> Reset password
                   </Button>
+                  <Button
+                    variant="ghost"
+                    className="text-red-500 hover:text-red-600 hover:bg-red-500/10 md:col-span-2"
+                    onClick={() => handleOpenDelete(selectedAdmin, selectedUser)}
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete user
+                  </Button>
                 </div>
               </div>
             )}
@@ -816,6 +854,28 @@ export function UserManagement() {
             </Button>
             <Button onClick={handleResetConfirm}>
               <RefreshCw className="h-4 w-4" /> Send reset email
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={activeModal === 'delete'} onClose={closeModal} title="Delete user" size="md">
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--muted)]">
+            Are you sure you want to delete <strong>{context.user?.name}</strong>? This action cannot be undone. 
+            All user data, credits, and access will be permanently removed.
+          </p>
+
+          <div className="flex items-center justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={closeModal}>
+              Cancel
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+              onClick={handleDeleteConfirm}
+            >
+              <Trash2 className="h-4 w-4" /> Delete permanently
             </Button>
           </div>
         </div>

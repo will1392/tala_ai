@@ -283,6 +283,70 @@ router.post('/users/create', async (req, res) => {
 /**
  * List all users with pagination
  */
+/**
+ * Delete a user
+ */
+router.delete('/users/:userId', async (req, res) => {
+  console.log('🔵 DELETE /api/admin/users/:userId called');
+  console.log('User ID to delete:', req.params.userId);
+  console.log('Requesting user:', req.userId);
+  
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
+
+    const supabase = getSupabaseService();
+    
+    // Delete from user_credits first (has FK to auth.users)
+    const { error: creditsError } = await supabase
+      .from('user_credits')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (creditsError) {
+      console.error('Error deleting user credits:', creditsError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete user credits',
+        details: creditsError.message
+      });
+    }
+    
+    // Delete from auth.users
+    const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+    
+    if (authError) {
+      console.error('Error deleting auth user:', authError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete user from authentication',
+        details: authError.message
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete user'
+    });
+  }
+});
+
+/**
+ * List all users
+ */
 router.get('/users', async (req, res) => {
   try {
     console.log('Admin users endpoint called');

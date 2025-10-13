@@ -80,6 +80,11 @@ const getUserId = (): string | null => {
   }
 };
 
+interface DeleteUserResponse {
+  success: boolean;
+  error?: string;
+}
+
 export const adminService = {
   createUser: async (request: CreateUserRequest): Promise<CreateUserResponse> => {
     try {
@@ -157,6 +162,38 @@ export const adminService = {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to list users'
+      };
+    }
+  },
+
+  deleteUser: async (userId: string): Promise<DeleteUserResponse> => {
+    try {
+      const currentUserId = getUserId();
+
+      const response = await fetch(buildApiUrl(`admin/users/${userId}`), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(currentUserId ? { 'x-user-id': currentUserId } : {})
+        }
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('API Error:', response.status, text);
+        return {
+          success: false,
+          error: `Server error (${response.status}): ${text || response.statusText}`
+        };
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete user'
       };
     }
   }
