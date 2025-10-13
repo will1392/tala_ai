@@ -73,8 +73,12 @@ router.post('/users/create', async (req, res) => {
     
     const supabase = getSupabaseService();
     
-    // For admin users (non-super_admin), enforce their organization
+    // Determine final organization ID
+    // 1. For admin users (non-super_admin), enforce their organization
+    // 2. If no organization specified, default to Tala AI parent organization
+    const TALA_AI_ORG_ID = '00000000-0000-0000-0000-000000000001';
     let finalOrganizationId = organizationId;
+    
     if (req.userRole === 'admin') {
       const { data: userData } = await supabase
         .from('user_credits')
@@ -84,6 +88,12 @@ router.post('/users/create', async (req, res) => {
       
       finalOrganizationId = userData?.organization_id || organizationId;
       console.log('📋 Admin user creating user in organization:', finalOrganizationId);
+    }
+    
+    // Default to Tala AI organization if no organization specified
+    if (!finalOrganizationId) {
+      finalOrganizationId = TALA_AI_ORG_ID;
+      console.log('📋 No organization specified, defaulting to Tala AI');
     }
 
     if (!email) {

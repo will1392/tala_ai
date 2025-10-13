@@ -56,9 +56,23 @@ export const LoginPage = () => {
 
       let role = 'agent';
       let organizationId = null;
+      const TALA_AI_ORG_ID = '00000000-0000-0000-0000-000000000001';
+      
       if (!creditsError && creditsData) {
         role = creditsData.role || 'agent';
         organizationId = creditsData.organization_id;
+        
+        // If user has no organization, assign them to Tala AI and update database
+        if (!organizationId) {
+          organizationId = TALA_AI_ORG_ID;
+          console.log('User has no organization, assigning to Tala AI');
+          
+          // Update user_credits with Tala AI organization
+          await supabase
+            .from('user_credits')
+            .update({ organization_id: TALA_AI_ORG_ID })
+            .eq('user_id', data.user.id);
+        }
       }
 
       // Set user in auth store
