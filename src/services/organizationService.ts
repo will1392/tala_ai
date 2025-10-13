@@ -6,7 +6,6 @@ interface Organization {
   slug: string;
   type: string;
   owner_id: string | null;
-  is_active: boolean;
   settings: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -114,7 +113,6 @@ export const organizationService = {
     page?: number;
     limit?: number;
     type?: string;
-    isActive?: boolean;
   }): Promise<ListOrganizationsResponse> => {
     try {
       const userId = getUserId();
@@ -123,7 +121,6 @@ export const organizationService = {
       if (params?.page) queryParams.set('page', params.page.toString());
       if (params?.limit) queryParams.set('limit', params.limit.toString());
       if (params?.type) queryParams.set('type', params.type);
-      if (params?.isActive !== undefined) queryParams.set('isActive', params.isActive.toString());
 
       const queryString = queryParams.toString();
       const url = queryString

@@ -172,8 +172,7 @@ export function UserManagementNew() {
     try {
       const response = await organizationService.listOrganizations({
         page: 1,
-        limit: 100,
-        isActive: true
+        limit: 100
       });
 
       if (response.success && response.data) {
