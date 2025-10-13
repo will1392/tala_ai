@@ -1753,7 +1753,7 @@ app.get('/api/tasks/upcoming', authenticate, asyncHandler(async (req, res) => {
 }));
 
 // Extract data from documents without storing
-app.post('/api/documents/extract', upload.array('document', 10), async (req, res) => {
+app.post('/api/documents/extract', authenticate, requireCredits('document_extract'), upload.array('document', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -1890,7 +1890,7 @@ app.post('/api/documents/extract', upload.array('document', 10), async (req, res
   }
 });
 
-app.post('/api/media/analyze-images', upload.array('file', 10), async (req, res) => {
+app.post('/api/media/analyze-images', authenticate, requireCredits('media_analysis'), upload.array('file', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -1985,7 +1985,7 @@ app.post('/api/media/analyze-images', upload.array('file', 10), async (req, res)
   }
 });
 
-app.post('/api/media/transcribe', upload.array('file', 5), async (req, res) => {
+app.post('/api/media/transcribe', authenticate, requireCredits('media_transcribe'), upload.array('file', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -2072,7 +2072,7 @@ app.post('/api/media/transcribe', upload.array('file', 5), async (req, res) => {
 });
 
 // Detect language of uploaded document
-app.post('/api/documents/detect-language', upload.single('document'), async (req, res) => {
+app.post('/api/documents/detect-language', authenticate, requireCredits('language_detect'), upload.single('document'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
