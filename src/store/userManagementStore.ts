@@ -8,6 +8,7 @@ import type {
 
 interface UserManagementState {
   admins: AdminTeam[];
+  setUsers: (users: any[]) => void;
   createUser: (adminId: string, input: CreateManagedUserInput) => ManagedUser | null;
   updateUser: (adminId: string, userId: string, updates: UpdateManagedUserInput) => void;
   changeUserEmail: (adminId: string, userId: string, email: string) => void;
@@ -29,6 +30,34 @@ const initialAdmins: AdminTeam[] = [];
 
 export const useUserManagementStore = create<UserManagementState>((set) => ({
   admins: initialAdmins,
+
+  setUsers: (users) => {
+    const managedUsers: ManagedUser[] = users.map((u) => ({
+      id: u.user_id,
+      name: u.user?.full_name || u.full_name || u.user?.email?.split('@')[0] || 'Unknown',
+      email: u.user?.email || 'unknown@example.com',
+      role: u.role,
+      status: 'active',
+      credits: (u.total_credits || 0) - (u.used_credits || 0),
+      lastLogin: u.updated_at || u.created_at,
+      lastPasswordReset: u.created_at,
+      createdAt: u.created_at,
+      updatedAt: u.updated_at || u.created_at
+    }));
+
+    const adminTeam: AdminTeam = {
+      id: 'all-users',
+      name: 'All Users',
+      email: 'admin@tala.ai',
+      teamName: 'Tala AI',
+      organization: 'Tala',
+      createdAt: now(),
+      updatedAt: now(),
+      users: managedUsers
+    };
+
+    set({ admins: [adminTeam] });
+  },
 
   createUser: (adminId, input) => {
     if (!adminId) {

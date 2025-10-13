@@ -112,6 +112,7 @@ export function UserManagement() {
   const { user } = useAuthStore();
   const {
     admins,
+    setUsers,
     createUser,
     updateUser,
     changeUserEmail,
@@ -159,6 +160,27 @@ export function UserManagement() {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [creditsError, setCreditsError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  const loadUsers = async () => {
+    setIsLoadingUsers(true);
+    try {
+      const response = await adminService.listUsers();
+      if (response.success && response.data) {
+        console.log('Loaded users from API:', response.data);
+        const users = Array.isArray(response.data) ? response.data : response.data.users || [];
+        setUsers(users);
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
   useEffect(() => {
     if (!feedback) return;
@@ -315,6 +337,7 @@ export function UserManagement() {
         message: `${response.data.fullName} was created successfully.${inviteMessage}` 
       });
       closeModal();
+      loadUsers();
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'An unexpected error occurred.');
     } finally {
