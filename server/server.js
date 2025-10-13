@@ -1060,6 +1060,10 @@ app.use('/api/roles', roleRoutes);
 import adminRoutes from './routes/adminRoutes.js';
 app.use('/api/admin', adminRoutes);
 
+// Organization routes
+import organizationRoutes from './routes/organizationRoutes.js';
+app.use('/api/organizations', organizationRoutes);
+
 // Marketing Profile routes
 import marketingProfileRoutes from './routes/marketingProfile.js';
 app.use('/api/marketing-profile', marketingProfileRoutes);

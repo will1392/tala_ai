@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Archivo:wght@400;600&display=swap" rel="stylesheet">
+    <title>Tala AI - Invitation</title>
+  </head>
+  <body style="margin:0;padding:0;background:#ffffff;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e6e8ee;border-radius:12px;overflow:hidden;">
+
+            <tr>
+              <td style="padding:24px;background:#ffffff;text-align:center;">
+                <img src="https://storage.googleapis.com/msgsndr/fiOlotZgZQKKSRn1EvVI/media/68cad374bdd06693a791b755.jpeg"
+                     alt="Tala AI Logo" width="160"
+                     style="display:block;margin:0 auto;max-width:160px;height:auto;">
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:28px;font-family:Archivo,Arial,sans-serif;color:#272d41;">
+                <h1 style="margin:0 0 8px 0;font-size:24px;line-height:30px;font-family:'DM Serif Display',Georgia,serif;">You've been invited to Tala AI</h1>
+                <p style="margin:0 0 16px 0;font-size:16px;line-height:24px;">
+                  Hi {{ .Email }}, you've been invited to join Tala AI.
+                </p>
+                <p style="margin:0 0 24px 0;font-size:16px;line-height:24px;">
+                  Click the button below to accept the invitation and set up your account.
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background:#34c6c7;border-radius:8px;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 18px;font-size:16px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:600;">
+                        Accept invitation
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin:24px 0 0 0;font-size:14px;line-height:22px;color:#4a516b;">
+                  If the button doesn't work, copy and paste this link into your browser:<br>
+                  <a href="{{ .ConfirmationURL }}" style="color:#34c6c7;text-decoration:underline;word-break:break-all;">{{ .ConfirmationURL }}</a>
+                </p>
+
+                <hr style="border:none;border-top:1px solid #e6e8ee;margin:28px 0;">
+                <p style="margin:0;font-size:12px;line-height:18px;color:#7c839b;">
+                  Didn't expect this invite? You can safely ignore this email.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:18px 28px;background:#f6f7fb;color:#8a90a6;font-size:12px;line-height:18px;font-family:Archivo,Arial,sans-serif;">
+                © 2025 Tala AI • <a href="https://tala-ai.vercel.app" style="color:#8a90a6;text-decoration:underline;">Visit Tala AI</a>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

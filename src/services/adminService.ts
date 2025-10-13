@@ -6,6 +6,7 @@ interface CreateUserRequest {
   fullName: string;
   role: ManagedUserRole;
   credits?: number;
+  organizationId?: string;
   sendInvite?: boolean;
   inviteRedirectUrl?: string;
 }
@@ -101,6 +102,7 @@ export const adminService = {
           password: generateSecurePassword(),
           fullName: request.fullName,
           role: request.role,
+          organizationId: request.organizationId,
           initialCredits: request.credits,
           sendInvite: request.sendInvite ?? true,
           inviteRedirectUrl: request.inviteRedirectUrl

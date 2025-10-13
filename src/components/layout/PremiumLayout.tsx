@@ -22,7 +22,8 @@ import {
   Moon,
   CreditCard,
   Shield,
-  Sparkles
+  Sparkles,
+  Building2
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { GlobalSearch } from './GlobalSearch';
@@ -338,6 +339,18 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
               <Shield className="h-5 w-5 text-yellow-500" />
               <span>User Management</span>
             </button>
+            {user?.role === 'super_admin' && (
+              <button
+                onClick={() => navigate('/admin/organizations')}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium hover:bg-muted",
+                  location.pathname === '/admin/organizations' && "bg-primary/10 text-primary"
+                )}
+              >
+                <Building2 className="h-5 w-5 text-yellow-500" />
+                <span>Organizations</span>
+              </button>
+            )}
           </div>
         )}
       </div>

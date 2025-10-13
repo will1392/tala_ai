@@ -24,6 +24,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { useUserManagementStore } from '../../store/userManagementStore';
 import { adminService } from '../../services/adminService';
+import { organizationService, type Organization } from '../../services/organizationService';
 import type {
   AdminTeam,
   ManagedUser,
@@ -164,7 +165,8 @@ export function UserManagement() {
     email: '',
     role: roleOptions[0]?.value ?? 'agent',
     status: statusOptions[1]?.value ?? 'invited',
-    credits: '0'
+    credits: '0',
+    organizationId: ''
   });
 
   const [editForm, setEditForm] = useState({
@@ -182,6 +184,8 @@ export function UserManagement() {
   const [creditsError, setCreditsError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(false);
 
   const loadUsers = async () => {
     setIsLoadingUsers(true);
@@ -199,8 +203,30 @@ export function UserManagement() {
     }
   };
 
+  const loadOrganizations = async () => {
+    if (!isSuperAdmin) return;
+    
+    setIsLoadingOrganizations(true);
+    try {
+      const response = await organizationService.listOrganizations({
+        page: 1,
+        limit: 100,
+        isActive: true
+      });
+      
+      if (response.success && response.data) {
+        setOrganizations(response.data);
+      }
+    } catch (error) {
+      console.error('Error loading organizations:', error);
+    } finally {
+      setIsLoadingOrganizations(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
+    loadOrganizations();
   }, []);
 
   useEffect(() => {
@@ -278,7 +304,8 @@ export function UserManagement() {
       email: '',
       role: roleOptions[0]?.value ?? 'agent',
       status: statusOptions[1]?.value ?? 'invited',
-      credits: '0'
+      credits: '0',
+      organizationId: ''
     });
     setCreateError(null);
     setActiveModal('create');
@@ -345,6 +372,7 @@ export function UserManagement() {
         email: trimmedEmail,
         fullName: trimmedName,
         role: createForm.role,
+        organizationId: createForm.organizationId || undefined,
         credits: creditsValue,
         sendInvite: true
       });
@@ -724,6 +752,23 @@ export function UserManagement() {
                 placeholder="name@company.com"
               />
             </div>
+            {isSuperAdmin && (
+              <div className="space-y-2">
+                <Label htmlFor="create-organization">Organization</Label>
+                <Select
+                  id="create-organization"
+                  value={createForm.organizationId}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, organizationId: event.target.value }))}
+                  options={[
+                    { value: '', label: 'No Organization' },
+                    ...organizations.map((org) => ({ value: org.id, label: org.name }))
+                  ]}
+                />
+                <p className="text-xs text-[var(--muted)]">
+                  Assign user to an organization for data isolation
+                </p>
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="create-role">Role</Label>

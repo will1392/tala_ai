@@ -43,6 +43,7 @@ import { srOnly } from './utils/accessibility';
 import { LiveRegionManager } from './components/accessibility';
 import Credits from './pages/Credits';
 import { UserManagement } from './pages/admin/UserManagement';
+import { OrganizationManagement } from './pages/admin/OrganizationManagement';
 import { ensureUserId } from './utils/ensureUserId';
 import './styles/globals.css';
 
@@ -124,6 +125,7 @@ function App() {
                     )}
                     <Route path="credits" element={<Credits />} />
                     <Route path="admin/users" element={<UserManagement />} />
+                    <Route path="admin/organizations" element={<OrganizationManagement />} />
                   </Route>
                   <Route path="/" element={<Layout />}>
                     <Route path="dashboard-old" element={<Dashboard />} />
