@@ -58,11 +58,18 @@ router.post('/users/create', async (req, res) => {
       sendInvite = true,
       inviteRedirectUrl
     } = req.body;
-    
-    if (!email || !password) {
+
+    if (!email) {
       return res.status(400).json({
         success: false,
-        error: 'Email and password are required'
+        error: 'Email is required'
+      });
+    }
+
+    if (!sendInvite && !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password is required when sendInvite is false'
       });
     }
     
@@ -77,27 +84,52 @@ router.post('/users/create', async (req, res) => {
     
     const supabase = getSupabaseService();
     
-    // 1. Create auth user
-    const createUserPayload = {
-      email: email,
-      password: password,
-      user_metadata: {
-        role: role,
-        full_name: fullName || email.split('@')[0], // Use email prefix if no name provided
-        created_by: req.userId
-      }
+    const userMetadata = {
+      role: role,
+      full_name: fullName || email.split('@')[0],
+      created_by: req.userId,
+      plan_type: planType,
+      organization_id: organizationId || null
     };
 
-    if (!sendInvite) {
-      createUserPayload.email_confirm = true; // Maintain legacy flow when invites are disabled
+    const redirectUrl = inviteRedirectUrl || process.env.SUPABASE_INVITE_REDIRECT_URL;
+
+    let authData;
+    let authError;
+    let invitationSent = false;
+
+    if (sendInvite) {
+      ({ data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(email, {
+        redirectTo: redirectUrl,
+        data: userMetadata
+      }));
+
+      if (!authError && authData?.user?.id) {
+        // Ensure metadata is persisted on the invited account
+        const { error: metadataError } = await supabase.auth.admin.updateUserById(authData.user.id, {
+          user_metadata: userMetadata
+        });
+
+        if (metadataError) {
+          console.warn('⚠️ Failed to persist metadata for invited user:', metadataError);
+        }
+
+        invitationSent = true;
+      }
     } else {
-      const redirectUrl = inviteRedirectUrl || process.env.SUPABASE_INVITE_REDIRECT_URL;
+      const createUserPayload = {
+        email: email,
+        password: password,
+        email_confirm: true,
+        user_metadata: userMetadata
+      };
+
       if (redirectUrl) {
         createUserPayload.emailRedirectTo = redirectUrl;
       }
-    }
 
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser(createUserPayload);
+      ({ data: authData, error: authError } = await supabase.auth.admin.createUser(createUserPayload));
+    }
     
     if (authError) {
       console.error('Error creating auth user:', authError);
@@ -106,8 +138,16 @@ router.post('/users/create', async (req, res) => {
         error: authError.message || 'Failed to create user'
       });
     }
-    
-    const newUserId = authData.user.id;
+
+    const newUserId = authData?.user?.id;
+
+    if (!newUserId) {
+      console.error('Supabase did not return a user ID after creation. Response:', authData);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create user in authentication service'
+      });
+    }
     
     // 2. Initialize user credits
     // First check if user_credits already exist (might be created by trigger)
@@ -227,7 +267,7 @@ router.post('/users/create', async (req, res) => {
         organizationId: finalOrganizationId,
         organizationName: organization?.name || organizationName,
         message: 'User created successfully',
-        invitationSent: sendInvite
+        invitationSent: invitationSent
       }
     });
     
