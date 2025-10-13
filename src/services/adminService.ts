@@ -1,4 +1,5 @@
 import type { ManagedUserRole } from '../types/userManagement';
+import buildApiUrl from '../utils/api';
 
 interface CreateUserRequest {
   email: string;
@@ -83,8 +84,8 @@ export const adminService = {
   createUser: async (request: CreateUserRequest): Promise<CreateUserResponse> => {
     try {
       const userId = getUserId();
-      
-      const response = await fetch('/api/admin/users/create', {
+
+      const response = await fetch(buildApiUrl('admin/users/create'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,14 +130,19 @@ export const adminService = {
   }): Promise<ListUsersResponse> => {
     try {
       const userId = getUserId();
-      
+
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.set('page', params.page.toString());
       if (params?.limit) queryParams.set('limit', params.limit.toString());
       if (params?.role) queryParams.set('role', params.role);
       if (params?.organizationId) queryParams.set('organizationId', params.organizationId);
 
-      const response = await fetch(`/api/admin/users?${queryParams.toString()}`, {
+      const queryString = queryParams.toString();
+      const url = queryString
+        ? `${buildApiUrl('admin/users')}?${queryString}`
+        : buildApiUrl('admin/users');
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
