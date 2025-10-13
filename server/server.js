@@ -12,6 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import { Readable } from 'stream';
 import { File as NodeFile } from 'node:buffer';
+import { randomBytes } from 'crypto';
 
 // Polyfill File for Node < 20 (required by OpenAI SDK for audio transcription)
 if (typeof globalThis.File === 'undefined') {
@@ -269,13 +270,25 @@ app.use(cors({
   credentials: true
 }));
 
+const isProduction = process.env.NODE_ENV === 'production';
+const sessionSecret = process.env.SESSION_SECRET;
+
+if (!sessionSecret) {
+  if (isProduction) {
+    throw new Error('SESSION_SECRET must be set in production environments.');
+  }
+  console.warn('⚠️  SESSION_SECRET is not set. Generating a temporary secret for this session.');
+}
+
 // Session middleware for OAuth token storage
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'dev-secret-key-change-in-production',
+  secret: sessionSecret || randomBytes(32).toString('hex'),
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Set to true in production with HTTPS
+    secure: isProduction,
+    httpOnly: true,
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));

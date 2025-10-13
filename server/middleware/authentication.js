@@ -28,6 +28,18 @@ const apiKeyManager = new APIKeyManager();
 // Initialize auth services
 let authInitialized = false;
 
+const environment = (process.env.NODE_ENV || '').toLowerCase();
+const mockAuthExplicitlyEnabled = process.env.MOCK_AUTH === 'true';
+const mockAuthEnabled = ['development', 'test'].includes(environment) || mockAuthExplicitlyEnabled;
+
+if (!environment && !mockAuthExplicitlyEnabled) {
+  console.warn('⚠️  NODE_ENV is not set. Mock authentication will remain disabled until explicitly enabled.');
+}
+
+if (environment === 'production' && mockAuthExplicitlyEnabled) {
+  console.warn('⚠️  Mock authentication has been explicitly enabled in production. Proceed with extreme caution.');
+}
+
 async function initializeAuthServices() {
   if (authInitialized) return;
   
@@ -47,7 +59,7 @@ async function initializeAuthServices() {
  * Mock authentication configuration
  */
 const MOCK_AUTH_CONFIG = {
-  enabled: process.env.NODE_ENV === 'development' || process.env.MOCK_AUTH === 'true' || !process.env.NODE_ENV,
+  enabled: mockAuthEnabled,
   defaultOrgId: process.env.DEFAULT_ORG_ID || null,
   defaultUserId: process.env.DEFAULT_USER_ID || null,
   
