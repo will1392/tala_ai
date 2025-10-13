@@ -8,7 +8,29 @@ const router = express.Router();
 
 console.log('✅ Admin routes module loaded');
 
-// All admin routes require authentication and super_admin role
+/**
+ * Health check endpoint (no auth required for testing)
+ */
+router.get('/health', (req, res) => {
+  console.log('🔵 GET /api/admin/health called');
+  res.json({ success: true, message: 'Admin routes are working', timestamp: new Date().toISOString() });
+});
+
+/**
+ * Test POST endpoint (no auth for debugging)
+ */
+router.post('/test', (req, res) => {
+  console.log('🔵 POST /api/admin/test called');
+  console.log('Request body:', req.body);
+  res.json({ 
+    success: true, 
+    method: 'POST',
+    message: 'POST route test successful',
+    body: req.body
+  });
+});
+
+// All other admin routes require authentication and super_admin role
 router.use(authenticate);
 router.use(requireRole('super_admin'));
 
