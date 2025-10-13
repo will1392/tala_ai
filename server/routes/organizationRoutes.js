@@ -7,8 +7,17 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
-// All organization management routes require super_admin
-router.use(requireRole('super_admin'));
+// Allow both super_admin and admin to access organization routes
+router.use((req, res, next) => {
+  if (req.userRole === 'super_admin' || req.userRole === 'admin') {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      error: 'Access denied. Admin or Super Admin role required.'
+    });
+  }
+});
 
 console.log('✅ Organization routes middleware configured');
 
@@ -46,7 +55,6 @@ router.post('/create', async (req, res) => {
         slug,
         type,
         owner_id: ownerId || null,
-        is_active: true,
         settings,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -83,7 +91,7 @@ router.post('/create', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     console.log('🔵 GET /api/organizations called');
-    const { page = 1, limit = 50, type, isActive = true } = req.query;
+    const { page = 1, limit = 50, type } = req.query;
     const offset = (page - 1) * limit;
     
     const supabase = getSupabaseService();
@@ -95,9 +103,6 @@ router.get('/', async (req, res) => {
     // Apply filters
     if (type) {
       query = query.eq('type', type);
-    }
-    if (isActive !== undefined) {
-      query = query.eq('is_active', isActive === 'true' || isActive === true);
     }
     
     // Apply pagination
@@ -189,7 +194,6 @@ router.put('/:organizationId', async (req, res) => {
     if (slug !== undefined) updates.slug = slug;
     if (type !== undefined) updates.type = type;
     if (ownerId !== undefined) updates.owner_id = ownerId;
-    if (isActive !== undefined) updates.is_active = isActive;
     if (settings !== undefined) updates.settings = settings;
     
     const { data, error } = await supabase
@@ -226,13 +230,10 @@ router.delete('/:organizationId', async (req, res) => {
     
     const supabase = getSupabaseService();
     
-    // Soft delete
+    // Hard delete since we don't have is_active column
     const { data, error } = await supabase
       .from('organizations')
-      .update({
-        is_active: false,
-        updated_at: new Date().toISOString()
-      })
+      .delete()
       .eq('id', organizationId)
       .select()
       .single();
