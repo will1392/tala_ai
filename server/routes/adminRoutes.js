@@ -119,8 +119,6 @@ router.post('/users/create', async (req, res) => {
       });
     }
     
-    const supabase = getSupabaseService();
-    
     const userMetadata = {
       role: role,
       full_name: fullName || email.split('@')[0],

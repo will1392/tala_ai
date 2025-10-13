@@ -1,30 +1,23 @@
 -- Migration: Move all users without an organization to Tala AI
 -- Run this after 01-add-type-column-to-organizations.sql
+-- Simplified version compatible with existing schema
 
 -- Step 1: Ensure Tala AI organization exists (idempotent)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM organizations WHERE id = '00000000-0000-0000-0000-000000000001') THEN
-    -- Create new Tala AI organization
+    -- Create new Tala AI organization with minimal columns
     INSERT INTO organizations (
       id,
       name,
       slug,
       type,
-      owner_id,
-      is_active,
-      settings,
-      created_at,
-      updated_at
+      created_at
     ) VALUES (
       '00000000-0000-0000-0000-000000000001',
       'Tala AI',
       'tala-ai',
       'parent',
-      NULL,
-      true,
-      '{"isParent": true, "sharedKnowledge": true}'::jsonb,
-      CURRENT_TIMESTAMP,
       CURRENT_TIMESTAMP
     );
     RAISE NOTICE 'Created Tala AI organization';
@@ -34,10 +27,7 @@ BEGIN
     SET
       name = 'Tala AI',
       slug = 'tala-ai',
-      type = 'parent',
-      is_active = true,
-      settings = '{"isParent": true, "sharedKnowledge": true}'::jsonb,
-      updated_at = CURRENT_TIMESTAMP
+      type = 'parent'
     WHERE id = '00000000-0000-0000-0000-000000000001';
     RAISE NOTICE 'Updated existing Tala AI organization';
   END IF;
@@ -49,9 +39,7 @@ DECLARE
   affected_rows INT;
 BEGIN
   UPDATE user_credits
-  SET 
-    organization_id = '00000000-0000-0000-0000-000000000001',
-    updated_at = CURRENT_TIMESTAMP
+  SET organization_id = '00000000-0000-0000-0000-000000000001'
   WHERE organization_id IS NULL;
   
   GET DIAGNOSTICS affected_rows = ROW_COUNT;
