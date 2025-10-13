@@ -42,8 +42,7 @@ import { DEFAULT_TOUR_STEPS } from './tour/steps';
 import { srOnly } from './utils/accessibility';
 import { LiveRegionManager } from './components/accessibility';
 import Credits from './pages/Credits';
-import { UserManagement } from './pages/admin/UserManagement';
-import { OrganizationManagement } from './pages/admin/OrganizationManagement';
+import { UserManagementNew } from './pages/admin/UserManagementNew';
 import { ensureUserId } from './utils/ensureUserId';
 import './styles/globals.css';
 
@@ -124,8 +123,7 @@ function App() {
                       <Route path="marketing" element={<MarketingDashboard />} />
                     )}
                     <Route path="credits" element={<Credits />} />
-                    <Route path="admin/users" element={<UserManagement />} />
-                    <Route path="admin/organizations" element={<OrganizationManagement />} />
+                    <Route path="admin/users" element={<UserManagementNew />} />
                   </Route>
                   <Route path="/" element={<Layout />}>
                     <Route path="dashboard-old" element={<Dashboard />} />
