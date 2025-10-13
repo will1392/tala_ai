@@ -317,16 +317,16 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
         </div>
         
         {/* Super Admin Section */}
-        {(creditInfo?.role === 'super_admin' || user?.role === 'super_admin') && (
+        {(creditInfo?.role === 'super_admin' || user?.role === 'super_admin' || user?.role === 'admin') && (
           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="px-3 mb-2">
               <span className="inline-flex items-center gap-1 rounded-full border border-yellow-200 bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-700 dark:border-yellow-500/40 dark:bg-yellow-500/10 dark:text-yellow-200">
                 <Sparkles className="h-3 w-3" />
-                Super Admin Mode
+                {user?.role === 'super_admin' ? 'Super Admin Mode' : 'Admin Mode'}
               </span>
             </div>
             <p className="px-3 text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2">
-              Super Admin
+              {user?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
             </p>
             <button
               onClick={() => navigate('/admin/users')}

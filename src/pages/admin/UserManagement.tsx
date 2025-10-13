@@ -122,6 +122,26 @@ export function UserManagement() {
   } = useUserManagementStore();
 
   const isSuperAdmin = user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin';
+  
+  // Only allow super_admin and admin to access this page
+  if (!isSuperAdmin && !isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="mb-4">
+              <Shield className="h-16 w-16 text-gray-400 mx-auto" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+            <p className="text-[var(--muted)]">
+              You don't have permission to access User Management. This feature is only available to administrators.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const accessibleAdmins = useMemo(() => {
     if (!user) return [];
