@@ -9,18 +9,30 @@ This guide will help you migrate all existing users to the Tala AI parent organi
 
 ## Migration Steps
 
-### Step 1: Run the Migration SQL
+### Step 1: Add Type Column to Organizations Table
 
 Navigate to your Supabase project:
 1. Go to **SQL Editor**
 2. Click **New Query**
-3. Copy and paste the contents of `migrate-users-to-tala-ai-org.sql`
+3. Copy and paste the contents of `01-add-type-column-to-organizations.sql`
 4. Click **Run**
+
+This will:
+- ✅ Add `type` column to organizations table if it doesn't exist
+- ✅ Create index on the type column
+- ✅ Show confirmation message
+
+### Step 2: Run the User Migration
+
+1. In **SQL Editor**, click **New Query**
+2. Copy and paste the contents of `02-migrate-users-to-tala-ai.sql`
+3. Click **Run**
 
 This will:
 - ✅ Create the Tala AI parent organization (if it doesn't exist)
 - ✅ Move all users with `NULL` organization_id to Tala AI
-- ✅ Show verification results
+- ✅ Show verification results with user counts
+- ✅ Display sample of migrated users
 
 ### Step 2: Verify Results
 
