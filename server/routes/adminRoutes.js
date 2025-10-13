@@ -59,6 +59,9 @@ router.post('/users/create', async (req, res) => {
       inviteRedirectUrl
     } = req.body;
 
+    console.log('📋 Creating user with role:', role);
+    console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
+
     if (!email) {
       return res.status(400).json({
         success: false,
