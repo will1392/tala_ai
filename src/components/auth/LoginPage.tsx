@@ -36,11 +36,11 @@ export const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      const normalizedEmail = email.trim().toLowerCase();
+      const trimmedEmail = email.trim();
 
       // Authenticate with Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
+        email: trimmedEmail,
         password,
       });
 
@@ -98,7 +98,7 @@ export const LoginPage = () => {
       // Set user in auth store
       setUser({
         id: data.user.id,
-        email: data.user.email || normalizedEmail,
+        email: data.user.email || trimmedEmail,
         role,
         organizationId: organizationId,
         name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
