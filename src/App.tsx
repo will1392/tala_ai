@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Layout } from './components/layout/Layout';
 import { PremiumLayout } from './components/layout/PremiumLayout';
 import { LoginPage } from './components/auth/LoginPage';
+import { SetPassword } from './pages/SetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { UnifiedDashboard } from './pages/UnifiedDashboard';
 import { ModernDashboard } from './pages/ModernDashboard';
@@ -92,7 +93,10 @@ function App() {
             {isAuthenticated && <DueTaskBanner />}
             <Routes>
               {!isAuthenticated ? (
-                <Route path="*" element={<LoginPage />} />
+                <>
+                  <Route path="/set-password" element={<SetPassword />} />
+                  <Route path="*" element={<LoginPage />} />
+                </>
               ) : (
                 <>
                   <Route path="/" element={<Navigate to="/chat" replace />} />
