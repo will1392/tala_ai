@@ -593,9 +593,9 @@ Let's begin with understanding your business. What type of travel experiences do
     };
   }, [conversationId, messages]);
 
-  // Only scroll to bottom for user messages, not assistant responses
+  // Scroll to bottom for all new messages
   useEffect(() => {
-    if (messages.length > 0 && messages[messages.length - 1].sender === 'user') {
+    if (messages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
