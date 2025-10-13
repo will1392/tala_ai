@@ -11,6 +11,7 @@ import {
   Users,
   Key,
   Save,
+  LogOut,
   Settings as SettingsIcon
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '../components/ui/Card';
@@ -21,6 +22,8 @@ import { Select } from '../components/ui/Select';
 import { cn } from '../utils/cn';
 import type { UserProfile } from '../components/onboarding/UserProfileOnboarding';
 import CreditsDashboard from '../components/credits/CreditsDashboard';
+import { useAuthStore } from '../store/authStore';
+import { useNavigate } from 'react-router-dom';
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -554,17 +557,81 @@ const ToggleOption = ({ label, description, checked, onChange }: any) => {
 };
 
 // Placeholder components for other sections
-const SecuritySettings = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Security Settings</CardTitle>
-      <CardDescription>Manage your account security</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p className="text-[var(--muted)]">Security settings coming soon...</p>
-    </CardContent>
-  </Card>
-);
+const SecuritySettings = () => {
+  const { logout, user } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Security Settings</CardTitle>
+          <CardDescription>Manage your account security and sessions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="pb-4 border-b border-[var(--border)]">
+              <h3 className="text-sm font-medium mb-2">Change Password</h3>
+              <p className="text-sm text-[var(--muted)] mb-4">Update your password to keep your account secure</p>
+              <Button variant="secondary" size="sm">
+                Change Password
+              </Button>
+            </div>
+
+            <div className="pb-4 border-b border-[var(--border)]">
+              <h3 className="text-sm font-medium mb-2">Two-Factor Authentication</h3>
+              <p className="text-sm text-[var(--muted)] mb-4">Add an extra layer of security to your account</p>
+              <Button variant="secondary" size="sm">
+                Enable 2FA
+              </Button>
+            </div>
+
+            <div className="pb-4 border-b border-[var(--border)]">
+              <h3 className="text-sm font-medium mb-2">Active Sessions</h3>
+              <p className="text-sm text-[var(--muted)] mb-4">Manage devices and sessions where you're logged in</p>
+              <div className="flex items-start gap-3 p-3 bg-[var(--muted)] rounded-lg">
+                <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                <div className="text-sm flex-1">
+                  <p className="text-[var(--fg)] font-medium">Current Session</p>
+                  <p className="text-[var(--muted)]">{user?.email}</p>
+                  <p className="text-[var(--muted)] text-xs mt-1">Last activity: Just now</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium mb-2">Account Actions</h3>
+              <p className="text-sm text-[var(--muted)] mb-4">Sign out of your account or end all sessions</p>
+              <div className="flex gap-3">
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                >
+                  End All Sessions
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const DataSettings = () => (
   <Card>

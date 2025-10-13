@@ -74,11 +74,11 @@ router.post('/users/create', async (req, res) => {
     }
     
     // Validate role
-    const validRoles = ['agent', 'agency_owner'];
+    const validRoles = ['agent', 'admin', 'agency_owner'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid role. Must be agent or agency_owner'
+        error: 'Invalid role. Must be agent, admin, or agency_owner'
       });
     }
     
