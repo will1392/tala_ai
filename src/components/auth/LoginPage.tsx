@@ -8,12 +8,19 @@ import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContextNew';
 import { useNavigate } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL || '',
+  import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+);
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const { setUser } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -25,13 +32,52 @@ export const LoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
     try {
-      const user = await login(email, password);
-      toast.success(`Welcome back, ${user.name}!`);
+      // Authenticate with Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (!data.user) {
+        throw new Error('Login failed');
+      }
+
+      // Get user role from user_credits
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/admin/users?limit=1`, {
+        headers: {
+          'x-user-id': data.user.id
+        }
+      });
+
+      let role = 'agent';
+      if (response.ok) {
+        const userData = await response.json();
+        if (userData.success && userData.data && userData.data.length > 0) {
+          role = userData.data[0].role || 'agent';
+        }
+      }
+
+      // Set user in auth store
+      setUser({
+        id: data.user.id,
+        email: data.user.email || email,
+        role: role as any,
+        name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+        createdAt: new Date(data.user.created_at)
+      });
+
+      toast.success(`Welcome back!`);
       navigate('/chat');
     } catch (error) {
+      console.error('Login error:', error);
       toast.error(error instanceof Error ? error.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
