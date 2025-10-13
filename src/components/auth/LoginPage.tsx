@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContextNew';
 import { useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
+import type { User } from '../../types/auth';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL || '',
@@ -33,11 +34,13 @@ export const LoginPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+
       // Authenticate with Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
@@ -47,6 +50,14 @@ export const LoginPage = () => {
         throw new Error('Login failed');
       }
 
+      // Persist auth tokens for backend requests
+      if (data.session?.access_token) {
+        localStorage.setItem('auth_token', data.session.access_token);
+      }
+      if (data.session?.refresh_token) {
+        localStorage.setItem('refresh_token', data.session.refresh_token);
+      }
+
       // Get user role and organization from Supabase user_credits
       const { data: creditsData, error: creditsError } = await supabase
         .from('user_credits')
@@ -54,12 +65,18 @@ export const LoginPage = () => {
         .eq('user_id', data.user.id)
         .single();
 
-      let role = 'agent';
-      let organizationId = null;
+      type SupabaseRole = 'super_admin' | 'admin' | 'agent' | 'agency_owner' | null;
+      let role: User['role'] = 'agent';
+      let organizationId: string | null = null;
       const TALA_AI_ORG_ID = '00000000-0000-0000-0000-000000000001';
       
       if (!creditsError && creditsData) {
-        role = creditsData.role || 'agent';
+        const supabaseRole = (creditsData.role as SupabaseRole) ?? null;
+        if (supabaseRole === 'agency_owner') {
+          role = 'admin';
+        } else if (supabaseRole === 'super_admin' || supabaseRole === 'admin' || supabaseRole === 'agent') {
+          role = supabaseRole;
+        }
         organizationId = creditsData.organization_id;
         
         // If user has no organization, assign them to Tala AI and update database
@@ -75,11 +92,14 @@ export const LoginPage = () => {
         }
       }
 
+      // Store the authenticated Supabase user ID for API calls
+      localStorage.setItem('userId', data.user.id);
+
       // Set user in auth store
       setUser({
         id: data.user.id,
-        email: data.user.email || email,
-        role: role as any,
+        email: data.user.email || normalizedEmail,
+        role,
         organizationId: organizationId,
         name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
         createdAt: new Date(data.user.created_at)

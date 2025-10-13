@@ -97,9 +97,17 @@ export const useAuthStore = create<AuthStore>()(
           isAuthenticated: false,
           isLoading: false
         });
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('userId');
       },
 
       setUser: (user: User | null) => {
+        if (user) {
+          localStorage.setItem('userId', user.id);
+        } else {
+          localStorage.removeItem('userId');
+        }
         set({
           user,
           isAuthenticated: !!user,
