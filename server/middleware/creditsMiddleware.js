@@ -55,20 +55,19 @@ export function requireCredits(operation, customCost = null) {
       operation,
       cost,
       creditsEnabled: process.env.CREDITS_ENABLED,
+      nodeEnv: process.env.NODE_ENV,
       path: req.path,
       method: req.method
     });
     
-    // Skip credits check for certain conditions
-    if (process.env.NODE_ENV === 'development') {
-      console.log('⚠️ Credits check skipped in development mode');
+    // Skip credits check ONLY if explicitly disabled
+    if (process.env.CREDITS_ENABLED === 'false') {
+      console.log('⚠️ Credits disabled via CREDITS_ENABLED=false');
       return next();
     }
     
-    if (process.env.CREDITS_ENABLED === 'false') {
-      console.log('⚠️ Credits disabled via environment variable');
-      return next();
-    }
+    // Credits are enabled by default in all environments
+    console.log('✅ Credits check active');
     
     // Get user ID
     const userId = req.headers['x-user-id'] || req.session?.userId || req.user?.id;
