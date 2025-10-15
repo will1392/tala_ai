@@ -172,21 +172,104 @@ export async function getCreditsStatus(req, res) {
     }
     
     const result = await creditSystem.getUserCredits(userId);
-    
+
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get credit status',
         message: result.error
       });
     }
-    
-    // Get usage history
+
+    const creditData = result.data || {};
+
+    // Determine tier and default limits from plan type
+    const tierMap = {
+      free: 'free',
+      agent: 'premium',
+      agency: 'enterprise',
+      enterprise: 'enterprise',
+      payg: 'payAsYouGo',
+      pay_as_you_go: 'payAsYouGo'
+    };
+
+    const tier = tierMap[creditData.plan_type] || 'free';
+
+    const tierDailyLimit = {
+      free: 10,
+      premium: 100,
+      enterprise: 1000,
+      payAsYouGo: null
+    };
+
+    // Get usage history (last 7 days for dashboard widgets)
     const history = await creditSystem.getCreditHistory(userId, 7);
-    
+
+    const transactions = history.success ? history.transactions : [];
+
+    // Calculate daily usage for current day and build daily usage chart data
+    const todayKey = new Date().toISOString().split('T')[0];
+    const dailyUsageMap = new Map();
+    let todayUsage = 0;
+
+    transactions.forEach(transaction => {
+      if (!transaction?.created_at) return;
+
+      const dateKey = new Date(transaction.created_at).toISOString().split('T')[0];
+
+      if (transaction.credits > 0) {
+        const current = dailyUsageMap.get(dateKey) || 0;
+        const newTotal = current + transaction.credits;
+        dailyUsageMap.set(dateKey, newTotal);
+
+        if (dateKey === todayKey) {
+          todayUsage += transaction.credits;
+        }
+      }
+    });
+
+    const dailyUsage = Array.from(dailyUsageMap.entries())
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, credits]) => ({ date, credits }));
+
+    // Build usage summary grouped by operation
+    const byOperation = {};
+    if (history.success && history.summary) {
+      Object.entries(history.summary).forEach(([operation, summary]) => {
+        byOperation[operation] = {
+          count: summary.count,
+          credits: summary.totalCredits
+        };
+      });
+    }
+
+    const hasTierLimit = Object.prototype.hasOwnProperty.call(tierDailyLimit, tier);
+
+    const enhancedCredits = {
+      ...creditData,
+      balance: creditData.available_credits ?? creditData.total_credits ?? 0,
+      monthly_allocation: (creditData.total_credits || 0) + (creditData.bonus_credits || 0),
+      monthly_usage: creditData.used_credits || 0,
+      tier,
+      daily_usage: todayUsage,
+      daily_limit: hasTierLimit ? tierDailyLimit[tier] : tierDailyLimit.free,
+      last_reset: creditData.last_reset_date || null
+    };
+
+    const usage = {
+      totalOperations: transactions.filter(t => t.credits > 0).length,
+      totalCreditsUsed: history.success ? history.totalSpent : 0,
+      periodStart: history.success && transactions.length > 0
+        ? transactions[transactions.length - 1].created_at
+        : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      periodEnd: new Date().toISOString(),
+      byOperation,
+      dailyUsage
+    };
+
     res.json({
-      credits: result.data,
-      usage: history.success ? history.summary : {},
-      transactions: history.success ? history.transactions : [],
+      credits: enhancedCredits,
+      usage,
+      transactions,
       costs: OPERATION_COSTS
     });
   } catch (error) {
