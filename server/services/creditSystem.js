@@ -9,41 +9,58 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Credit costs in credits (1 credit = $0.001)
+// Based on real API pricing with 20% markup for profit
+// Typical message: ~500 input tokens + ~300 output tokens
 export const CREDIT_COSTS = {
-  // Chat Operations
+  // Chat Operations (by model) - WITH 20% MARKUP
   chat_message: {
-    'gpt-4o-mini': 10,
-    'gemini-2.0-flash': 8,
-    'claude-3-5-haiku': 25,
-    'claude-3-5-sonnet': 75,
-    'gpt-4o': 150,
-    'grok-2': 50,
-    'default': 30
+    // Most efficient models (< 1 cent per message)
+    'gpt-4o-mini': 1,              // API: $0.0003, You: $0.0010, Profit: $0.0007
+    'gpt-5-nano-2025-08-07': 1,    // API: $0.0002, You: $0.0010, Profit: $0.0008  
+    'gemini-2.0-flash': 1,         // API: $0.0001, You: $0.0010, Profit: $0.0009
+    'gemini-2.5-flash': 1,         // API: $0.0001, You: $0.0010, Profit: $0.0009
+    'claude-3-5-haiku': 1,         // Similar pricing to gpt-4o-mini
+    
+    // Mid-tier models ($0.002-0.008 per message)
+    'gpt-5-mini-2025-08-07': 2,    // API: $0.0008, You: $0.0020, Profit: $0.0011
+    'gemini-2.5-pro': 3,           // API: $0.0021, You: $0.0030, Profit: $0.0009
+    'claude-3-5-sonnet': 8,        // API: $0.0060, You: $0.0080, Profit: $0.0020
+    'claude-sonnet-4-20250514': 8, // API: $0.0060, You: $0.0080, Profit: $0.0020
+    'grok-2': 8,                   // API: $0.0060, You: $0.0080, Profit: $0.0020
+    'grok-4': 8,                   // API: $0.0060, You: $0.0080, Profit: $0.0020
+    'grok-4-latest': 8,            // API: $0.0060, You: $0.0080, Profit: $0.0020
+    
+    // Premium models ($0.025-0.036 per message)
+    'gpt-4o': 31,                  // API: $0.0255, You: $0.0310, Profit: $0.0055
+    'gpt-5-2025-08-07': 31,        // API: $0.0255, You: $0.0310, Profit: $0.0055
+    'claude-opus-4-20250514': 36,  // API: $0.0300, You: $0.0360, Profit: $0.0060
+    
+    'default': 30                  // Fallback for unknown models
   },
   
-  // Document Operations
-  document_upload: 50,
-  document_search: 5,
-  document_extract: 100,
-  document_analyze: 150,
+  // Document Operations (using gpt-4o-mini as baseline)
+  document_upload: 1,        // Quick processing of upload
+  document_search: 1,        // Vector search + context retrieval
+  document_extract: 2,       // Extract specific information
+  document_analyze: 2,       // Full document analysis
   
-  // Voice Operations
-  voice_transcription_per_minute: 20,
-  voice_to_document: 70,
+  // Voice Operations (Whisper-equivalent: $0.006/min + 20% markup)
+  voice_transcription_per_minute: 8,   // $0.0072 per minute
+  voice_to_document: 36,               // ~5 minutes of audio
   
   // Email Operations
-  email_parse: 30,
-  email_batch_process: 200,
-  email_task_extraction: 50,
+  email_parse: 1,                // Parse single email (like search)
+  email_batch_process: 10,       // Process 10 emails
+  email_task_extraction: 1,      // Extract tasks from email
   
   // Advanced Features
-  image_analysis: 150,
-  multi_agent_task: 300,
-  document_translation: 200,
+  image_analysis: 1,             // Vision model analysis
+  multi_agent_task: 24,          // 3x Claude Sonnet calls
+  document_translation: 3,       // 1.5x document analysis
   
-  // Bulk Operations
-  bulk_document_process: 500,
-  knowledge_base_search: 10
+  // Bulk Operations  
+  bulk_document_process: 10,     // 5 documents
+  knowledge_base_search: 1       // RAG search
 };
 
 // Monthly credit allocation by plan type
