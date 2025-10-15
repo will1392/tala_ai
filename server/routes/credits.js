@@ -1,6 +1,7 @@
 import express from 'express';
 import CreditSystem from '../services/creditSystem.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
+import creditScheduler from '../services/creditScheduler.js';
 
 const router = express.Router();
 const creditSystem = new CreditSystem();
@@ -336,6 +337,76 @@ router.post('/change-plan', authenticate, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to change plan' 
+    });
+  }
+});
+
+/**
+ * GET /api/credits/scheduler/status
+ * Get credit scheduler status (super admin only)
+ */
+router.get('/scheduler/status', authenticate, requireRole('super_admin'), async (req, res) => {
+  try {
+    const status = creditScheduler.getStatus();
+    res.json({ 
+      success: true, 
+      scheduler: status 
+    });
+  } catch (error) {
+    console.error('Error getting scheduler status:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get scheduler status' 
+    });
+  }
+});
+
+/**
+ * POST /api/credits/scheduler/manual-reset
+ * Manually trigger a credit reset (super admin only - use with caution!)
+ */
+router.post('/scheduler/manual-reset', authenticate, requireRole('super_admin'), async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    
+    if (confirm !== 'RESET_ALL_CREDITS') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Confirmation required. Send { "confirm": "RESET_ALL_CREDITS" }' 
+      });
+    }
+    
+    const result = await creditScheduler.manualReset();
+    res.json(result);
+  } catch (error) {
+    console.error('Error during manual reset:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to perform manual reset' 
+    });
+  }
+});
+
+/**
+ * GET /api/credits/next-reset
+ * Get next scheduled credit reset date (public)
+ */
+router.get('/next-reset', authenticate, async (req, res) => {
+  try {
+    const nextResetDate = creditScheduler.getNextResetDate();
+    const daysUntilReset = creditScheduler.getDaysUntilReset();
+    
+    res.json({ 
+      success: true,
+      nextResetDate,
+      daysUntilReset,
+      timezone: 'UTC'
+    });
+  } catch (error) {
+    console.error('Error getting next reset date:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to get next reset date' 
     });
   }
 });

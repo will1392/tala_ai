@@ -57,9 +57,10 @@ import QdrantOptimizer from './services/QdrantOptimizer.js';
 // Import role service
 import roleService from './services/roleService.js';
 
-// Import credits middleware
+// Import credits middleware and scheduler
 import creditsMiddleware from './middleware/creditsMiddleware.js';
 const { requireCredits, getCreditsStatus, purchaseCredits, getCreditPackages, upgradeTier, getTransactionHistory } = creditsMiddleware;
+import creditScheduler from './services/creditScheduler.js';
 
 // Load environment variables from server directory
 dotenv.config({ path: path.join(dirname(fileURLToPath(import.meta.url)), '.env') });
@@ -188,6 +189,13 @@ if (enableQdrantOptimizer) {
     } else {
       console.log('⏭️  Skipping Qdrant optimization (ENABLE_QDRANT_OPTIMIZER=false)');
     }
+    
+    // Start credit scheduler for monthly resets
+    console.log('💳 Starting credit scheduler...');
+    creditScheduler.start();
+    const schedulerStatus = creditScheduler.getStatus();
+    console.log(`✅ Credit scheduler active - next reset: ${schedulerStatus.nextResetDate}`);
+    console.log(`   Days until reset: ${schedulerStatus.daysUntilReset}`);
   } catch (error) {
     console.log('⚠️  Database health check failed - using JSON fallback mode');
     console.error('Details:', error.message);

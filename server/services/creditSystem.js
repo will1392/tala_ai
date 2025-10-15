@@ -273,7 +273,8 @@ class CreditSystem {
         creditCost,
         availableCredits: userCredits.data.available_credits,
         shortfall: 0,
-        bypassReason: 'super_admin_unlimited_access'
+        bypassReason: 'super_admin_unlimited_access',
+        nextResetDate: this.getNextResetDate()
       };
     }
 
@@ -284,8 +285,23 @@ class CreditSystem {
       hasEnoughCredits,
       creditCost,
       availableCredits: userCredits.data.available_credits,
-      shortfall: hasEnoughCredits ? 0 : creditCost - userCredits.data.available_credits
+      shortfall: hasEnoughCredits ? 0 : creditCost - userCredits.data.available_credits,
+      nextResetDate: this.getNextResetDate()
     };
+  }
+
+  /**
+   * Get next scheduled reset date
+   */
+  getNextResetDate() {
+    const now = new Date();
+    const nextReset = new Date(Date.UTC(
+      now.getUTCMonth() === 11 ? now.getUTCFullYear() + 1 : now.getUTCFullYear(),
+      now.getUTCMonth() === 11 ? 0 : now.getUTCMonth() + 1,
+      1, 0, 0, 0, 0
+    ));
+    
+    return nextReset.toISOString();
   }
 
   /**
