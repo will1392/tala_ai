@@ -8,6 +8,8 @@ import express from 'express';
 import { ConversationService } from '../../services/db/conversationService.js';
 import { TalaIntelligence } from '../../services/intelligence/TalaIntelligence.js';
 import { getSharedDb, initializeSharedDb } from '../../services/db/sharedDatabase.js';
+import { authenticate } from '../../middleware/auth.js';
+import { requireCredits } from '../../middleware/creditsMiddleware.js';
 
 const router = express.Router();
 
@@ -34,7 +36,7 @@ initializeServices().catch(console.error);
  * POST /api/chat/v2
  * Process a chat message with database persistence
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { message, conversationId, metadata = {} } = req.body;
     const userId = req.headers['x-user-id'] || req.headers['x-mock-user-id'] || 'anonymous';

@@ -50,7 +50,7 @@ const intelligence = new TalaIntelligence(intelligenceConfig);
  * POST /api/chat/v2
  * Enhanced chat endpoint with full intelligence integration
  */
-router.post('/v2', authenticate, async (req, res) => {
+router.post('/v2', authenticate, requireCredits('chat_message'), async (req, res) => {
   console.log('🎯 IntelligentChat /v2 endpoint hit!');
   console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
   
