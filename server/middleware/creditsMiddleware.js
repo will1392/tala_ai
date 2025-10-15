@@ -90,7 +90,8 @@ export function requireCredits(operation, customCost = null) {
         creditCost: creditCheck.creditCost,
         availableCredits: creditCheck.availableCredits,
         shortfall: creditCheck.shortfall,
-        upgradeUrl: '/credits'
+        upgradeUrl: '/credits',
+        nextResetDate: creditCheck.nextResetDate
       });
     }
     

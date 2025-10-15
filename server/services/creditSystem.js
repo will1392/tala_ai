@@ -53,6 +53,8 @@ const MONTHLY_CREDIT_ALLOCATION = {
   enterprise: 50000 // $50 worth for enterprise (custom)
 };
 
+const DEFAULT_PLAN_TYPE = 'agent';
+
 class CreditSystem {
   constructor() {
     this.supabase = createClient(
