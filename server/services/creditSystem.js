@@ -357,6 +357,12 @@ class CreditSystem {
 
       // Consume from appropriate pool
       if (planType === 'agency' && organizationId) {
+        console.log('💳 Consuming from organization pool:', {
+          userId,
+          organizationId,
+          creditCost: creditCheck.creditCost
+        });
+        
         // Use organization pool
         const { data: orgData } = await this.supabase
           .from('organization_credits')
@@ -366,14 +372,25 @@ class CreditSystem {
 
         const newUsedCredits = (orgData?.used_credits || 0) + creditCheck.creditCost;
 
+        console.log('💳 Updating organization credits:', {
+          oldUsed: orgData?.used_credits || 0,
+          newUsed: newUsedCredits,
+          creditCost: creditCheck.creditCost
+        });
+
         const { error: updateError } = await this.supabase
           .from('organization_credits')
           .update({ used_credits: newUsedCredits })
           .eq('organization_id', organizationId);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('❌ Failed to update organization credits:', updateError);
+          throw updateError;
+        }
+        
+        console.log('✅ Organization credits updated successfully');
 
-        // Track individual usage within agency
+        // Track individual usage within agency - use UPSERT to handle missing records
         const { data: memberData } = await this.supabase
           .from('agency_members')
           .select('credits_used_this_period')
@@ -381,14 +398,26 @@ class CreditSystem {
           .eq('organization_id', organizationId)
           .single();
 
-        await this.supabase
+        const newCreditsUsed = (memberData?.credits_used_this_period || 0) + creditCheck.creditCost;
+
+        // UPSERT: Insert if not exists, update if exists
+        const { error: memberError } = await this.supabase
           .from('agency_members')
-          .update({
-            credits_used_this_period: (memberData?.credits_used_this_period || 0) + creditCheck.creditCost,
-            last_activity: new Date().toISOString()
-          })
-          .eq('user_id', userId)
-          .eq('organization_id', organizationId);
+          .upsert({
+            user_id: userId,
+            organization_id: organizationId,
+            credits_used_this_period: newCreditsUsed,
+            last_activity: new Date().toISOString(),
+            active: true,
+            role: 'agent'
+          }, {
+            onConflict: 'user_id,organization_id'
+          });
+
+        if (memberError) {
+          console.error('Failed to track agency member usage:', memberError);
+          // Don't throw - organization credits were already deducted successfully
+        }
 
       } else {
         // Use individual pool
