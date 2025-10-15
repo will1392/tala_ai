@@ -94,7 +94,7 @@ export function requireCredits(operation, customCost = null) {
       });
     }
     
-    // Store credit info for later deduction
+    // Store credit info for deduction after successful response
     req.creditInfo = {
       userId,
       operation,
@@ -102,19 +102,12 @@ export function requireCredits(operation, customCost = null) {
       balance: creditCheck.availableCredits
     };
     
-    // Deduct credits after successful response
-    const originalSend = res.send;
-    const originalJson = res.json;
-    
+    // Track if credits were deducted
     let creditsDeducted = false;
     
-    const deductCreditsOnce = async () => {
-      console.log('🎯 deductCreditsOnce called:', {
-        creditsDeducted,
-        statusCode: res.statusCode,
-        shouldDeduct: !creditsDeducted && res.statusCode < 400
-      });
-      
+    // Intercept response finish to deduct credits
+    res.on('finish', async () => {
+      // Only deduct for successful responses
       if (!creditsDeducted && res.statusCode < 400) {
         creditsDeducted = true;
         
@@ -124,16 +117,19 @@ export function requireCredits(operation, customCost = null) {
           statusCode: res.statusCode
         };
         
-        // If it's a chat request, add message preview
         if (req.body?.message) {
           metadata.messagePreview = req.body.message.substring(0, 100);
         }
         
-        console.log('💳 Attempting to consume credits:', {
+        if (req.body?.model) {
+          metadata.model = req.body.model;
+        }
+        
+        console.log('💳 Consuming credits after successful response:', {
           userId,
           operation,
           cost,
-          metadata
+          statusCode: res.statusCode
         });
         
         try {
@@ -143,39 +139,20 @@ export function requireCredits(operation, customCost = null) {
             { cost, ...metadata }
           );
           
-          console.log('💳 Credit consumption result:', result);
-          
           if (!result.success) {
-            console.error(`❌ Failed to deduct credits for ${userId}:`, result.error);
+            console.error(`❌ Failed to deduct ${cost} credits from ${userId}:`, result.error);
           } else {
-            console.log(`✅ Deducted ${result.creditsConsumed} credits from ${userId} for ${operation}. Remaining: ${result.remainingCredits}`);
+            console.log(`✅ Deducted ${result.creditsConsumed} credits. User ${userId} remaining: ${result.remainingCredits}`);
           }
         } catch (error) {
-          console.error('❌ Exception during credit deduction:', error);
+          console.error('❌ Exception during credit deduction:', error.message);
         }
+      } else if (creditsDeducted) {
+        console.log('⏭️  Credits already deducted, skipping');
+      } else {
+        console.log('⏭️  Non-success response, not deducting credits:', res.statusCode);
       }
-    };
-    
-    // Override response methods to deduct credits
-    res.send = async function(data) {
-      await deductCreditsOnce();
-      return originalSend.call(this, data);
-    };
-    
-    res.json = async function(data) {
-      await deductCreditsOnce();
-      
-      // Add credits info to response if successful
-      if (res.statusCode < 400 && typeof data === 'object') {
-        data._credits = {
-          cost,
-          newBalance: req.creditInfo.balance - cost,
-          operation
-        };
-      }
-      
-      return originalJson.call(this, data);
-    };
+    });
     
     next();
   };
