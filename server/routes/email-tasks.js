@@ -6,6 +6,7 @@
 
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/creditsMiddleware.js';
 import EmailActionHandler from '../services/email/EmailActionHandler.js';
 import EmailManager from '../services/email/EmailManager.js';
 import TaskStore from '../services/tasks/TaskStore.js';
@@ -57,7 +58,7 @@ router.use(authenticate);
  * Extract tasks from email content
  * POST /api/email-tasks/extract
  */
-router.post('/extract', async (req, res) => {
+router.post('/extract', requireCredits('email_task_extraction'), async (req, res) => {
   try {
     const { emailId, subject, from, body, useAI = true } = req.body;
     
@@ -154,7 +155,7 @@ router.post('/extract', async (req, res) => {
  * Send email to Tala for task extraction
  * POST /api/email-tasks/send-to-tala
  */
-router.post('/send-to-tala', async (req, res) => {
+router.post('/send-to-tala', requireCredits('email_parse'), async (req, res) => {
   try {
     const { emailId, options = {} } = req.body;
     const userId = req.user?.id || req.userId;
@@ -200,7 +201,7 @@ router.post('/send-to-tala', async (req, res) => {
  * Batch send emails to Tala
  * POST /api/email-tasks/batch-send-to-tala
  */
-router.post('/batch-send-to-tala', async (req, res) => {
+router.post('/batch-send-to-tala', requireCredits('email_batch_process'), async (req, res) => {
   try {
     const { emailIds, options = {} } = req.body;
     const userId = req.user?.id || req.userId;

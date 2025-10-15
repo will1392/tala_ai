@@ -17,6 +17,7 @@ import { EncryptedDocumentService } from '../services/db/encryptedDocumentServic
 
 // Security imports
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/creditsMiddleware.js';
 
 // Mock implementations for missing dependencies
 const requirePermission = (permission) => (req, res, next) => next();
@@ -269,6 +270,7 @@ router.get('/:id',
 router.post('/',
   authenticate,
   requirePermission('documents:write'),
+  requireCredits('document_upload'),
   async (req, res) => {
     try {
       // Validate request body
@@ -540,6 +542,7 @@ router.post('/:id/share',
   authenticate,
   requireResourceAccess('document'),
   requirePermission('documents:share'),
+  requireCredits('document_upload'),
   async (req, res) => {
     try {
       const documentId = sanitizeString(req.params.id, { maxLength: 36 });
@@ -634,6 +637,7 @@ router.post('/:id/share',
 router.post('/analyze-visual',
   authenticate,
   requirePermission('documents:read'),
+  requireCredits('image_analysis'),
   async (req, res) => {
     try {
       const schema = {
@@ -763,6 +767,7 @@ router.post('/:id/translate',
   authenticate,
   requireResourceAccess('document'),
   requirePermission('documents:write'),
+  requireCredits('document_translation'),
   async (req, res) => {
     try {
       const documentId = sanitizeString(req.params.id, { maxLength: 36 });
@@ -922,6 +927,7 @@ router.post('/bulk-process',
   authenticate,
   requirePermission('documents:write'),
   requireRole('admin'),
+  requireCredits('bulk_document_process'),
   async (req, res) => {
     try {
       const schema = {
@@ -1065,6 +1071,7 @@ router.get('/pipeline/stats',
 router.post('/search',
   authenticate,
   requirePermission('documents:read'),
+  requireCredits('document_search'),
   async (req, res) => {
     try {
       // Validate request body
@@ -1178,6 +1185,7 @@ router.post('/search',
 router.post('/upload',
   authenticate,
   requirePermission('documents:write'),
+  requireCredits('document_upload'),
   upload.single('file'),
   async (req, res) => {
     try {

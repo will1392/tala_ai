@@ -3,6 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import matter from 'gray-matter';
+import { authenticate } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/creditsMiddleware.js';
 
 const router = express.Router();
 
@@ -47,7 +49,7 @@ const upload = multer({
 });
 
 // Upload endpoint
-router.post('/upload', upload.array('files', 10), async (req, res) => {
+router.post('/upload', authenticate, requireCredits('knowledge_base_search'), upload.array('files', 10), async (req, res) => {
   try {
     const { channel, category, metadata } = req.body;
     const uploadedFiles = [];
