@@ -1,12 +1,14 @@
 import express from 'express';
 const router = express.Router();
 import ContentGenerationService from '../../services/cmo/ContentGenerationService.js';
+import { authenticate } from '../../middleware/auth.js';
+import { requireCredits } from '../../middleware/creditsMiddleware.js';
 
 // Initialize Content Generation Service
 const contentService = new ContentGenerationService();
 
 // Generate content
-router.post('/generate', async (req, res) => {
+router.post('/generate', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { type, prompt, options } = req.body;
     
@@ -37,7 +39,7 @@ router.post('/generate', async (req, res) => {
 });
 
 // Adjust tone
-router.post('/adjust-tone', async (req, res) => {
+router.post('/adjust-tone', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { content, tone } = req.body;
     
@@ -54,7 +56,7 @@ router.post('/adjust-tone', async (req, res) => {
 });
 
 // Suggest hashtags
-router.post('/suggest-hashtags', async (req, res) => {
+router.post('/suggest-hashtags', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { content, platform } = req.body;
     
@@ -78,7 +80,7 @@ router.post('/suggest-hashtags', async (req, res) => {
 });
 
 // Optimize for platform
-router.post('/optimize-platform', async (req, res) => {
+router.post('/optimize-platform', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { content, platform } = req.body;
     
@@ -95,7 +97,7 @@ router.post('/optimize-platform', async (req, res) => {
 });
 
 // Predict performance
-router.post('/predict-performance', async (req, res) => {
+router.post('/predict-performance', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { type, data } = req.body;
     

@@ -4,13 +4,15 @@
 
 import express from 'express';
 import { cmoAssistant } from '../services/cmo/CMOAssistant.js';
+import { authenticate } from '../middleware/auth.js';
+import { requireCredits } from '../middleware/creditsMiddleware.js';
 
 const router = express.Router();
 
 /**
  * Navigate back in conversation
  */
-router.post('/navigate', async (req, res) => {
+router.post('/navigate', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { userId, stepsBack = 1 } = req.body;
     
@@ -29,7 +31,7 @@ router.post('/navigate', async (req, res) => {
 /**
  * Process follow-up suggestion
  */
-router.post('/followup', async (req, res) => {
+router.post('/followup', authenticate, requireCredits('chat_message'), async (req, res) => {
   try {
     const { userId, suggestion } = req.body;
     
