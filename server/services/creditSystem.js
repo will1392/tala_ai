@@ -308,15 +308,30 @@ class CreditSystem {
    * Consume credits for an operation
    */
   async consumeCredits(userId, operation, additionalParams = {}) {
+    console.log('🔄 consumeCredits called:', {
+      userId: userId?.substring(0, 8) + '...',
+      operation,
+      cost: additionalParams.cost
+    });
+    
     try {
       // First check if user has enough credits
       const creditCheck = await this.checkCredits(userId, operation, additionalParams);
       
+      console.log('✅ Credit check result:', {
+        success: creditCheck.success,
+        hasEnoughCredits: creditCheck.hasEnoughCredits,
+        availableCredits: creditCheck.availableCredits,
+        creditCost: creditCheck.creditCost
+      });
+      
       if (!creditCheck.success) {
+        console.error('❌ Credit check failed:', creditCheck.error);
         return creditCheck;
       }
 
       if (!creditCheck.hasEnoughCredits) {
+        console.error('❌ Insufficient credits');
         return {
           success: false,
           error: 'INSUFFICIENT_CREDITS',

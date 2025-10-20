@@ -14,6 +14,7 @@ const OPERATION_COSTS = {
   'chat_intelligent': 15,
   'chat_generate': 5,
   'chat_v2': 10,
+  'chat_message': 10,
   
   // Document operations (moderate cost)
   'document_upload': 3,
@@ -57,7 +58,10 @@ export function requireCredits(operation, customCost = null) {
       creditsEnabled: process.env.CREDITS_ENABLED,
       nodeEnv: process.env.NODE_ENV,
       path: req.path,
-      method: req.method
+      method: req.method,
+      userId: userId?.substring(0, 8) + '...',
+      hasXUserId: !!req.headers['x-user-id'],
+      hasReqUserId: !!req.userId
     });
     
     // Skip credits check ONLY if explicitly disabled
@@ -69,8 +73,11 @@ export function requireCredits(operation, customCost = null) {
     // Credits are enabled by default in all environments
     console.log('✅ Credits check active');
     
-    // Get user ID
-    const userId = req.headers['x-user-id'] || req.session?.userId || req.user?.id;
+    // Get user ID - check multiple sources
+    const userId = req.headers['x-user-id'] || 
+                   req.userId || 
+                   req.session?.userId || 
+                   req.user?.id;
     
     if (!userId) {
       return res.status(401).json({
@@ -107,6 +114,14 @@ export function requireCredits(operation, customCost = null) {
     
     // Intercept response finish to deduct credits
     res.on('finish', async () => {
+      console.log('🏁 Response finished event fired:', {
+        userId: userId?.substring(0, 8) + '...',
+        operation,
+        statusCode: res.statusCode,
+        creditsDeducted,
+        shouldDeduct: !creditsDeducted && res.statusCode < 400
+      });
+      
       // Only deduct for successful responses
       if (!creditsDeducted && res.statusCode < 400) {
         creditsDeducted = true;
@@ -126,7 +141,7 @@ export function requireCredits(operation, customCost = null) {
         }
         
         console.log('💳 Consuming credits after successful response:', {
-          userId,
+          userId: userId?.substring(0, 8) + '...',
           operation,
           cost,
           statusCode: res.statusCode
@@ -140,12 +155,12 @@ export function requireCredits(operation, customCost = null) {
           );
           
           if (!result.success) {
-            console.error(`❌ Failed to deduct ${cost} credits from ${userId}:`, result.error);
+            console.error(`❌ Failed to deduct ${cost} credits from ${userId?.substring(0, 8)}...:`, result.error);
           } else {
-            console.log(`✅ Deducted ${result.creditsConsumed} credits. User ${userId} remaining: ${result.remainingCredits}`);
+            console.log(`✅ Deducted ${result.creditsConsumed} credits. User ${userId?.substring(0, 8)}... remaining: ${result.remainingCredits}`);
           }
         } catch (error) {
-          console.error('❌ Exception during credit deduction:', error.message);
+          console.error('❌ Exception during credit deduction:', error.message, error.stack);
         }
       } else if (creditsDeducted) {
         console.log('⏭️  Credits already deducted, skipping');
