@@ -250,7 +250,9 @@ app.use(cors({
       'http://localhost:5175',
       'http://localhost:3000',
       'http://127.0.0.1:5173',
-      'http://127.0.0.1:5174'
+      'http://127.0.0.1:5174',
+      'https://tala-ai.vercel.app', // Production Vercel frontend
+      'https://tala-ai-git-main-wills-projects-3dd06ef9.vercel.app' // Vercel preview deployments
     ];
     
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -260,9 +262,17 @@ app.use(cors({
     if (process.env.CORS_ORIGIN) {
       const corsOrigins = process.env.CORS_ORIGIN.split(',').map(o => o.trim());
       if (corsOrigins.includes(origin) || allowedOrigins.includes(origin)) {
+        console.log('✅ CORS: Allowing configured origin:', origin);
         return callback(null, true);
       }
     } else if (allowedOrigins.includes(origin)) {
+      console.log('✅ CORS: Allowing default origin:', origin);
+      return callback(null, true);
+    }
+    
+    // Allow all Vercel preview deployments (tala-ai-*.vercel.app)
+    if (origin && origin.match(/^https:\/\/tala-ai.*\.vercel\.app$/)) {
+      console.log('✅ CORS: Allowing Vercel preview deployment:', origin);
       return callback(null, true);
     }
     
@@ -307,8 +317,21 @@ app.use(express.urlencoded({ limit: '10mb', extended: true })); // 10MB for form
 
 // Serve uploaded files with proper headers
 app.use('/api/files', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || 'http://localhost:5173');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'https://tala-ai.vercel.app'
+  ];
+  
+  // Check if origin is allowed or matches Vercel pattern
+  if (origin && (allowedOrigins.includes(origin) || origin.match(/^https:\/\/tala-ai.*\.vercel\.app$/))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  } else if (process.env.CORS_ORIGIN) {
+    res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   
@@ -4730,7 +4753,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Tala AI Backend Server running on port ${PORT}`);
-  console.log(`📡 CORS enabled for: ${process.env.CORS_ORIGIN}`);
+  console.log(`📡 CORS enabled for: ${process.env.CORS_ORIGIN || 'localhost + https://tala-ai.vercel.app + https://tala-ai-*.vercel.app'}`);
   console.log(`🔗 Qdrant URL: ${process.env.QDRANT_URL}`);
   console.log(`🤖 Multi-LLM Mode: ${enableMultiLLM ? 'ENABLED' : 'DISABLED'}`);
   console.log(`🔐 Authentication: ${process.env.NODE_ENV === 'development' || process.env.MOCK_AUTH === 'true' || !process.env.NODE_ENV ? 'Mock mode (development)' : 'Production mode'}`);
