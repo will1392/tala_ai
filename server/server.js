@@ -240,52 +240,45 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Middleware
+// Middleware - Simplified CORS for production
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests from Vite dev server on multiple ports
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175',
-      'http://localhost:3000',
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:5174',
-      'https://tala-ai.vercel.app', // Production Vercel frontend
-      'https://tala-ai-git-main-wills-projects-3dd06ef9.vercel.app' // Vercel preview deployments
-    ];
+    console.log('🔍 CORS check for origin:', origin);
     
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('✅ CORS: Allowing request with no origin');
+      return callback(null, true);
+    }
     
-    // Check if CORS_ORIGIN is set and matches
+    // Always allow Vercel deployments
+    if (origin.includes('vercel.app')) {
+      console.log('✅ CORS: Allowing Vercel deployment:', origin);
+      return callback(null, true);
+    }
+    
+    // Always allow localhost
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      console.log('✅ CORS: Allowing localhost:', origin);
+      return callback(null, true);
+    }
+    
+    // Check CORS_ORIGIN env var
     if (process.env.CORS_ORIGIN) {
       const corsOrigins = process.env.CORS_ORIGIN.split(',').map(o => o.trim());
-      if (corsOrigins.includes(origin) || allowedOrigins.includes(origin)) {
-        console.log('✅ CORS: Allowing configured origin:', origin);
+      if (corsOrigins.some(allowed => origin.includes(allowed) || allowed.includes(origin))) {
+        console.log('✅ CORS: Allowing from CORS_ORIGIN:', origin);
         return callback(null, true);
       }
-    } else if (allowedOrigins.includes(origin)) {
-      console.log('✅ CORS: Allowing default origin:', origin);
-      return callback(null, true);
-    }
-    
-    // Allow all Vercel preview deployments (tala-ai-*.vercel.app)
-    if (origin && origin.match(/^https:\/\/tala-ai.*\.vercel\.app$/)) {
-      console.log('✅ CORS: Allowing Vercel preview deployment:', origin);
-      return callback(null, true);
-    }
-    
-    // In development or if mock auth is enabled, be more permissive
-    if (process.env.NODE_ENV === 'development' || process.env.MOCK_AUTH === 'true') {
-      console.log('⚠️  CORS: Allowing origin in development mode:', origin);
-      return callback(null, true);
     }
     
     console.warn('❌ CORS: Blocked origin:', origin);
     callback(null, false);
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-organization-id'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
 }));
 
 const isProduction = process.env.NODE_ENV === 'production';
