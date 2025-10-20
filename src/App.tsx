@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Layout } from './components/layout/Layout';
 import { PremiumLayout } from './components/layout/PremiumLayout';
 import { LoginPage } from './components/auth/LoginPage';
+import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
 import { SetPassword } from './pages/SetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { UnifiedDashboard } from './pages/UnifiedDashboard';
@@ -95,6 +96,7 @@ function App() {
               {!isAuthenticated ? (
                 <>
                   <Route path="/set-password" element={<SetPassword />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
                   <Route path="*" element={<LoginPage />} />
                 </>
               ) : (
