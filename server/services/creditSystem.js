@@ -85,6 +85,20 @@ class CreditSystem {
    */
   async initializeUserCredits(userId, organizationId, planType = 'agent') {
     try {
+      // First, verify the user exists in auth.users to avoid foreign key error
+      const { data: authUser, error: authError } = await this.supabase.auth.admin.getUserById(userId);
+      
+      if (authError || !authUser) {
+        console.warn(`⚠️ User ${userId} not found in auth.users, skipping credit initialization`);
+        return { 
+          success: false, 
+          error: 'User not found in auth system',
+          skipInitialization: true 
+        };
+      }
+      
+      console.log(`✅ User ${userId} verified in auth.users, initializing credits`);
+      
       // For agency users, check if organization already has a credit pool
       if (planType === 'agency' && organizationId) {
         const { data: orgCredits } = await this.supabase
