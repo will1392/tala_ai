@@ -65,7 +65,8 @@ router.post('/users/create', async (req, res) => {
       planType = 'agent',
       initialCredits,
       sendInvite = true,
-      inviteRedirectUrl
+      inviteRedirectUrl,
+      useTempPassword = false // NEW: Option to create with temp password
     } = req.body;
 
     console.log('📋 Creating user with role:', role);
@@ -103,11 +104,26 @@ router.post('/users/create', async (req, res) => {
       });
     }
 
-    if (!sendInvite && !password) {
+    if (!sendInvite && !password && !useTempPassword) {
       return res.status(400).json({
         success: false,
-        error: 'Password is required when sendInvite is false'
+        error: 'Password is required when sendInvite is false and useTempPassword is false'
       });
+    }
+    
+    // Generate temporary password if requested
+    let tempPassword = null;
+    let finalPassword = password;
+    
+    if (useTempPassword && !sendInvite) {
+      // Generate secure temporary password
+      const adjectives = ['Swift', 'Bright', 'Quick', 'Smart', 'Bold', 'Clear', 'Sharp', 'Wise'];
+      const nouns = ['Tiger', 'Eagle', 'Lion', 'Wolf', 'Hawk', 'Bear', 'Fox', 'Owl'];
+      const numbers = Math.floor(1000 + Math.random() * 9000);
+      tempPassword = `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}${numbers}!`;
+      finalPassword = tempPassword;
+      
+      console.log('🔐 Generated temporary password for:', email);
     }
     
     // Validate role
@@ -124,7 +140,9 @@ router.post('/users/create', async (req, res) => {
       full_name: fullName || email.split('@')[0],
       created_by: req.userId,
       plan_type: planType,
-      organization_id: finalOrganizationId || null
+      organization_id: finalOrganizationId || null,
+      requires_password_change: useTempPassword ? true : false, // Flag for password change
+      temp_password_created_at: useTempPassword ? new Date().toISOString() : null
     };
 
     const redirectUrl = inviteRedirectUrl || process.env.SUPABASE_INVITE_REDIRECT_URL;
@@ -154,8 +172,8 @@ router.post('/users/create', async (req, res) => {
     } else {
       const createUserPayload = {
         email: email,
-        password: password,
-        email_confirm: true,
+        password: finalPassword, // Use temp password if generated
+        email_confirm: true, // Auto-confirm so they can login immediately
         user_metadata: userMetadata
       };
 
@@ -290,20 +308,29 @@ router.post('/users/create', async (req, res) => {
       }
     }
     
+    const responseData = {
+      userId: newUserId,
+      email: email,
+      fullName: fullName || email.split('@')[0],
+      role: role,
+      planType: planType,
+      credits: creditsToAllocate,
+      organizationId: createdOrganizationId,
+      organizationName: organization?.name || organizationName,
+      message: 'User created successfully',
+      invitationSent: invitationSent
+    };
+    
+    // Include temp password in response if generated
+    if (tempPassword) {
+      responseData.temporaryPassword = tempPassword;
+      responseData.requiresPasswordChange = true;
+      responseData.message = 'User created with temporary password. User must change password on first login.';
+    }
+    
     res.json({
       success: true,
-      data: {
-        userId: newUserId,
-        email: email,
-        fullName: fullName || email.split('@')[0],
-        role: role,
-        planType: planType,
-        credits: creditsToAllocate,
-        organizationId: createdOrganizationId,
-        organizationName: organization?.name || organizationName,
-        message: 'User created successfully',
-        invitationSent: invitationSent
-      }
+      data: responseData
     });
     
   } catch (error) {
