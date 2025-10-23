@@ -240,40 +240,48 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Helper to determine if an origin is allowed
+const configuredCorsOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+const isAllowedOrigin = origin => {
+  if (!origin) {
+    return true;
+  }
+
+  if (origin.includes('vercel.app')) {
+    return true;
+  }
+
+  if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    return true;
+  }
+
+  return configuredCorsOrigins.some(allowed =>
+    origin === allowed ||
+    origin.includes(allowed) ||
+    allowed.includes(origin)
+  );
+};
+
 // Middleware - Simplified CORS for production
 app.use(cors({
-  origin: function(origin, callback) {
+  origin(origin, callback) {
     console.log('🔍 CORS check for origin:', origin);
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      console.log('✅ CORS: Allowing request with no origin');
-      return callback(null, true);
-    }
-    
-    // Always allow Vercel deployments
-    if (origin.includes('vercel.app')) {
-      console.log('✅ CORS: Allowing Vercel deployment:', origin);
-      return callback(null, true);
-    }
-    
-    // Always allow localhost
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      console.log('✅ CORS: Allowing localhost:', origin);
-      return callback(null, true);
-    }
-    
-    // Check CORS_ORIGIN env var
-    if (process.env.CORS_ORIGIN) {
-      const corsOrigins = process.env.CORS_ORIGIN.split(',').map(o => o.trim());
-      if (corsOrigins.some(allowed => origin.includes(allowed) || allowed.includes(origin))) {
-        console.log('✅ CORS: Allowing from CORS_ORIGIN:', origin);
-        return callback(null, true);
+
+    if (isAllowedOrigin(origin)) {
+      if (!origin) {
+        console.log('✅ CORS: Allowing request with no origin');
+      } else {
+        console.log('✅ CORS: Allowing origin:', origin);
       }
+      return callback(null, true);
     }
-    
+
     console.warn('❌ CORS: Blocked origin:', origin);
-    callback(null, false);
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -286,30 +294,34 @@ app.use(cors({
 // Additional explicit CORS headers for API routes
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
-  
+
   console.log('🌐 API middleware - Origin:', origin, 'Method:', req.method);
-  
-  // Set CORS headers for all API requests
-  if (origin && (
-    origin.includes('vercel.app') || 
-    origin.includes('localhost') || 
-    origin.includes('127.0.0.1')
-  )) {
+
+  if (isAllowedOrigin(origin) && origin) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-organization-id');
     res.header('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
-    
+
     console.log('✅ API CORS headers set for origin:', origin);
   }
-  
-  // Handle preflight OPTIONS requests
+
   if (req.method === 'OPTIONS') {
-    console.log('✅ Handling OPTIONS preflight request for:', req.path);
-    return res.status(204).end();
+    if (isAllowedOrigin(origin)) {
+      console.log('✅ Handling OPTIONS preflight request for:', req.path);
+      return res.status(204).end();
+    }
+
+    console.warn('❌ OPTIONS preflight blocked by CORS for origin:', origin);
+    return res.status(403).json({ error: 'Origin not allowed by CORS' });
   }
-  
+
+  if (origin && !isAllowedOrigin(origin)) {
+    console.warn('❌ API request blocked by CORS for origin:', origin);
+    return res.status(403).json({ error: 'Origin not allowed by CORS' });
+  }
+
   next();
 });
 
