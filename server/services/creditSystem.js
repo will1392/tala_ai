@@ -324,19 +324,6 @@ class CreditSystem {
       return { success: false, error: 'Failed to check credits' };
     }
 
-    // Super admin bypass: always allow operations for super_admin users
-    if (userCredits.data.role === 'super_admin') {
-      return {
-        success: true,
-        hasEnoughCredits: true,
-        creditCost,
-        availableCredits: userCredits.data.available_credits,
-        shortfall: 0,
-        bypassReason: 'super_admin_unlimited_access',
-        nextResetDate: this.getNextResetDate()
-      };
-    }
-
     const hasEnoughCredits = userCredits.data.available_credits >= creditCost;
     
     return {
@@ -398,22 +385,6 @@ class CreditSystem {
           creditCost: creditCheck.creditCost,
           availableCredits: creditCheck.availableCredits,
           shortfall: creditCheck.shortfall
-        };
-      }
-
-      // Super admin bypass: don't actually deduct credits but still log and return success
-      if (creditCheck.bypassReason === 'super_admin_unlimited_access') {
-        await this.logCreditTransaction(userId, operation, 0, {
-          ...additionalParams,
-          bypass_reason: 'super_admin_unlimited_access',
-          would_have_cost: creditCheck.creditCost
-        });
-
-        return {
-          success: true,
-          creditsConsumed: 0,
-          remainingCredits: creditCheck.availableCredits,
-          bypassReason: 'super_admin_unlimited_access'
         };
       }
 

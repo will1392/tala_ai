@@ -621,9 +621,13 @@ Let's begin with understanding your business. What type of travel experiences do
   useEffect(() => {
     if (conversationId && !loadedConversationsRef.current.has(conversationId)) {
       loadedConversationsRef.current.add(conversationId);
-      loadConversationMessages(conversationId);
+      // Only load messages if we don't already have messages in the current conversation
+      // This prevents clearing messages during an active conversation when backend assigns ID
+      if (messages.length === 0) {
+        loadConversationMessages(conversationId);
+      }
     }
-  }, [conversationId]);
+  }, [conversationId, messages.length]);
   
   // Save messages on unmount or window close
   useEffect(() => {
@@ -1014,11 +1018,12 @@ Let's begin with understanding your business. What type of travel experiences do
 
   return (
     <div className={cn(
-      "flex h-[calc(100vh-4rem)] relative",
+      "flex flex-col h-[calc(100vh-4rem)] relative",
       "bg-white dark:bg-secondary-800",
       "text-gray-900 dark:text-white",
       "transition-colors duration-200",
-      isMarketingMode && "border-2 border-primary/50 dark:border-white"
+      isMarketingMode && "border-2 border-primary/50 dark:border-white",
+      "overflow-hidden" // Prevent any overflow issues
     )}>
       {/* Skip to main content link for keyboard navigation */}
       <a 
@@ -1029,7 +1034,7 @@ Let's begin with understanding your business. What type of travel experiences do
       </a>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {/* Header Bar */}
         <div className="flex items-center justify-between px-3 md:px-6 py-3 border-b border-white/10">
           <div className="flex items-center gap-2 md:gap-3">
@@ -1136,7 +1141,7 @@ Let's begin with understanding your business. What type of travel experiences do
         <main 
           id="main-chat-content" 
           ref={mainContentRef}
-          className="flex-1 overflow-y-auto" 
+          className="flex-1 overflow-y-auto min-h-0" 
           role="main" 
           aria-label="Chat messages" 
           tabIndex={-1}
@@ -1313,6 +1318,7 @@ Let's begin with understanding your business. What type of travel experiences do
 
       {/* Input Area - Fixed at bottom */}
       <div className={cn(
+        "flex-shrink-0", // Prevent input from shrinking
         "backdrop-blur-sm",
         "border-t border-gray-200 dark:border-white/10",
         "bg-white/80 dark:bg-secondary-700",
