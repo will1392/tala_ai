@@ -217,6 +217,11 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Debug logging
+  useEffect(() => {
+    console.log('🎨 SidebarContent render - creditInfo:', creditInfo);
+  }, [creditInfo]);
+  
   return (
     <div className="flex h-full flex-col border-r">
       <div className="flex items-center justify-between p-4">
@@ -358,7 +363,7 @@ const SidebarContent = ({ items = sidebarItems, expandedItems, toggleExpanded, a
               {creditsLoading ? (
                 <span className="text-sm text-muted-foreground">Loading...</span>
               ) : (
-                <span className="font-bold text-cyan-500">
+                <span className="font-bold text-cyan-500" key={creditInfo?.available_credits}>
                   {creditInfo ? formatCredits(creditInfo.available_credits) : '0'}
                 </span>
               )}
@@ -413,6 +418,11 @@ export const PremiumLayout = () => {
   // Use the credits hook and auth store
   const { creditInfo, loading: creditsLoading } = useCredits();
   const { user } = useAuthStore();
+  
+  // Debug logging for credit updates
+  useEffect(() => {
+    console.log('🔄 PremiumLayout - creditInfo updated:', creditInfo);
+  }, [creditInfo]);
 
   const envVars = import.meta.env as Record<string, string | boolean | undefined>;
   const isProduction = envVars.VITE_ENV === 'production';

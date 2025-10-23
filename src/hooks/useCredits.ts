@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { buildApiUrl } from '../utils/api';
 
-interface CreditInfo {
+export interface CreditInfo {
   available_credits: number;
   plan_type: string;
   is_organization_pool: boolean;
   next_reset_date?: string;
+  role?: string;
+  lastUpdated?: number;
 }
 
 export const useCredits = () => {
@@ -30,12 +32,16 @@ export const useCredits = () => {
       const data = await response.json();
       
       if (response.ok && data.success && data.data) {
-        setCreditInfo({
+        const newCreditInfo = {
           available_credits: data.data.available_credits,
           plan_type: data.data.plan_type || 'agent',
           is_organization_pool: data.data.is_organization_pool || false,
-          next_reset_date: data.data.next_reset_date
-        });
+          next_reset_date: data.data.next_reset_date,
+          role: data.data.role,
+          lastUpdated: Date.now()
+        };
+        console.log('💳 useCredits: Setting new credit info:', newCreditInfo);
+        setCreditInfo(newCreditInfo);
       } else {
         setError('Failed to fetch credits');
       }
