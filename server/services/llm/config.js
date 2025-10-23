@@ -9,8 +9,6 @@
 const LLM_PROVIDERS = {
   OPENAI: 'openai',
   ANTHROPIC: 'anthropic',
-  GOOGLE: 'google',
-  GROK: 'grok',
   LLAMA: 'llama',
   MOCK: 'mock'
 };
@@ -167,123 +165,6 @@ const LLM_MODELS = {
     }
   },
 
-  // Google Models
-  'gemini-2.5-flash': {
-    provider: LLM_PROVIDERS.GOOGLE,
-    name: 'Gemini 2.5 Flash',
-    maxTokens: 8192,
-    contextWindow: 1048576,  // 1M+ tokens
-    pricing: {
-      input: 0.000075,  // per 1K tokens (estimated)
-      output: 0.0003    // per 1K tokens (estimated)
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: true,
-      functionCalling: true,
-      codeExecution: true,
-      searchGrounding: true,
-      thinking: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 8192,
-      topP: 0.95
-    }
-  },
-  'gemini-2.5-pro': {
-    provider: LLM_PROVIDERS.GOOGLE,
-    name: 'Gemini 2.5 Pro',
-    maxTokens: 65536,
-    contextWindow: 1048576,  // 1M+ tokens
-    pricing: {
-      input: 0.00125,  // per 1K tokens (estimated)
-      output: 0.005    // per 1K tokens (estimated)
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: true,
-      functionCalling: true,
-      codeExecution: true,
-      searchGrounding: true,
-      thinking: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 8192,
-      topP: 0.95
-    }
-  },
-
-  // Grok Models (X.AI)
-  'grok-4': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 4.0',
-    maxTokens: 4096,
-    contextWindow: 128000,
-    pricing: {
-      input: 0.003,    // per 1K tokens (from article)
-      output: 0.015    // per 1K tokens (from article)
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true,
-      reasoning: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-4-latest': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 4.0 Latest',
-    maxTokens: 4096,
-    contextWindow: 128000,
-    pricing: {
-      input: 0.003,    // per 1K tokens
-      output: 0.015    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true,
-      reasoning: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
-  'grok-4-0709': {
-    provider: LLM_PROVIDERS.GROK,
-    name: 'Grok 4.0 (July 2024)',
-    maxTokens: 4096,
-    contextWindow: 128000,
-    pricing: {
-      input: 0.003,    // per 1K tokens
-      output: 0.015    // per 1K tokens
-    },
-    capabilities: {
-      chat: true,
-      embedding: false,
-      vision: false,
-      functionCalling: true,
-      reasoning: true
-    },
-    defaultParams: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1.0
-    }
-  },
 
   // Llama Models (Local deployment)
   'llama-3.1-8b': {
@@ -434,24 +315,6 @@ const PROVIDER_CONFIGS = {
       tokensPerMinute: 40000
     }
   },
-  [LLM_PROVIDERS.GOOGLE]: {
-    baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-    apiKeyEnv: 'GOOGLE_AI_API_KEY',
-    defaultModel: 'gemini-2.5-flash',
-    rateLimits: {
-      requestsPerMinute: 60,
-      tokensPerMinute: 32000
-    }
-  },
-  [LLM_PROVIDERS.GROK]: {
-    baseURL: 'https://api.x.ai/v1',
-    apiKeyEnv: 'GROK_API_KEY',
-    defaultModel: 'grok-4-latest',
-    rateLimits: {
-      requestsPerMinute: 100,
-      tokensPerMinute: 50000
-    }
-  },
   [LLM_PROVIDERS.LLAMA]: {
     baseURL: null, // Local deployment
     apiKeyEnv: null,
@@ -498,9 +361,8 @@ const LOAD_BALANCING = {
     random: 'random'
   },
   fallbackChain: [
-    'gpt-4o-mini',
+    'gpt-5-nano-2025-08-07',
     'claude-sonnet-4-20250514',
-    'gemini-2.5-flash',
     'llama-3.1-8b'
   ]
 };

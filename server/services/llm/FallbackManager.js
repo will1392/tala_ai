@@ -148,47 +148,35 @@ export class FallbackManager {
     // Circuit breakers for each service
     this.circuitBreakers = new Map();
     
-    // Fallback chain configurations for different query types (Updated with GPT-5)
+    // Fallback chain configurations for different query types (GPT-5 Nano primary, Claude backup)
     this.fallbackChains = {
       complexPlanning: [
-        'gpt-5-2025-08-07',           // GPT-5 for heavy-duty work
-        'gpt-5-mini-2025-08-07',      // Fallback to GPT-5 Mini
-        'claude-opus-4-20250514',     // Then Claude 4 Opus
-        'gemini-2.5-pro'              // Finally Gemini 2.5 Pro
+        'gpt-5-nano-2025-08-07',      // GPT-5 Nano as primary
+        'claude-sonnet-4-20250514'    // Claude Sonnet as backup
       ],
       realTime: [
         'gpt-5-nano-2025-08-07',      // GPT-5 Nano for fast responses
-        'grok-4-latest',              // Grok for real-time
-        'gemini-2.5-flash',           // Gemini Flash for speed
         'claude-sonnet-4-20250514'    // Claude as backup
       ],
       documentAnalysis: [
-        'gpt-5-2025-08-07',           // GPT-5 for best analysis
-        'gpt-5-mini-2025-08-07',      // GPT-5 Mini as fallback
-        'claude-sonnet-4-20250514',   // Claude 4 for analysis
-        'gemini-2.5-pro'              // Gemini 2.5 Pro
+        'gpt-5-nano-2025-08-07',      // GPT-5 Nano for analysis
+        'claude-sonnet-4-20250514'    // Claude as backup
       ],
       multimodal: [
-        'gpt-5-mini-2025-08-07',      // GPT-5 Mini for multimodal
-        'gemini-2.5-pro',             // Gemini 2.5 Pro for vision
-        'claude-sonnet-4-20250514'    // Claude 4 as backup
+        'gpt-5-nano-2025-08-07',      // GPT-5 Nano for multimodal
+        'claude-sonnet-4-20250514'    // Claude as backup
       ],
       creative: [
-        'claude-opus-4-20250514',     // Keep Claude for creative (pending GPT-5 testing)
-        'gpt-5-mini-2025-08-07',      // Try GPT-5 Mini for creative
-        'claude-sonnet-4-20250514',   // Claude Sonnet
-        'gemini-2.5-flash'            // Gemini Flash
+        'gpt-5-nano-2025-08-07',      // GPT-5 Nano for creative
+        'claude-sonnet-4-20250514'    // Claude as backup
       ],
       factual: [
         'gpt-5-nano-2025-08-07',      // GPT-5 Nano for quick facts
-        'gemini-2.5-flash',           // Gemini Flash
         'claude-sonnet-4-20250514'    // Claude as backup
       ],
       costOptimized: [
         'gpt-5-nano-2025-08-07',      // GPT-5 Nano is cost-effective
-        'gemini-2.5-flash',           // Gemini Flash is cheap
-        'gpt-4o-mini',                // Legacy GPT-4o Mini
-        'grok-4-latest'               // Grok as final fallback
+        'claude-sonnet-4-20250514'    // Claude as backup
       ]
     };
 

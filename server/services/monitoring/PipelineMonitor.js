@@ -69,7 +69,7 @@ class PipelineMonitor extends EventEmitter {
     
     // Cost tracking
     this.costModel = {
-      geminiVision: {
+      vision: {
         perRequest: 0.0025,
         freeQuota: 1000,
         used: 0
@@ -256,7 +256,7 @@ class PipelineMonitor extends EventEmitter {
    */
   trackAPIUsage(stage, result) {
     const apiMap = {
-      visual_analysis: 'geminiVision',
+      visual_analysis: 'vision',
       ocr: 'ocr',
       translation: 'translation'
     };
@@ -282,7 +282,7 @@ class PipelineMonitor extends EventEmitter {
     let cost = 0;
     const model = this.costModel[api];
     
-    if (api === 'geminiVision') {
+    if (api === 'vision') {
       model.used++;
       if (model.used > model.freeQuota) {
         cost = model.perRequest;

@@ -50,39 +50,39 @@ export class CostOptimizer {
     this.optimizationRules = {
       // Simple queries can use cheaper models
       factual: {
-        primary: ['gpt-4o-mini', 'gemini-2.5-flash'],
+        primary: ['gpt-5-nano-2025-08-07'],
         fallback: ['claude-sonnet-4-20250514'],
         maxCostPerQuery: 0.001 // $0.001 per query
       },
       
       // Real-time queries prioritize speed but can be cost-optimized
       realTime: {
-        primary: ['grok-4-latest', 'gpt-4o-mini'],
-        fallback: ['gemini-2.5-flash'],
+        primary: ['gpt-5-nano-2025-08-07'],
+        fallback: ['claude-sonnet-4-20250514'],
         maxCostPerQuery: 0.005
       },
       
       // Complex queries need quality but can use mid-tier models
       complexPlanning: {
-        primary: ['claude-sonnet-4-20250514', 'gpt-4o-mini'],
-        fallback: ['gemini-2.5-pro'],
+        primary: ['gpt-5-nano-2025-08-07'],
+        fallback: ['claude-sonnet-4-20250514'],
         maxCostPerQuery: 0.02,
-        emergencyFallback: ['gpt-4o-mini'] // When budget is critical
+        emergencyFallback: ['gpt-5-nano-2025-08-07'] // When budget is critical
       },
       
       // Document analysis can be optimized
       documentAnalysis: {
-        primary: ['claude-sonnet-4-20250514', 'gpt-4o-mini'],
-        fallback: ['gemini-2.5-pro'],
+        primary: ['gpt-5-nano-2025-08-07'],
+        fallback: ['claude-sonnet-4-20250514'],
         maxCostPerQuery: 0.015
       },
       
       // Creative content prioritizes quality
       creative: {
-        primary: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514'],
-        fallback: ['gpt-4o-mini'],
+        primary: ['gpt-5-nano-2025-08-07'],
+        fallback: ['claude-sonnet-4-20250514'],
         maxCostPerQuery: 0.05,
-        emergencyFallback: ['gpt-4o-mini']
+        emergencyFallback: ['gpt-5-nano-2025-08-07']
       }
     };
 
@@ -413,7 +413,7 @@ export class CostOptimizer {
     }
     
     // Check for underutilized cheap models
-    const cheapModels = ['gpt-4o-mini', 'gemini-2.5-flash'];
+    const cheapModels = ['gpt-4o-mini', 'gpt-5-nano-2025-08-07'];
     const totalCost = this.costs.total;
     const cheapModelCost = cheapModels.reduce((sum, model) => sum + (this.costs.models.get(model) || 0), 0);
     const cheapModelUsage = totalCost > 0 ? cheapModelCost / totalCost : 0;

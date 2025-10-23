@@ -89,7 +89,10 @@ export function requireCredits(operation, customCost = null) {
     // Check if user has sufficient credits
     const creditCheck = await creditSystem.checkCredits(userId, operation, { cost });
     
-    if (!creditCheck.success || !creditCheck.hasEnoughCredits) {
+    // Super admin bypass - allow unlimited credits
+    if (creditCheck.isSuperAdmin) {
+      console.log('🔓 [CREDITS MIDDLEWARE] Super admin detected - bypassing credit check');
+    } else if (!creditCheck.success || !creditCheck.hasEnoughCredits) {
       return res.status(402).json({
         error: 'Insufficient credits',
         message: `This operation requires ${creditCheck.creditCost || cost} credits. You have ${creditCheck.availableCredits} credits remaining.`,

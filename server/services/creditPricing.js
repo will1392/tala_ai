@@ -88,12 +88,8 @@ export function generateCreditCosts() {
     'gpt-5-nano-2025-08-07',
     'gpt-5-mini-2025-08-07',
     'gpt-5-2025-08-07',
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
     'claude-sonnet-4-20250514',
-    'claude-opus-4-20250514',
-    'grok-4',
-    'grok-4-latest'
+    'claude-opus-4-20250514'
   ];
 
   for (const modelId of chatModels) {
@@ -105,10 +101,8 @@ export function generateCreditCosts() {
 
   // Add friendly aliases
   costs.chat_message['gpt-4o'] = costs.chat_message['gpt-5-2025-08-07'] || 200;
-  costs.chat_message['gemini-2.0-flash'] = costs.chat_message['gemini-2.5-flash'] || 1;
   costs.chat_message['claude-3-5-haiku'] = costs.chat_message['gpt-4o-mini'] || 1; // Similar pricing
   costs.chat_message['claude-3-5-sonnet'] = costs.chat_message['claude-sonnet-4-20250514'] || 8;
-  costs.chat_message['grok-2'] = costs.chat_message['grok-4'] || 8;
   costs.chat_message['default'] = 30;
 
   // Document Operations (using GPT-4o-mini as baseline)

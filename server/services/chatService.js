@@ -298,10 +298,8 @@ class ChatService {
     if (this.enableMultiLLM && this.llmRouter) {
       // Get models from LLM Router
       return this.llmRouter.getAvailableModels ? this.llmRouter.getAvailableModels() : [
-        'gpt-4o-mini-2024-07-18',
-        'claude-sonnet-4-20250514',
-        'gemini-2.5-flash',
-        'grok-3-latest'
+        'gpt-5-nano-2025-08-07',
+        'claude-sonnet-4-20250514'
       ];
     } else {
       return ['gpt-4o-mini'];

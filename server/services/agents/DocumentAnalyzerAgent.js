@@ -14,7 +14,7 @@ export class DocumentAnalyzerAgent extends BaseAgent {
   constructor(options = {}) {
     super({
       ...options,
-      preferredLLM: 'gemini-2.0',
+      preferredLLM: 'gpt-5-mini-2025-08-07',
       confidence_threshold: 0.85,
       temperature: 0.2, // Low temperature for accurate extraction
       timeout: 45000 // Longer timeout for document processing
@@ -95,7 +95,7 @@ export class DocumentAnalyzerAgent extends BaseAgent {
    * Get preferred LLM
    */
   getPreferredLLM() {
-    return 'gemini-2.0'; // Gemini has strong vision capabilities
+    return 'gpt-5-mini-2025-08-07'; // GPT-5 Mini has strong vision capabilities
   }
 
   /**

@@ -7,8 +7,6 @@
 
 import OpenAIService from './providers/OpenAIService.js';
 import AnthropicService from './providers/AnthropicService.js';
-import GoogleService from './providers/GeminiService.js';
-import GrokService from './GrokService.js';
 import MockLLMService from './providers/MockLLMService.js';
 
 import { 
@@ -49,10 +47,8 @@ class LLMManager {
     
     // Test each provider's default model
     for (const [provider, models] of Object.entries({
-      [LLM_PROVIDERS.OPENAI]: ['gpt-4o-mini', 'text-embedding-3-small'],
-      [LLM_PROVIDERS.ANTHROPIC]: ['claude-sonnet-4-20250514'],
-      [LLM_PROVIDERS.GOOGLE]: ['gemini-2.5-flash'],
-      [LLM_PROVIDERS.GROK]: ['grok-beta']
+      [LLM_PROVIDERS.OPENAI]: ['gpt-5-nano-2025-08-07', 'text-embedding-3-small'],
+      [LLM_PROVIDERS.ANTHROPIC]: ['claude-sonnet-4-20250514']
     })) {
       for (const modelId of models) {
         availabilityChecks.push(this.checkModelAvailability(modelId));
@@ -99,12 +95,6 @@ class LLMManager {
         break;
       case LLM_PROVIDERS.ANTHROPIC:
         service = new AnthropicService(modelId);
-        break;
-      case LLM_PROVIDERS.GOOGLE:
-        service = new GoogleService(modelId);
-        break;
-      case LLM_PROVIDERS.GROK:
-        service = new GrokService(modelId);
         break;
       default:
         throw new Error(`Unsupported provider: ${modelConfig.provider}`);
@@ -280,7 +270,7 @@ class LLMManager {
    */
   selectFastestModel(models) {
     // Prioritize models known for speed
-    const speedPriority = ['gemini-2.5-flash', 'gpt-4o-mini', 'claude-sonnet-4-20250514'];
+    const speedPriority = ['gpt-5-nano-2025-08-07', 'claude-sonnet-4-20250514'];
     
     for (const fastModel of speedPriority) {
       if (models.includes(fastModel)) {

@@ -450,7 +450,6 @@ export class BaseAgent {
   getLLMProvider(model) {
     if (model.includes('gpt')) return 'openai';
     if (model.includes('claude')) return 'anthropic';
-    if (model.includes('gemini')) return 'google';
     if (model.includes('llama')) return 'ollama';
     return 'openai'; // default
   }

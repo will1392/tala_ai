@@ -9,8 +9,6 @@
 import { 
   OpenAIService, 
   AnthropicService, 
-  GeminiService, 
-  GrokService, 
   MockLLMService 
 } from './providers/index.js';
 import { 
@@ -42,10 +40,8 @@ class LLMRouter {
       dailyBudget: options.dailyBudget || null,
       monthlyBudget: options.monthlyBudget || null,
       fallbackChain: options.fallbackChain || [
-        'gpt-4o-mini',
+        'gpt-5-nano-2025-08-07',
         'claude-sonnet-4-20250514',
-        'gemini-2.5-flash',
-        'grok-4-latest',
         'mock-model'
       ],
       ...options
@@ -423,34 +419,29 @@ class LLMRouter {
     // Model selection rules based on query type
     const routingRules = {
       realTime: [
-        'grok-4-latest',    // Best for real-time/current info
-        'gpt-4o-mini',      // Fast and reliable
-        'gemini-2.5-flash'  // Ultra-fast backup
+        'gpt-5-nano-2025-08-07',       // GPT-5 Nano for real-time info
+        'claude-sonnet-4-20250514'     // Claude as backup
       ],
       complexPlanning: [
-        'claude-opus-4-20250514',      // Best reasoning for complex planning
-        'claude-sonnet-4-20250514',    // Good balance
-        'gemini-2.5-pro'               // Strong multimodal planning
+        'gpt-5-2025-08-07',            // GPT-5 for complex planning
+        'claude-opus-4-20250514',      // Claude Opus as backup
+        'claude-sonnet-4-20250514'     // Claude Sonnet as final backup
       ],
       documentAnalysis: [
-        'claude-sonnet-4-20250514',    // Excellent text analysis
-        'gpt-4o-mini',                 // Good general analysis
-        'gemini-2.5-pro'               // Strong document understanding
+        'gpt-5-nano-2025-08-07',       // GPT-5 Nano for analysis
+        'claude-sonnet-4-20250514'     // Claude as backup
       ],
       multimodal: [
-        'gemini-2.5-pro',              // Best multimodal capabilities
-        'gpt-4o-mini',                 // Good vision support
-        'claude-sonnet-4-20250514'     // Growing multimodal support
+        'gpt-5-mini-2025-08-07',       // GPT-5 Mini for multimodal
+        'claude-sonnet-4-20250514'     // Claude as backup
       ],
       creative: [
-        'claude-opus-4-20250514',      // Most creative and nuanced
-        'gpt-4o-mini',                 // Good creative balance
-        'gemini-2.5-flash'             // Fast creative responses
+        'gpt-5-nano-2025-08-07',       // GPT-5 Nano for creative
+        'claude-opus-4-20250514'       // Claude Opus as backup
       ],
       factual: [
-        'gpt-4o-mini',                 // Cost-effective for simple facts
-        'gemini-2.5-flash',            // Ultra-fast facts
-        'claude-sonnet-4-20250514'     // Accurate and detailed
+        'gpt-5-nano-2025-08-07',       // GPT-5 Nano for facts
+        'claude-sonnet-4-20250514'     // Claude as backup
       ]
     };
     
@@ -480,7 +471,7 @@ class LLMRouter {
     }
     
     // Return the best available candidate
-    const selected = candidates[0] || 'gpt-4o-mini';
+    const selected = candidates[0] || 'gpt-5-nano-2025-08-07';
     this.log(`Model selection for ${queryType}: ${selected} (from ${candidates.length} candidates)`);
     
     return selected;
@@ -560,12 +551,6 @@ class LLMRouter {
         break;
       case LLM_PROVIDERS.ANTHROPIC:
         service = new AnthropicService(modelId);
-        break;
-      case LLM_PROVIDERS.GOOGLE:
-        service = new GeminiService(modelId);
-        break;
-      case LLM_PROVIDERS.GROK:
-        service = new GrokService(modelId);
         break;
       case LLM_PROVIDERS.MOCK:
         service = new MockLLMService(modelId);

@@ -17,18 +17,12 @@ export const CREDIT_COSTS = {
     // Most efficient models (< 1 cent per message)
     'gpt-4o-mini': 1,              // API: $0.0003, You: $0.0010, Profit: $0.0007
     'gpt-5-nano-2025-08-07': 1,    // API: $0.0002, You: $0.0010, Profit: $0.0008  
-    'gemini-2.0-flash': 1,         // API: $0.0001, You: $0.0010, Profit: $0.0009
-    'gemini-2.5-flash': 1,         // API: $0.0001, You: $0.0010, Profit: $0.0009
     'claude-3-5-haiku': 1,         // Similar pricing to gpt-4o-mini
     
     // Mid-tier models ($0.002-0.008 per message)
     'gpt-5-mini-2025-08-07': 2,    // API: $0.0008, You: $0.0020, Profit: $0.0011
-    'gemini-2.5-pro': 3,           // API: $0.0021, You: $0.0030, Profit: $0.0009
     'claude-3-5-sonnet': 8,        // API: $0.0060, You: $0.0080, Profit: $0.0020
     'claude-sonnet-4-20250514': 8, // API: $0.0060, You: $0.0080, Profit: $0.0020
-    'grok-2': 8,                   // API: $0.0060, You: $0.0080, Profit: $0.0020
-    'grok-4': 8,                   // API: $0.0060, You: $0.0080, Profit: $0.0020
-    'grok-4-latest': 8,            // API: $0.0060, You: $0.0080, Profit: $0.0020
     
     // Premium models ($0.025-0.036 per message)
     'gpt-4o': 31,                  // API: $0.0255, You: $0.0310, Profit: $0.0055
@@ -317,13 +311,29 @@ class CreditSystem {
    * Check if user has enough credits for an operation
    */
   async checkCredits(userId, operation, additionalParams = {}) {
-    const creditCost = this.calculateCreditCost(operation, additionalParams);
     const userCredits = await this.getUserCredits(userId);
     
     if (!userCredits.success) {
       return { success: false, error: 'Failed to check credits' };
     }
 
+    // Super admin bypass - unlimited credits for super admins
+    const isSuperAdmin = userCredits.data.role === 'super_admin' || userCredits.data.has_unlimited_credits;
+    if (isSuperAdmin) {
+      console.log('🔓 [CREDITS] Super admin bypass activated for user:', userId?.substring(0, 8) + '...');
+      return {
+        success: true,
+        hasEnoughCredits: true,
+        creditCost: 0,  // Zero cost for super admins
+        availableCredits: Number.MAX_SAFE_INTEGER,  // Infinite available credits
+        shortfall: 0,
+        nextResetDate: this.getNextResetDate(),
+        isSuperAdmin: true,
+        bypassReason: 'super_admin_unlimited_credits'
+      };
+    }
+
+    const creditCost = this.calculateCreditCost(operation, additionalParams);
     const hasEnoughCredits = userCredits.data.available_credits >= creditCost;
     
     return {
@@ -368,12 +378,33 @@ class CreditSystem {
         success: creditCheck.success,
         hasEnoughCredits: creditCheck.hasEnoughCredits,
         availableCredits: creditCheck.availableCredits,
-        creditCost: creditCheck.creditCost
+        creditCost: creditCheck.creditCost,
+        isSuperAdmin: creditCheck.isSuperAdmin
       });
       
       if (!creditCheck.success) {
         console.error('❌ Credit check failed:', creditCheck.error);
         return creditCheck;
+      }
+
+      // Super admin bypass - skip credit deduction
+      if (creditCheck.isSuperAdmin) {
+        console.log('🔓 [CREDITS] Super admin bypass - skipping credit deduction for user:', userId?.substring(0, 8) + '...');
+        
+        // Log the transaction with 0 credits consumed
+        await this.logCreditTransaction(userId, operation, 0, {
+          ...additionalParams,
+          super_admin_bypass: true,
+          original_cost: this.calculateCreditCost(operation, additionalParams)
+        });
+        
+        return {
+          success: true,
+          creditsConsumed: 0,  // Zero credits consumed for super admins
+          remainingCredits: Number.MAX_SAFE_INTEGER,  // Infinite remaining credits
+          isSuperAdmin: true,
+          bypassReason: 'super_admin_unlimited_credits'
+        };
       }
 
       if (!creditCheck.hasEnoughCredits) {
