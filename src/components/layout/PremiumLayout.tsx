@@ -461,15 +461,8 @@ export const PremiumLayout = () => {
       return '∞';
     }
     
-    if (credits >= 10000) {
-      // For 10k+, show one decimal (floor to avoid rounding up)
-      return `${Math.floor(credits / 100) / 10}k`;
-    } else if (credits >= 1000) {
-      // For 1k-9.9k, show two decimals (floor to avoid rounding up)
-      const value = Math.floor(credits / 10) / 100;
-      return `${value.toFixed(2)}k`;
-    }
-    return credits.toString();
+    // Show full number with comma separators for complete transparency
+    return credits.toLocaleString('en-US');
   };
 
   const toggleExpanded = (id: string) => {
@@ -583,7 +576,11 @@ export const PremiumLayout = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-6 md:p-8 lg:p-10 max-w-[1600px] mx-auto">
+        <main className={cn(
+          "flex-1 max-w-[1600px] mx-auto",
+          // Add padding for non-chat pages, but let chat page handle its own layout
+          location.pathname.includes('/chat') ? "" : "p-6 md:p-8 lg:p-10"
+        )}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

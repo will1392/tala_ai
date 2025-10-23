@@ -55,15 +55,8 @@ export const Sidebar = () => {
       return '∞';
     }
     
-    if (credits >= 10000) {
-      // For 10k+, show one decimal (floor to avoid rounding up)
-      return `${Math.floor(credits / 100) / 10}k`;
-    } else if (credits >= 1000) {
-      // For 1k-9.9k, show two decimals (floor to avoid rounding up)
-      const value = Math.floor(credits / 10) / 100;
-      return `${value.toFixed(2)}k`;
-    }
-    return credits.toString();
+    // Show full number with comma separators for complete transparency
+    return credits.toLocaleString('en-US');
   };
 
   const getPlanLabel = () => {

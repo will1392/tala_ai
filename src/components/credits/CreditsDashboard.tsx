@@ -250,7 +250,7 @@ export default function CreditsDashboard() {
             <CreditCard className="text-[var(--primary)]" size={20} />
             {isLowBalance && <AlertTriangle className="text-orange-500" size={16} />}
           </div>
-          <div className="text-2xl font-bold text-[var(--fg)]">{credits?.balance || 0}</div>
+          <div className="text-2xl font-bold text-[var(--fg)]">{(credits?.balance || 0).toLocaleString('en-US')}</div>
           <div className="text-sm text-[var(--muted)]">Available Credits</div>
           <div className="mt-2 w-full bg-[var(--border)] rounded-full h-2">
             <div 
@@ -272,7 +272,7 @@ export default function CreditsDashboard() {
           <div className="text-2xl font-bold text-[var(--fg)]">{tierInfo.name}</div>
           <div className="text-sm text-[var(--muted)]">Current Tier</div>
           <div className={`mt-2 inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${tierInfo.bgColor} ${tierInfo.color}`}>
-            {credits?.monthly_allocation || 0} credits/month
+            {(credits?.monthly_allocation || 0).toLocaleString('en-US')} credits/month
           </div>
         </motion.div>
 
@@ -285,7 +285,7 @@ export default function CreditsDashboard() {
           <div className="flex items-center justify-between mb-2">
             <Activity className="text-green-600" size={20} />
           </div>
-          <div className="text-2xl font-bold text-[var(--fg)]">{credits?.daily_usage || 0}</div>
+          <div className="text-2xl font-bold text-[var(--fg)]">{(credits?.daily_usage || 0).toLocaleString('en-US')}</div>
           <div className="text-sm text-[var(--muted)]">Used Today</div>
           <div className="mt-2 text-xs text-[var(--muted)]">
             Limit: {credits?.daily_limit || 'Unlimited'} / day
@@ -375,7 +375,7 @@ export default function CreditsDashboard() {
                       </div>
                     </div>
                     <div className="text-sm font-medium text-[var(--fg)]">
-                      -{data.credits} credits
+                      -{data.credits.toLocaleString('en-US')} credits
                     </div>
                   </div>
                 ))}
@@ -431,7 +431,7 @@ export default function CreditsDashboard() {
                           {op.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </span>
                         <span className="text-sm text-[var(--muted)]">
-                          {data.credits} credits ({data.count} uses)
+                          {data.credits.toLocaleString('en-US')} credits ({data.count} uses)
                         </span>
                       </div>
                       <div className="w-full bg-[var(--border)] rounded-full h-2">
@@ -473,12 +473,12 @@ export default function CreditsDashboard() {
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold text-[var(--fg)]">{pkg.name}</h3>
                   <div className="mt-2">
-                    <span className="text-3xl font-bold text-[var(--fg)]">{pkg.credits}</span>
+                    <span className="text-3xl font-bold text-[var(--fg)]">{pkg.credits.toLocaleString('en-US')}</span>
                     <span className="text-sm text-[var(--muted)]"> credits</span>
                   </div>
                   {pkg.bonus && (
                     <div className="mt-1 text-sm text-green-500">
-                      +{pkg.bonus} bonus credits
+                      +{pkg.bonus.toLocaleString('en-US')} bonus credits
                     </div>
                   )}
                 </div>

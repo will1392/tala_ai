@@ -117,7 +117,7 @@ export default function CreditsIndicator() {
             <CreditCard size={16} className="text-[var(--primary)]" />
           )}
           <span className="font-medium text-sm">
-            {credits.has_unlimited_credits ? '∞' : credits.balance}
+            {credits.has_unlimited_credits ? '∞' : credits.balance.toLocaleString('en-US')}
           </span>
           <span className="text-xs text-[var(--muted)]">
             {credits.has_unlimited_credits ? 'unlimited' : 'credits'}
