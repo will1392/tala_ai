@@ -285,7 +285,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-organization-id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-organization-id', 'Cache-Control', 'Pragma', 'Expires'],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   preflightContinue: false,
   optionsSuccessStatus: 204
@@ -301,7 +301,7 @@ app.use('/api', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-organization-id');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-organization-id, Cache-Control, Pragma, Expires');
     res.header('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
 
     console.log('✅ API CORS headers set for origin:', origin);
