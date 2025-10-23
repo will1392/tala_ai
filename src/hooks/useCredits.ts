@@ -21,7 +21,10 @@ export const useCredits = () => {
       setError(null);
       
       const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
-      const response = await fetch(buildApiUrl('credits/balance'), {
+      const url = buildApiUrl('credits/balance');
+      console.log('🔍 useCredits: Fetching from URL:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'x-user-id': userId,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -29,7 +32,9 @@ export const useCredits = () => {
         }
       });
       
+      console.log('📡 useCredits: Response status:', response.status, response.ok);
       const data = await response.json();
+      console.log('📦 useCredits: Response data:', data);
       
       if (response.ok && data.success && data.data) {
         const newCreditInfo = {
@@ -43,6 +48,8 @@ export const useCredits = () => {
         console.log('💳 useCredits: Setting new credit info:', newCreditInfo);
         setCreditInfo(newCreditInfo);
       } else {
+        console.error('❌ useCredits: Failed to fetch credits - response not ok or invalid data structure');
+        console.error('Response ok:', response.ok, 'Data success:', data.success, 'Has data:', !!data.data);
         setError('Failed to fetch credits');
       }
     } catch (err) {
