@@ -52,6 +52,12 @@ export function requireCredits(operation, customCost = null) {
   const cost = customCost !== null ? customCost : (OPERATION_COSTS[operation] || 1);
   
   return async (req, res, next) => {
+    // Get user ID - check multiple sources
+    const userId = req.headers['x-user-id'] || 
+                   req.userId || 
+                   req.session?.userId || 
+                   req.user?.id;
+    
     console.log('🎫 requireCredits middleware called:', {
       operation,
       cost,
@@ -72,12 +78,6 @@ export function requireCredits(operation, customCost = null) {
     
     // Credits are enabled by default in all environments
     console.log('✅ Credits check active');
-    
-    // Get user ID - check multiple sources
-    const userId = req.headers['x-user-id'] || 
-                   req.userId || 
-                   req.session?.userId || 
-                   req.user?.id;
     
     if (!userId) {
       return res.status(401).json({
