@@ -33,7 +33,7 @@ export const api = {
   // Chat API
   sendChatMessage: async (message: string): Promise<{ message: string }> => {
     try {
-      const response = await apiClient.post('/chat/message', { message });
+      const response = await apiClient.post('/chat', { message });
       return response.data;
     } catch (error) {
       // Mock response for development
