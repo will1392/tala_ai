@@ -19,21 +19,45 @@ export default function CreditsIndicator() {
 
   useEffect(() => {
     fetchCredits();
-    // Refresh credits every 30 seconds
-    const interval = setInterval(fetchCredits, 30000);
+    // Refresh credits every 5 seconds for near real-time updates
+    const interval = setInterval(fetchCredits, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Listen for credit update events from chat
+  useEffect(() => {
+    const handleCreditUpdate = () => {
+      console.log('📊 Credit update event received in CreditsIndicator');
+      fetchCredits();
+    };
+
+    window.addEventListener('creditUpdate', handleCreditUpdate);
+    return () => window.removeEventListener('creditUpdate', handleCreditUpdate);
   }, []);
 
   const fetchCredits = async () => {
     try {
-      const response = await fetch('/api/credits/status', {
+      const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/credits/balance`, {
         headers: {
-          'x-user-id': localStorage.getItem('userId') || 'demo-user'
+          'x-user-id': userId,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
       });
       if (response.ok) {
         const data = await response.json();
-        setCredits(data.credits);
+        if (data.success && data.data) {
+          // Transform the balance API response to match the expected format
+          setCredits({
+            balance: data.data.available_credits || 0,
+            monthly_allocation: data.data.monthly_allocation || 5000,
+            tier: data.data.plan_type || 'agent',
+            daily_usage: 0, // Not provided by balance endpoint
+            daily_limit: 100 // Default limit
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch credits:', error);

@@ -21,7 +21,9 @@ export const useCredits = () => {
       const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
       const response = await fetch(buildApiUrl('credits/balance'), {
         headers: {
-          'x-user-id': userId
+          'x-user-id': userId,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
       });
       
@@ -50,9 +52,9 @@ export const useCredits = () => {
     fetchCredits();
   }, [fetchCredits]);
 
-  // Set up polling
+  // Set up polling - reduced to 5 seconds for near real-time updates
   useEffect(() => {
-    const interval = setInterval(fetchCredits, 10000); // Poll every 10 seconds
+    const interval = setInterval(fetchCredits, 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
   }, [fetchCredits]);
 

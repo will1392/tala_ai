@@ -93,15 +93,43 @@ export default function CreditsDashboard() {
 
   const fetchCreditStatus = async () => {
     try {
+      const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/credits/status`, {
+      const response = await fetch(`${apiUrl}/api/credits/balance`, {
         headers: {
-          'x-user-id': localStorage.getItem('userId') || 'demo-user'
+          'x-user-id': userId,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
         }
       });
       if (response.ok) {
         const data = await response.json();
-        setCreditStatus(data);
+        if (data.success && data.data) {
+          // Transform balance API response to match expected format
+          setCreditStatus({
+            credits: {
+              user_id: userId,
+              balance: data.data.available_credits || 0,
+              monthly_allocation: data.data.monthly_allocation || 5000,
+              tier: data.data.plan_type || 'agent',
+              daily_usage: 0,
+              daily_limit: 100,
+              monthly_usage: (data.data.monthly_allocation || 5000) - (data.data.available_credits || 0),
+              last_reset: data.data.next_reset_date || new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            },
+            usage: {
+              totalOperations: 0,
+              totalCreditsUsed: (data.data.monthly_allocation || 5000) - (data.data.available_credits || 0),
+              periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+              periodEnd: new Date().toISOString(),
+              byOperation: {},
+              dailyUsage: []
+            },
+            costs: {}
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch credit status:', error);
