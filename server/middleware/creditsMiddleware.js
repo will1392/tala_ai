@@ -58,7 +58,7 @@ export function requireCredits(operation, customCost = null) {
                    req.session?.userId || 
                    req.user?.id;
     
-    console.log('🎫 requireCredits middleware called:', {
+    console.log('💳 [CREDITS] requireCredits middleware called:', {
       operation,
       cost,
       creditsEnabled: process.env.CREDITS_ENABLED,
@@ -114,7 +114,7 @@ export function requireCredits(operation, customCost = null) {
     
     // Intercept response finish to deduct credits
     res.on('finish', async () => {
-      console.log('🏁 Response finished event fired:', {
+      console.log('💳 [CREDITS] Response finished event fired:', {
         userId: userId?.substring(0, 8) + '...',
         operation,
         statusCode: res.statusCode,
@@ -140,7 +140,7 @@ export function requireCredits(operation, customCost = null) {
           metadata.model = req.body.model;
         }
         
-        console.log('💳 Consuming credits after successful response:', {
+        console.log('💳 [CREDITS] Consuming credits after successful response:', {
           userId: userId?.substring(0, 8) + '...',
           operation,
           cost,
@@ -155,9 +155,9 @@ export function requireCredits(operation, customCost = null) {
           );
           
           if (!result.success) {
-            console.error(`❌ Failed to deduct ${cost} credits from ${userId?.substring(0, 8)}...:`, result.error);
+            console.error(`💳 [CREDITS] ❌ Failed to deduct ${cost} credits from ${userId?.substring(0, 8)}...:`, result.error);
           } else {
-            console.log(`✅ Deducted ${result.creditsConsumed} credits. User ${userId?.substring(0, 8)}... remaining: ${result.remainingCredits}`);
+            console.log(`💳 [CREDITS] ✅ Deducted ${result.creditsConsumed} credits. User ${userId?.substring(0, 8)}... remaining: ${result.remainingCredits}`);
           }
         } catch (error) {
           console.error('❌ Exception during credit deduction:', error.message, error.stack);
