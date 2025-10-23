@@ -38,7 +38,8 @@
     "check:knowledge-system": "node scripts/check-knowledge-system.js",
     "upload:knowledge": "node scripts/upload-knowledge.js",
     "dedupe:knowledge": "node scripts/dedupe-knowledge.js",
-    "rollback:batch": "node scripts/rollback-batch.js"
+    "rollback:batch": "node scripts/rollback-batch.js",
+    "init:default-user": "node scripts/init-default-user.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",

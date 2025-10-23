@@ -89,15 +89,54 @@ class CreditSystem {
       const { data: authUser, error: authError } = await this.supabase.auth.admin.getUserById(userId);
       
       if (authError || !authUser) {
-        console.warn(`⚠️ User ${userId} not found in auth.users, skipping credit initialization`);
-        return { 
-          success: false, 
-          error: 'User not found in auth system',
-          skipInitialization: true 
-        };
+        console.warn(`⚠️ User ${userId} not found in auth.users`);
+        
+        // Try to auto-create the user in Supabase Auth if it's a valid UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(userId)) {
+          console.log(`🔧 Attempting to auto-create user ${userId} in auth.users`);
+          
+          try {
+            const { data: newUser, error: createError } = await this.supabase.auth.admin.createUser({
+              id: userId,
+              email: `user-${userId.substring(0, 8)}@tala-ai.com`,
+              email_confirm: true,
+              user_metadata: {
+                auto_created: true,
+                created_at: new Date().toISOString(),
+                plan_type: planType
+              }
+            });
+            
+            if (createError) {
+              console.error(`❌ Failed to auto-create user: ${createError.message}`);
+              return { 
+                success: false, 
+                error: 'User not found and auto-creation failed',
+                skipInitialization: true 
+              };
+            }
+            
+            console.log(`✅ User ${userId} auto-created in auth.users`);
+          } catch (createErr) {
+            console.error(`❌ Exception during user auto-creation:`, createErr);
+            return { 
+              success: false, 
+              error: 'User not found and auto-creation failed',
+              skipInitialization: true 
+            };
+          }
+        } else {
+          console.error(`❌ Invalid user ID format: ${userId}`);
+          return { 
+            success: false, 
+            error: 'Invalid user ID format',
+            skipInitialization: true 
+          };
+        }
+      } else {
+        console.log(`✅ User ${userId} verified in auth.users, initializing credits`);
       }
-      
-      console.log(`✅ User ${userId} verified in auth.users, initializing credits`);
       
       // For agency users, check if organization already has a credit pool
       if (planType === 'agency' && organizationId) {

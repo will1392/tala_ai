@@ -15,6 +15,21 @@ router.get('/balance', authenticate, async (req, res) => {
     const result = await creditSystem.getUserCredits(req.userId);
     
     if (!result.success) {
+      // If initialization was skipped due to missing user, try to auto-initialize
+      if (result.skipInitialization) {
+        console.log(`🔄 Attempting to auto-initialize user ${req.userId}...`);
+        const initResult = await creditSystem.initializeUserCredits(req.userId, null, 'agent');
+        
+        if (initResult.success) {
+          console.log(`✅ Auto-initialization successful for user ${req.userId}`);
+          // Retry getting credits
+          const retryResult = await creditSystem.getUserCredits(req.userId);
+          return res.json(retryResult);
+        } else {
+          console.error(`❌ Auto-initialization failed for user ${req.userId}:`, initResult.error);
+        }
+      }
+      
       return res.status(500).json(result);
     }
     
