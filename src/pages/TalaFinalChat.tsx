@@ -778,7 +778,11 @@ Let's begin with understanding your business. What type of travel experiences do
       });
       
       // Dispatch credit update event after successful response
-      window.dispatchEvent(new Event('creditUpdate'));
+      // Add a small delay to allow backend to complete credit deduction
+      // Backend deducts credits asynchronously in res.on('finish') event
+      setTimeout(() => {
+        window.dispatchEvent(new Event('creditUpdate'));
+      }, 500); // 500ms delay should be enough for backend to process
       
       // Store the raw response (we'll render markdown in the component)
       console.log('📚 Response data sources:', data.sources); // Debug log
@@ -975,7 +979,10 @@ Let's begin with understanding your business. What type of travel experiences do
       });
       
       // Dispatch credit update event after successful response
-      window.dispatchEvent(new Event('creditUpdate'));
+      // Add a small delay to allow backend to complete credit deduction
+      setTimeout(() => {
+        window.dispatchEvent(new Event('creditUpdate'));
+      }, 500);
       
       // Update message as successful
       setMessages(prev => prev.map(m => 
