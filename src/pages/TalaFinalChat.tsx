@@ -760,11 +760,12 @@ Let's begin with understanding your business. What type of travel experiences do
           };
         }
         
+        const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
         const response = await fetch(buildApiUrl('chat/v2'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': '59b70373-ba68-4d89-8420-5c3723aef01f' // Your Supabase user
+            'x-user-id': userId
           },
           body: JSON.stringify(requestBody)
         });
@@ -958,12 +959,13 @@ Let's begin with understanding your business. What type of travel experiences do
     
     // Recreate the request
     try {
+      const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
       const data = await executeWithRetry(async () => {
         const response = await fetch(buildApiUrl('chat/v2'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': '59b70373-ba68-4d89-8420-5c3723aef01f' // Your Supabase user
+            'x-user-id': userId
           },
           body: JSON.stringify({
             message: message.content,

@@ -32,7 +32,6 @@ const LLM_MODELS = {
       functionCalling: true
     },
     defaultParams: {
-      temperature: 0.7,
       maxTokens: 4096,
       topP: 1.0
     }
@@ -53,7 +52,6 @@ const LLM_MODELS = {
       functionCalling: true
     },
     defaultParams: {
-      temperature: 0.7,
       maxTokens: 8192,
       topP: 1.0
     }
@@ -74,7 +72,6 @@ const LLM_MODELS = {
       functionCalling: true
     },
     defaultParams: {
-      temperature: 0.7,
       maxTokens: 16384,
       topP: 1.0
     }
