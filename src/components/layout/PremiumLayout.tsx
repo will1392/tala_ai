@@ -457,11 +457,11 @@ export const PremiumLayout = () => {
 
   const formatCredits = (credits: number): string => {
     if (credits >= 10000) {
-      // For 10k+, show one decimal
-      return `${(credits / 1000).toFixed(1)}k`;
+      // For 10k+, show one decimal (floor to avoid rounding up)
+      return `${Math.floor(credits / 100) / 10}k`;
     } else if (credits >= 1000) {
-      // For 1k-9.9k, show two decimals to avoid rounding issues
-      const value = credits / 1000;
+      // For 1k-9.9k, show two decimals (floor to avoid rounding up)
+      const value = Math.floor(credits / 10) / 100;
       return `${value.toFixed(2)}k`;
     }
     return credits.toString();
