@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { announceChatStatus } from '../../utils/announceToScreenReader';
+import { buildApiUrl } from '../../utils/api';
 
 interface ProcessingStatusProps {
   requestId?: string;
@@ -127,8 +128,7 @@ export const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
     }
 
     // Connect to SSE endpoint
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const source = new EventSource(`${apiUrl}/api/chat/status/stream/${requestId}`);
+    const source = new EventSource(buildApiUrl(`chat/status/stream/${requestId}`));
     
     source.onmessage = (event) => {
       try {

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
+import { buildApiUrl } from '../utils/api';
 
 interface GenerationOptions {
   tone?: 'professional' | 'friendly' | 'casual' | 'urgent' | 'empathetic';
@@ -55,7 +56,7 @@ export const useContentGeneration = () => {
     setError(null);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/generate`, {
+      const response = await axios.post(buildApiUrl('cmo/generate'), {
         type,
         prompt,
         options
@@ -77,7 +78,7 @@ export const useContentGeneration = () => {
     newTone: GenerationOptions['tone']
   ): Promise<string> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/adjust-tone`, {
+      const response = await axios.post(buildApiUrl('cmo/adjust-tone'), {
         content,
         tone: newTone
       });
@@ -95,7 +96,7 @@ export const useContentGeneration = () => {
     platform: string
   ): Promise<string[]> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/suggest-hashtags`, {
+      const response = await axios.post(buildApiUrl('cmo/suggest-hashtags'), {
         content,
         platform
       });
@@ -113,7 +114,7 @@ export const useContentGeneration = () => {
     platform: string
   ): Promise<string> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/optimize-platform`, {
+      const response = await axios.post(buildApiUrl('cmo/optimize-platform'), {
         content,
         platform
       });
@@ -131,7 +132,7 @@ export const useContentGeneration = () => {
     data: any
   ): Promise<PerformancePrediction> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/predict-performance`, {
+      const response = await axios.post(buildApiUrl('cmo/predict-performance'), {
         type,
         data
       });
@@ -149,7 +150,7 @@ export const useContentGeneration = () => {
     content?: string
   ): Promise<any> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/analyze-keywords`, {
+      const response = await axios.post(buildApiUrl('cmo/analyze-keywords'), {
         keywords,
         content
       });
@@ -167,7 +168,7 @@ export const useContentGeneration = () => {
     platform: string
   ): Promise<AdScore> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/score-ad`, {
+      const response = await axios.post(buildApiUrl('cmo/score-ad'), {
         adCopy,
         platform
       });
@@ -185,7 +186,7 @@ export const useContentGeneration = () => {
     count: number = 3
   ): Promise<any[]> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/generate-variations`, {
+      const response = await axios.post(buildApiUrl('cmo/generate-variations'), {
         prompt,
         count
       });
@@ -202,7 +203,7 @@ export const useContentGeneration = () => {
     data: any
   ): Promise<PerformancePrediction> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/cmo/predict-seo`, {
+      const response = await axios.post(buildApiUrl('cmo/predict-seo'), {
         data
       });
 

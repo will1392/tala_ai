@@ -26,6 +26,7 @@ import {
 } from './DocumentUploadOptions';
 import { DocumentExtractionService, type ExtractionResult } from '../../services/documentExtractionService';
 import { MediaProcessingService } from '../../services/mediaProcessingService';
+import { buildApiUrl } from '../../utils/api';
 
 interface ChatInputProps {
   onSend: (message: string, attachments?: File[], wasVoiceInput?: boolean) => void;
@@ -148,8 +149,7 @@ export const ChatInput = ({ onSend, disabled = false, placeholder = "Type your m
     if (!lastVoiceMessage) return;
     
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/voice/store`, {
+      const response = await fetch(buildApiUrl('voice/store'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

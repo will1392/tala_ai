@@ -145,7 +145,7 @@ export const TalaFinalChatRedesigned: React.FC = () => {
       console.log('🔄 Loading messages for conversation:', convId);
       
       // Always try backend first - this is our source of truth
-      const response = await fetch(`http://localhost:3001/api/conversations/${convId}/messages`, {
+      const response = await fetch(buildApiUrl(`conversations/${convId}/messages`), {
         headers: {
           'x-user-id': 'admin-1'
         }

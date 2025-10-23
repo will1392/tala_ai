@@ -44,9 +44,11 @@ export function useStatusUpdates(
     }
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-    const eventSource = new EventSource(
-      `${apiUrl}/chat/status/stream/${requestId}`
-    );
+    // Use /api prefix for the status stream endpoint
+    const streamUrl = apiUrl.includes('localhost') 
+      ? `/api/chat/status/stream/${requestId}`
+      : `${apiUrl}/api/chat/status/stream/${requestId}`;
+    const eventSource = new EventSource(streamUrl);
 
     eventSource.onopen = () => {
       setIsConnected(true);

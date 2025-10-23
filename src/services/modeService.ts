@@ -4,20 +4,21 @@
  * Handles mode persistence and synchronization
  */
 
+import { buildApiUrl } from '../utils/api';
+
 interface UserMode {
   mode: 'travel' | 'cmo';
   subMode: string | null;
 }
 
 class ModeService {
-  private apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
   /**
    * Get user's current mode from server
    */
   async getUserMode(userId: string): Promise<UserMode> {
     try {
-      const response = await fetch(`${this.apiUrl}/api/users/${userId}/mode`, {
+      const response = await fetch(buildApiUrl(`users/${userId}/mode`), {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -52,7 +53,7 @@ class ModeService {
     subMode?: string | null
   ): Promise<{ success: boolean; mode: string; subMode: string | null }> {
     try {
-      const response = await fetch(`${this.apiUrl}/api/users/${userId}/mode`, {
+      const response = await fetch(buildApiUrl(`users/${userId}/mode`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

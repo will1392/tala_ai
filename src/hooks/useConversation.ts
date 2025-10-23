@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { buildApiUrl } from '../utils/api';
 
 // Generate UUID without external dependency
 const generateUUID = () => {
@@ -110,8 +111,7 @@ export function useConversation(options: UseConversationOptions = {}) {
       
       // Try backend first (source of truth)
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        const response = await fetch(`${apiUrl}/api/conversations`, {
+        const response = await fetch(buildApiUrl('conversations'), {
           headers: {
             'x-user-id': userId
           }

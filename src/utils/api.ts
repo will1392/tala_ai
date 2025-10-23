@@ -68,8 +68,17 @@ export const buildApiUrl = (path: string = '') => {
     return base || '/api';
   }
 
-  const normalizedPath = path.replace(/^\/+/, '');
-  return `${base}/${normalizedPath}`;
+  // Remove leading slashes from path
+  let normalizedPath = path.replace(/^\/+/, '');
+  
+  // If the path already starts with 'api/', remove it to prevent double /api
+  // This handles cases where someone might pass 'api/conversations' or '/api/conversations'
+  if (normalizedPath.startsWith('api/')) {
+    normalizedPath = normalizedPath.substring(4); // Remove 'api/'
+  }
+  
+  // Remove any trailing slashes from the final path
+  return `${base}/${normalizedPath}`.replace(/\/+$/, '');
 };
 
 export default buildApiUrl;

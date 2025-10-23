@@ -1,3 +1,5 @@
+import { buildApiUrl } from '../utils/api';
+
 export interface ImageAnalysisItem {
   fileName: string;
   description?: string;
@@ -42,7 +44,7 @@ export class MediaProcessingService {
       });
       formData.append('userId', 'admin-1');
 
-      const response = await fetch('http://localhost:3001/api/media/analyze-images', {
+      const response = await fetch(buildApiUrl('media/analyze-images'), {
         method: 'POST',
         body: formData
       });
@@ -72,7 +74,7 @@ export class MediaProcessingService {
       });
       formData.append('userId', 'admin-1');
 
-      const response = await fetch('http://localhost:3001/api/media/transcribe', {
+      const response = await fetch(buildApiUrl('media/transcribe'), {
         method: 'POST',
         body: formData
       });

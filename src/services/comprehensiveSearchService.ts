@@ -5,6 +5,7 @@
 
 import { primaryFolderService } from './primaryFolderService';
 import { folderService } from './folderService';
+import { buildApiUrl } from '../utils/api';
 
 export interface SearchableItem {
   id: string;
@@ -524,7 +525,7 @@ export class ComprehensiveSearchService {
   private async getAllDocuments(userId: string, isAdmin: boolean): Promise<any[]> {
     try {
       // This would integrate with your existing document service
-      const response = await fetch(`http://localhost:3001/api/documents/all?userId=${userId}&isAdmin=${isAdmin}`);
+      const response = await fetch(buildApiUrl(`documents/all?userId=${userId}&isAdmin=${isAdmin}`));
       if (response.ok) {
         const data = await response.json();
         return data.documents || [];

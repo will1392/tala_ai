@@ -1,4 +1,5 @@
 import { getMarketingContext, getMarketingStructuredData, getMarketingResponseAdjustment } from './MarketingContextService';
+import { buildApiUrl } from '../utils/api';
 
 export interface ChatMessage {
   id: string;
@@ -52,10 +53,10 @@ export class ChatService {
   private isAdmin: boolean;
 
   constructor(userId: string = 'test_user_123', isAdmin: boolean = true) {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    this.baseUrl = ''; // Not needed anymore, we use buildApiUrl
     this.userId = userId;
     this.isAdmin = isAdmin;
-    console.log('💬 ChatService initialized:', { baseUrl: this.baseUrl, userId: this.userId });
+    console.log('💬 ChatService initialized:', { userId: this.userId });
     
     // Check if marketing profile exists
     const marketingData = getMarketingStructuredData();
@@ -85,7 +86,7 @@ export class ChatService {
       if (isTaskCreation) {
         console.log('🎯 Detected task creation request:', message);
         // Use direct task creation endpoint
-        const taskResponse = await fetch(`${this.baseUrl}/api/chat-tasks/create`, {
+        const taskResponse = await fetch(buildApiUrl('chat-tasks/create'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ export class ChatService {
       
       // Regular chat request - use v2 endpoint
       console.log('🚀 ChatService sending request:', {
-        url: `${this.baseUrl}/api/chat/v2`,
+        url: buildApiUrl('chat/v2'),
         body: {
           message,
           userId: this.userId,
@@ -140,7 +141,7 @@ export class ChatService {
         enhancedMessage = `${message}\n\n[Marketing Context]\n${marketingContext}`;
       }
       
-      const response = await fetch(`${this.baseUrl}/api/chat/v2`, {
+      const response = await fetch(buildApiUrl('chat/v2'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -166,7 +167,7 @@ export class ChatService {
         console.error('❌ Chat API error:', {
           status: response.status,
           statusText: response.statusText,
-          url: `${this.baseUrl}/api/chat/v2`
+          url: buildApiUrl('chat/v2')
         });
         const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
         throw new Error(errorData.error || `Failed to send message: ${response.status} ${response.statusText}`);
@@ -208,7 +209,7 @@ export class ChatService {
   async getChatHistory(conversationId: string): Promise<ChatMessage[]> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/api/chat/history/${conversationId}?userId=${this.userId}`,
+        buildApiUrl(`chat/history/${conversationId}?userId=${this.userId}`),
         {
           method: 'GET',
           headers: {
@@ -236,7 +237,7 @@ export class ChatService {
   async getConversations(): Promise<Conversation[]> {
     try {
       const response = await fetch(
-        `${this.baseUrl}/api/chat/conversations?userId=${this.userId}`,
+        buildApiUrl(`chat/conversations?userId=${this.userId}`),
         {
           method: 'GET',
           headers: {
