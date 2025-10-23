@@ -9,37 +9,21 @@ interface CreditsData {
   tier: string;
   daily_usage: number;
   daily_limit: number;
+  is_super_admin?: boolean;
+  has_unlimited_credits?: boolean;
 }
 
 export default function CreditsIndicator() {
   const [credits, setCredits] = useState<CreditsData | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchCredits();
-    // Refresh credits every 5 seconds for near real-time updates
-    const interval = setInterval(fetchCredits, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Listen for credit update events from chat
-  useEffect(() => {
-    const handleCreditUpdate = () => {
-      console.log('📊 Credit update event received in CreditsIndicator');
-      fetchCredits();
-    };
-
-    window.addEventListener('creditUpdate', handleCreditUpdate);
-    return () => window.removeEventListener('creditUpdate', handleCreditUpdate);
-  }, []);
-
-  const fetchCredits = async () => {
+  const fetchCredits = async (isInitialLoad = false) => {
     try {
       const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/credits/balance`, {
+      const response = await fetch('/api/credits/balance', {
         headers: {
           'x-user-id': userId,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -55,16 +39,42 @@ export default function CreditsIndicator() {
             monthly_allocation: data.data.monthly_allocation || 5000,
             tier: data.data.plan_type || 'agent',
             daily_usage: 0, // Not provided by balance endpoint
-            daily_limit: 100 // Default limit
+            daily_limit: 100, // Default limit
+            is_super_admin: data.data.is_super_admin || false,
+            has_unlimited_credits: data.data.has_unlimited_credits || false
           });
+          
+          // Mark as loaded after first successful fetch
+          if (!hasLoadedOnce) {
+            setHasLoadedOnce(true);
+            setLoading(false);
+          }
         }
       }
     } catch (error) {
       console.error('Failed to fetch credits:', error);
-    } finally {
-      setLoading(false);
+      if (!hasLoadedOnce) {
+        setLoading(false);
+      }
     }
   };
+
+  useEffect(() => {
+    fetchCredits(true);
+    // Refresh credits every 5 seconds for near real-time updates
+    const interval = setInterval(() => fetchCredits(false), 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for credit update events from chat
+  useEffect(() => {
+    const handleCreditUpdate = () => {
+      fetchCredits(false);
+    };
+
+    window.addEventListener('creditUpdate', handleCreditUpdate);
+    return () => window.removeEventListener('creditUpdate', handleCreditUpdate);
+  }, []);
 
   const handleCreditClick = () => {
     navigate('/settings/billing');
@@ -78,9 +88,10 @@ export default function CreditsIndicator() {
 
   if (!credits) return null;
 
-  const usagePercentage = (credits.balance / credits.monthly_allocation) * 100;
-  const isLowBalance = credits.balance < credits.monthly_allocation * 0.2;
-  const isCritical = credits.balance < 10;
+  // Super admins have unlimited credits - never show warnings
+  const usagePercentage = credits.has_unlimited_credits ? 100 : (credits.balance / credits.monthly_allocation) * 100;
+  const isLowBalance = !credits.has_unlimited_credits && credits.balance < credits.monthly_allocation * 0.2;
+  const isCritical = !credits.has_unlimited_credits && credits.balance < 10;
 
   return (
     <div className="relative">
@@ -105,8 +116,12 @@ export default function CreditsIndicator() {
           ) : (
             <CreditCard size={16} className="text-[var(--primary)]" />
           )}
-          <span className="font-medium text-sm">{credits.balance}</span>
-          <span className="text-xs text-[var(--muted)]">credits</span>
+          <span className="font-medium text-sm">
+            {credits.has_unlimited_credits ? '∞' : credits.balance}
+          </span>
+          <span className="text-xs text-[var(--muted)]">
+            {credits.has_unlimited_credits ? 'unlimited' : 'credits'}
+          </span>
         </div>
         
         {/* Mini progress bar */}

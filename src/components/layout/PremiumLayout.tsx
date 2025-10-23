@@ -456,6 +456,11 @@ export const PremiumLayout = () => {
   }, []);
 
   const formatCredits = (credits: number): string => {
+    // Check if user has unlimited credits (super admin)
+    if (creditInfo?.has_unlimited_credits) {
+      return '∞';
+    }
+    
     if (credits >= 10000) {
       // For 10k+, show one decimal (floor to avoid rounding up)
       return `${Math.floor(credits / 100) / 10}k`;

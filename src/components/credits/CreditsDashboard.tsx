@@ -53,6 +53,14 @@ const TIER_BENEFITS = {
     color: 'text-gray-600',
     bgColor: 'bg-gray-50'
   },
+  agent: {
+    name: 'Agent',
+    monthlyCredits: 5000,
+    dailyLimit: 100,
+    features: ['Full access to all features', 'Priority support', 'Unlimited documents', 'Advanced AI models'],
+    color: 'text-[var(--primary)]',
+    bgColor: 'bg-[var(--primary)]/10'
+  },
   premium: {
     name: 'Premium',
     monthlyCredits: 1000,
@@ -68,6 +76,14 @@ const TIER_BENEFITS = {
     features: ['All premium features', 'Dedicated support', 'Custom models', 'SLA guarantee'],
     color: 'text-purple-600',
     bgColor: 'bg-purple-50'
+  },
+  agency: {
+    name: 'Agency',
+    monthlyCredits: 25000,
+    dailyLimit: 1000,
+    features: ['All enterprise features', 'Multi-user support', 'Shared credit pool', 'Custom branding'],
+    color: 'text-cyan-600',
+    bgColor: 'bg-cyan-50'
   },
   payAsYouGo: {
     name: 'Pay As You Go',
@@ -94,8 +110,7 @@ export default function CreditsDashboard() {
   const fetchCreditStatus = async () => {
     try {
       const userId = localStorage.getItem('userId') || '59b70373-ba68-4d89-8420-5c3723aef01f';
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/api/credits/balance`, {
+      const response = await fetch('/api/credits/balance', {
         headers: {
           'x-user-id': userId,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -129,11 +144,11 @@ export default function CreditsDashboard() {
             },
             costs: {}
           });
+          setLoading(false);
         }
       }
     } catch (error) {
       console.error('Failed to fetch credit status:', error);
-    } finally {
       setLoading(false);
     }
   };

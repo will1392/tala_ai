@@ -49,7 +49,12 @@ export const Sidebar = () => {
     setUserRole(role);
   }, []);
 
-  const formatCredits = (credits: number): string => {
+  const formatCredits = (credits: number, isUnlimited?: boolean): string => {
+    // Super admins have unlimited credits
+    if (isUnlimited) {
+      return '∞';
+    }
+    
     if (credits >= 10000) {
       // For 10k+, show one decimal (floor to avoid rounding up)
       return `${Math.floor(credits / 100) / 10}k`;
@@ -147,9 +152,11 @@ export const Sidebar = () => {
             </div>
             <div className="flex items-center gap-1">
               <span className="text-lg font-bold text-cyan-400">
-                {creditsLoading ? '...' : formatCredits(creditInfo?.available_credits || 0)}
+                {creditsLoading ? '...' : formatCredits(creditInfo?.available_credits || 0, creditInfo?.has_unlimited_credits)}
               </span>
-              {creditInfo?.is_organization_pool && (
+              {creditInfo?.has_unlimited_credits ? (
+                <span className="text-xs text-cyan-400/60">(unlimited)</span>
+              ) : creditInfo?.is_organization_pool && (
                 <span className="text-xs text-white/40">(shared)</span>
               )}
             </div>

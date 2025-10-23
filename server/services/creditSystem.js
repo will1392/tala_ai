@@ -270,6 +270,9 @@ class CreditSystem {
       // Calculate available credits
       const availableCredits = data.total_credits + data.bonus_credits - data.used_credits;
       
+      // Check if user is super admin
+      const isSuperAdmin = data.role === 'super_admin';
+      
       return {
         success: true,
         data: {
@@ -278,7 +281,10 @@ class CreditSystem {
           percentage_used: (data.used_credits / data.total_credits) * 100,
           is_organization_pool: false,
           plan_type: data.plan_type || 'agent',
-          role: data.role || 'agent'
+          role: data.role || 'agent',
+          is_super_admin: isSuperAdmin,
+          has_unlimited_credits: isSuperAdmin,
+          monthly_allocation: data.total_credits
         }
       };
     } catch (error) {
