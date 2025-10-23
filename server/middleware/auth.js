@@ -3,22 +3,46 @@
  * Simple auth middleware for the email-tasks routes
  */
 import roleService from '../services/roleService.js';
+import jwt from 'jsonwebtoken';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 /**
  * Authenticate user (mock implementation for testing)
  */
 export const authenticate = async (req, res, next) => {
-    // Get user ID from headers - support both x-user-id and x-mock-user-id
-    const userId = req.headers['x-user-id'] || 
-                   req.headers['x-mock-user-id'] || 
-                   req.headers.authorization?.replace('Bearer ', '') || 
-                   process.env.DEFAULT_USER_ID ||
-                   '59b70373-ba68-4d89-8420-5c3723aef01f'; // Your Supabase user
+    let userId = req.headers['x-user-id'] || req.headers['x-mock-user-id'];
+    
+    if (!userId && req.headers.authorization) {
+        const token = req.headers.authorization.replace('Bearer ', '');
+        
+        try {
+            const { data: { user }, error } = await supabase.auth.getUser(token);
+            
+            if (!error && user) {
+                userId = user.id;
+                console.log('🔐 Decoded JWT token, user ID:', userId);
+            } else {
+                console.warn('⚠️  Failed to verify Supabase token:', error?.message);
+            }
+        } catch (error) {
+            console.warn('⚠️  Error decoding JWT:', error.message);
+        }
+    }
+    
+    if (!userId) {
+        userId = process.env.DEFAULT_USER_ID || '59b70373-ba68-4d89-8420-5c3723aef01f';
+        console.log('🔐 Using default user ID:', userId);
+    }
     
     console.log('🔐 Auth middleware:', {
         'x-user-id': req.headers['x-user-id'],
         'x-mock-user-id': req.headers['x-mock-user-id'],
-        'authorization': req.headers.authorization,
+        'has-authorization': !!req.headers.authorization,
         'final userId': userId
     });
     
@@ -26,8 +50,6 @@ export const authenticate = async (req, res, next) => {
         return res.status(401).json({ error: 'Authentication required' });
     }
     
-    // In production, you would verify the token/session here
-    // For now, we'll accept any user ID
     req.userId = userId;
     req.organizationId = req.headers['x-organization-id'] || '00000000-0000-0000-0000-000000000001';
     
@@ -38,7 +60,7 @@ export const authenticate = async (req, res, next) => {
         console.log('🔐 User role:', userRole);
     } catch (error) {
         console.error('Error fetching user role:', error);
-        req.userRole = 'agent'; // Default role if fetch fails
+        req.userRole = 'agent';
     }
     
     next();
