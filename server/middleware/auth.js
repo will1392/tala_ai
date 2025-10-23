@@ -6,10 +6,17 @@ import roleService from '../services/roleService.js';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+let supabase = null;
+
+function getSupabaseClient() {
+    if (!supabase && process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+    }
+    return supabase;
+}
 
 /**
  * Authenticate user (mock implementation for testing)
@@ -19,18 +26,23 @@ export const authenticate = async (req, res, next) => {
     
     if (!userId && req.headers.authorization) {
         const token = req.headers.authorization.replace('Bearer ', '');
+        const client = getSupabaseClient();
         
-        try {
-            const { data: { user }, error } = await supabase.auth.getUser(token);
-            
-            if (!error && user) {
-                userId = user.id;
-                console.log('🔐 Decoded JWT token, user ID:', userId);
-            } else {
-                console.warn('⚠️  Failed to verify Supabase token:', error?.message);
+        if (client) {
+            try {
+                const { data: { user }, error } = await client.auth.getUser(token);
+                
+                if (!error && user) {
+                    userId = user.id;
+                    console.log('🔐 Decoded JWT token, user ID:', userId);
+                } else {
+                    console.warn('⚠️  Failed to verify Supabase token:', error?.message);
+                }
+            } catch (error) {
+                console.warn('⚠️  Error decoding JWT:', error.message);
             }
-        } catch (error) {
-            console.warn('⚠️  Error decoding JWT:', error.message);
+        } else {
+            console.warn('⚠️  Supabase client not configured, skipping JWT verification');
         }
     }
     
