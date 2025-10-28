@@ -118,7 +118,7 @@ Return as JSON:`;
     const results = await this.qdrant.search('tala_admin_knowledge', {
       vector: embedding.data[0].embedding,
       limit: limit,
-      score_threshold: 0.4
+      score_threshold: 0.25
     });
 
     return results.map(r => ({
@@ -146,7 +146,7 @@ Return as JSON:`;
       const results = await this.qdrant.search('tala_admin_knowledge', {
         vector: embedding.data[0].embedding,
         limit: limit,
-        score_threshold: 0.3, // Lower threshold for broader results
+        score_threshold: 0.2, // Lower threshold for broader results
         with_payload: true
       });
 
