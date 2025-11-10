@@ -60,7 +60,27 @@ const toWords = (value: string) =>
 const shorten = (value: string, fallback: string, maxWords = 4) => {
   const words = toWords(value);
   if (words.length === 0) return fallback;
+  if (words.length <= maxWords) return words.join(' ');
   return words.slice(0, maxWords).join(' ');
+};
+
+const extractKeyPhrase = (value: string, maxWords = 3): string => {
+  const lower = value.toLowerCase();
+  
+  if (lower.includes('affluent') || lower.includes('luxury') || lower.includes('high-net-worth')) {
+    return maxWords >= 3 ? 'Luxury travelers' : 'Executives';
+  }
+  if (lower.includes('executive') || lower.includes('professional')) {
+    return maxWords >= 3 ? 'Busy executives' : 'Executives';
+  }
+  if (lower.includes('founder') || lower.includes('entrepreneur')) {
+    return 'Founders';
+  }
+  if (lower.includes('small business') || lower.includes('local business')) {
+    return maxWords >= 3 ? 'Small business owners' : 'Business owners';
+  }
+  
+  return shorten(value, 'founders', maxWords);
 };
 
 const deriveContext = (request: HookRequest): HookContext => {
@@ -71,13 +91,13 @@ const deriveContext = (request: HookRequest): HookContext => {
 
   return {
     audience,
-    shortAudience: shorten(audience, 'founders', 2),
+    shortAudience: extractKeyPhrase(audience, 2),
     pain,
-    shortPain: shorten(pain, 'wasting time', 4),
+    shortPain: shorten(pain, 'wasting time', 3),
     outcome,
     shortOutcome: shorten(outcome, 'grow faster', 3),
     offering,
-    shortOffering: shorten(offering, 'this tool', 3)
+    shortOffering: shorten(offering, 'this system', 2)
   };
 };
 
