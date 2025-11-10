@@ -8,6 +8,7 @@ import {
   verifyHookSet
 } from '../utils/hookGenerator';
 import { cn } from '../utils/cn';
+import { buildApiUrl } from '../utils/api';
 
 type FormMode = 'basic' | 'advanced';
 type StageState = 'idle' | 'active' | 'complete' | 'retrying' | 'error';
@@ -204,7 +205,7 @@ const HookGenerator = () => {
       });
 
       try {
-        const response = await fetch('/api/hooks/generate', {
+        const response = await fetch(buildApiUrl('hooks/generate'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
