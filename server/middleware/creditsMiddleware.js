@@ -36,6 +36,9 @@ const OPERATION_COSTS = {
   'cmo_analyze': 3,
   'cmo_optimize': 4,
   
+  // Hook generation operations
+  'hook_generation': 5,
+  
   // Free operations
   'read': 0,
   'list': 0,

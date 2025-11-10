@@ -5,8 +5,9 @@ import { dedupeAndScore } from './scorer.js';
 import { retrieveNotes } from '../rag/retrieve.js';
 import { embedOne } from '../llm/embeddings.js';
 
-export async function runHookAgent({ avatar, topic, total = 30, corpus }) {
+export async function runHookAgent({ avatar, topic, total = 30, corpus, provenHooks = '' }) {
   console.log('🎯 Hook Agent starting:', { avatar, topic, total });
+  console.log('📚 Proven hooks available:', provenHooks ? 'Yes' : 'No');
   
   const plan = makePlan(total);
   const baseQuery = `${avatar} ${topic} hooks principles`;
@@ -31,7 +32,8 @@ export async function runHookAgent({ avatar, topic, total = 30, corpus }) {
         style: spec.style,
         awareness: spec.awareness,
         label: spec.label,
-        angleNotes
+        angleNotes,
+        provenHooks
       });
 
       if (result && result.text) {

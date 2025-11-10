@@ -742,9 +742,16 @@ app.get('/api/credits/packages', getCreditPackages);
 app.post('/api/credits/upgrade-tier', upgradeTier);
 app.get('/api/credits/history', getTransactionHistory);
 
-// Hook Generation API
+// Hook Generation API - Add OPTIONS handler for CORS preflight
+app.options('/api/hooks/generate', (req, res) => {
+  res.status(204).end();
+});
+
 app.post('/api/hooks/generate', optionalAuth, requireCredits('hook_generation'), asyncHandler(async (req, res) => {
   console.log('🎣 Hook generation request received');
+  console.log('   Method:', req.method);
+  console.log('   Path:', req.path);
+  console.log('   Headers:', JSON.stringify(req.headers, null, 2));
   
   const { 
     targetAudience, 

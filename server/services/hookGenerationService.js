@@ -1,6 +1,11 @@
 import { runHookAgent } from '../agents/conductor.js';
 import { HOOK_RULES } from '../agents/rules.js';
 import { loadCorpus } from '../vectorstore/load.js';
+import { QdrantClient } from '@qdrant/qdrant-js';
+import OpenAI from 'openai';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 function awarenessLabel(level) {
   const mapping = {
@@ -61,6 +66,13 @@ function buildSupportingInsights(request, hook) {
 export default class HookGenerationService {
   constructor() {
     this.corpusPromise = null;
+    this.qdrant = new QdrantClient({
+      url: process.env.QDRANT_URL,
+      apiKey: process.env.QDRANT_API_KEY
+    });
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
   }
 
   async getCorpus() {
@@ -71,6 +83,80 @@ export default class HookGenerationService {
       });
     }
     return this.corpusPromise;
+  }
+
+  /**
+   * Retrieve relevant proven hooks from Qdrant knowledge base
+   * @param {Object} request - HookRequest with destination, audience, etc.
+   * @returns {Promise<string>} - Formatted string of 20 relevant hook examples
+   */
+  async retrieveProvenHooks(request) {
+    try {
+      // Build semantic search query from request context
+      const queryParts = [
+        request.destination || '',
+        request.travelType || '',
+        request.targetAudience || '',
+        request.offering || '',
+        request.desiredOutcome || '',
+        request.campaignGoal || ''
+      ].filter(Boolean);
+
+      // Add pain points if available
+      if (Array.isArray(request.painPoints) && request.painPoints.length > 0) {
+        queryParts.push(...request.painPoints.slice(0, 2));
+      }
+
+      const searchQuery = queryParts.join(' ');
+      
+      if (!searchQuery.trim()) {
+        console.warn('⚠️  No search context for hook retrieval');
+        return '';
+      }
+
+      console.log('🔍 Searching hook knowledge base with:', searchQuery.slice(0, 100));
+
+      // Generate embedding for semantic search
+      const embedding = await this.openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: searchQuery
+      });
+
+      // Query Qdrant for relevant hooks
+      const results = await this.qdrant.search('kb_hook_generator', {
+        vector: embedding.data[0].embedding,
+        limit: 20,
+        score_threshold: 0.25,
+        with_payload: true
+      });
+
+      if (!results || results.length === 0) {
+        console.warn('⚠️  No hooks retrieved from knowledge base');
+        return '';
+      }
+
+      console.log(`✅ Retrieved ${results.length} relevant hooks from knowledge base`);
+
+      // Format the hooks for the prompt
+      const hookExamples = results
+        .map((result, index) => {
+          const content = result.payload?.content || '';
+          const metadata = result.payload?.metadata || {};
+          const score = result.score ? ` (relevance: ${(result.score * 100).toFixed(0)}%)` : '';
+          
+          // Extract awareness level and hook style from metadata if available
+          const awareness = metadata.awareness_level ? ` [${metadata.awareness_level}]` : '';
+          const style = metadata.hook_style ? ` {${metadata.hook_style}}` : '';
+          
+          return `${index + 1}. ${content}${awareness}${style}${score}`;
+        })
+        .join('\n\n');
+
+      return hookExamples;
+    } catch (error) {
+      console.error('❌ Failed to retrieve hooks from Qdrant:', error.message);
+      return '';
+    }
   }
 
   buildTopic(request) {
@@ -100,11 +186,15 @@ export default class HookGenerationService {
     const topic = this.buildTopic(request);
     const total = this.requestedTotal(request);
 
+    // Retrieve proven hooks from Qdrant knowledge base
+    const provenHooks = await this.retrieveProvenHooks(request);
+
     const result = await runHookAgent({
       avatar,
       topic,
       total,
-      corpus
+      corpus,
+      provenHooks
     });
 
     const hooks = Array.isArray(result.hooks) ? result.hooks : [];

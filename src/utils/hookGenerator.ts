@@ -57,18 +57,100 @@ const toWords = (value: string) =>
     .split(/\s+/)
     .filter(Boolean);
 
+const normalizePhrase = (value: string): string => {
+  const lower = value.toLowerCase().trim();
+  
+  // Convert problematic phrases to concise nouns
+  const phraseMap: Record<string, string> = {
+    'overwhelmed by research, fear of missing hidden gems': 'research overwhelm',
+    'overwhelmed by research, fear of missing': 'research overwhelm',
+    'overwhelmed by research, fear': 'research overwhelm',
+    'fear of missing gems': 'FOMO',
+    'fear of missing': 'FOMO',
+    'stress-free, perfectly planned': 'perfect trips',
+    'perfectly planned': 'perfect planning',
+    'full-service luxury travel': 'luxury planning',
+    'spending too much time on': 'time spent on',
+    'losing sales due to stockouts': 'stockouts',
+    'losing sales due to': 'lost sales',
+    'wasting money on': 'wasted spend on',
+    'too many options': 'choice overload',
+    'not enough time': 'time constraints',
+    'scale marketing without hiring': 'marketing scale',
+    'optimized inventory levels and higher profits': 'optimized inventory'
+  };
+  
+  // Try exact matches first
+  for (const [phrase, replacement] of Object.entries(phraseMap)) {
+    if (lower === phrase) {
+      return replacement;
+    }
+  }
+  
+  // Try partial matches
+  for (const [phrase, replacement] of Object.entries(phraseMap)) {
+    if (lower.includes(phrase)) {
+      return replacement;
+    }
+  }
+  
+  return value;
+};
+
+const lowercaseFirst = (str: string): string => {
+  if (!str) return str;
+  return str.charAt(0).toLowerCase() + str.slice(1);
+};
+
+const capitalizeFirst = (str: string): string => {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 const shorten = (value: string, fallback: string, maxWords = 4) => {
-  const words = toWords(value);
+  const normalized = normalizePhrase(value);
+  const words = toWords(normalized);
   if (words.length === 0) return fallback;
-  if (words.length <= maxWords) return words.join(' ');
-  return words.slice(0, maxWords).join(' ');
+  
+  // Return normalized phrase if it's already short enough
+  if (words.length <= maxWords) {
+    return lowercaseFirst(words.join(' '));
+  }
+  
+  // Smart truncation: try to keep meaningful phrases
+  const text = words.join(' ').toLowerCase();
+  
+  // If there's a comma, take the first part
+  if (text.includes(',')) {
+    const firstPart = text.split(',')[0].trim();
+    const firstWords = toWords(firstPart);
+    if (firstWords.length > 0 && firstWords.length <= maxWords) {
+      return lowercaseFirst(firstWords.join(' '));
+    }
+  }
+  
+  // Extract key nouns: remove common verb/preposition starts
+  const skipStarts = ['spending', 'losing', 'wasting', 'trying to', 'dealing with'];
+  for (const skip of skipStarts) {
+    if (text.startsWith(skip)) {
+      const remainder = text.slice(skip.length).trim();
+      const remainderWords = toWords(remainder);
+      if (remainderWords.length > 0 && remainderWords.length <= maxWords) {
+        return lowercaseFirst(remainderWords.join(' '));
+      }
+    }
+  }
+  
+  // Default: take first N words and lowercase
+  return lowercaseFirst(words.slice(0, maxWords).join(' '));
 };
 
 const extractKeyPhrase = (value: string, maxWords = 3): string => {
-  const lower = value.toLowerCase();
+  const lower = value.toLowerCase().trim();
   
+  // Priority patterns: match specific audience descriptors
   if (lower.includes('affluent') || lower.includes('luxury') || lower.includes('high-net-worth')) {
-    return maxWords >= 3 ? 'Luxury travelers' : 'Executives';
+    return maxWords >= 3 ? 'Luxury travelers' : 'Travelers';
   }
   if (lower.includes('executive') || lower.includes('professional')) {
     return maxWords >= 3 ? 'Busy executives' : 'Executives';
@@ -77,10 +159,29 @@ const extractKeyPhrase = (value: string, maxWords = 3): string => {
     return 'Founders';
   }
   if (lower.includes('small business') || lower.includes('local business')) {
-    return maxWords >= 3 ? 'Small business owners' : 'Business owners';
+    return maxWords >= 3 ? 'Small businesses' : 'Businesses';
+  }
+  if (lower.includes('travel') && !lower.includes('luxury')) {
+    return 'Travelers';
+  }
+  if (lower.includes('age') || lower.includes('planning') || lower.includes('vacation')) {
+    // Extract core identity before demographic details
+    if (lower.includes('affluent') || lower.includes('luxury')) {
+      return 'Luxury travelers';
+    }
+    return 'Travelers';
   }
   
-  return shorten(value, 'founders', maxWords);
+  // Extract first meaningful noun phrase (skip articles and adjectives)
+  const words = toWords(value);
+  const skipWords = ['the', 'a', 'an', 'aged', 'planning', 'who', 'are', 'is'];
+  const meaningful = words.filter(w => !skipWords.includes(w.toLowerCase()));
+  
+  if (meaningful.length === 0) return 'founders';
+  if (meaningful.length <= maxWords) return meaningful.slice(0, maxWords).join(' ');
+  
+  // Take first maxWords meaningful words
+  return meaningful.slice(0, maxWords).join(' ');
 };
 
 const deriveContext = (request: HookRequest): HookContext => {
@@ -89,15 +190,21 @@ const deriveContext = (request: HookRequest): HookContext => {
   const outcome = sanitize(request.desiredOutcome) || 'scale faster';
   const offering = sanitize(request.offering) || 'our system';
 
+  // Smart extraction: convert verbose inputs to concise phrases
+  const shortAudience = extractKeyPhrase(audience, 2);
+  const shortPain = shorten(pain, 'wasting time', 3);
+  const shortOutcome = shorten(outcome, 'better results', 3);
+  const shortOffering = shorten(offering, 'our service', 2);
+
   return {
     audience,
-    shortAudience: extractKeyPhrase(audience, 2),
+    shortAudience,
     pain,
-    shortPain: shorten(pain, 'wasting time', 3),
+    shortPain,
     outcome,
-    shortOutcome: shorten(outcome, 'grow faster', 3),
+    shortOutcome,
     offering,
-    shortOffering: shorten(offering, 'this system', 2)
+    shortOffering
   };
 };
 
@@ -106,13 +213,13 @@ const HOOK_TEMPLATES: HookTemplate[] = [
     label: '70-core',
     awareness: 'Problem Aware',
     rationale: 'Agitates the pain so relief feels urgent.',
-    build: ({ audience, shortPain }) => `${audience}: still ${shortPain}? There's a faster way.`
+    build: ({ shortAudience, shortPain }) => `${shortAudience}: still dealing with ${shortPain}? There's a faster way.`
   },
   {
     label: '70-core',
     awareness: 'Solution Aware',
     rationale: 'Shows the path to the promised outcome.',
-    build: ({ shortAudience, shortOutcome, shortOffering }) => `${shortAudience} who ${shortOutcome} start with ${shortOffering}.`
+    build: ({ shortAudience, shortOutcome, shortOffering }) => `${shortAudience} who want ${shortOutcome} start with ${shortOffering}.`
   },
   {
     label: '70-core',
@@ -130,7 +237,7 @@ const HOOK_TEMPLATES: HookTemplate[] = [
     label: '20-adjacent',
     awareness: 'Solution Aware',
     rationale: 'Shows the path to the promised outcome.',
-    build: ({ audience, shortOffering, shortOutcome }) => `${audience} use ${shortOffering} to ${shortOutcome} without the chaos.`
+    build: ({ shortAudience, shortOffering, shortOutcome }) => `${shortAudience} use ${shortOffering} to get ${shortOutcome} without the chaos.`
   },
   {
     label: '10-experimental',
@@ -142,37 +249,40 @@ const HOOK_TEMPLATES: HookTemplate[] = [
     label: '70-core',
     awareness: 'Problem Aware',
     rationale: 'Agitates the pain so relief feels urgent.',
-    build: ({ audience, shortPain }) => `${audience}: ${shortPain} is the leak. Plug it today.`
+    build: ({ shortAudience, shortPain }) => `${shortAudience}: ${shortPain} is costing you. Stop it now.`
   },
   {
     label: '20-adjacent',
     awareness: 'Completely Unaware',
     rationale: 'Sparks curiosity for people not yet shopping.',
-    build: ({ shortOutcome }) => `The one move that gets ${shortOutcome} without the grind.`
+    build: ({ shortOutcome }) => `The one move that gets you ${shortOutcome} without the grind.`
   },
   {
     label: '70-core',
     awareness: 'Solution Aware',
     rationale: 'Shows the path to the promised outcome.',
-    build: ({ shortOffering, shortOutcome }) => `${shortOffering} delivers ${shortOutcome}. No fluff, just results.`
+    build: ({ shortOffering, shortOutcome }) => `Get ${shortOutcome} with ${shortOffering}. No fluff, just results.`
   },
   {
     label: '10-experimental',
     awareness: 'Most Aware',
     rationale: 'Targets warm audience already sold on you.',
-    build: ({ shortOffering, shortOutcome }) => `Back for more? ${shortOffering} just made ${shortOutcome} even easier.`
+    build: ({ shortOffering, shortOutcome }) => {
+      const offering = capitalizeFirst(shortOffering);
+      return `Back for more? ${offering} just made ${shortOutcome} even easier.`;
+    }
   },
   {
     label: '70-core',
     awareness: 'Problem Aware',
     rationale: 'Agitates the pain so relief feels urgent.',
-    build: ({ shortAudience, shortPain }) => `${shortAudience} lose hours to ${shortPain}. Stop the bleed.`
+    build: ({ shortAudience, shortPain }) => `${shortAudience}: stop losing hours to ${shortPain}.`
   },
   {
     label: '20-adjacent',
     awareness: 'Product Aware',
     rationale: 'Clarifies why your offer wins the comparison.',
-    build: ({ audience, shortOffering }) => `${audience} who tried everything picked ${shortOffering}. Here's the proof.`
+    build: ({ shortAudience, shortOffering }) => `${shortAudience} who tried everything chose ${shortOffering}. Here's why.`
   },
   {
     label: '70-core',
@@ -190,13 +300,16 @@ const HOOK_TEMPLATES: HookTemplate[] = [
     label: '10-experimental',
     awareness: 'Problem Aware',
     rationale: 'Agitates the pain so relief feels urgent.',
-    build: ({ audience, shortPain }) => `${audience}: every minute you spend on ${shortPain} costs you money.`
+    build: ({ shortAudience, shortPain }) => `${shortAudience}: every hour spent on ${shortPain} costs you money.`
   },
   {
     label: '70-core',
     awareness: 'Product Aware',
     rationale: 'Clarifies why your offer wins the comparison.',
-    build: ({ shortOffering, shortOutcome }) => `${shortOffering} beats the competition on ${shortOutcome}. See how.`
+    build: ({ shortOffering, shortOutcome }) => {
+      const offering = capitalizeFirst(shortOffering);
+      return `${offering} beats the competition on ${shortOutcome}. See how.`;
+    }
   },
   {
     label: '20-adjacent',
@@ -214,13 +327,17 @@ const HOOK_TEMPLATES: HookTemplate[] = [
     label: '70-core',
     awareness: 'Problem Aware',
     rationale: 'Agitates the pain so relief feels urgent.',
-    build: ({ audience, shortPain }) => `${audience}: if ${shortPain} drains you, try this.`
+    build: ({ shortAudience, shortPain }) => `${shortAudience}: if ${shortPain} drains you, try this.`
   },
   {
     label: '20-adjacent',
     awareness: 'Completely Unaware',
     rationale: 'Sparks curiosity for people not yet shopping.',
-    build: ({ shortAudience, shortOutcome }) => `The ${shortAudience} secret to ${shortOutcome} nobody talks about.`
+    build: ({ shortAudience, shortOutcome }) => {
+      // Convert to lowercase for natural phrasing
+      const audience = lowercaseFirst(shortAudience);
+      return `The ${audience} secret to ${shortOutcome} nobody talks about.`;
+    }
   }
 ];
 
