@@ -323,15 +323,15 @@ const HookGenerator = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Mode Toggle */}
-            <div className="flex gap-2 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">
+            <div className="flex gap-2 w-fit">
               <button
                 type="button"
                 onClick={() => setMode('basic')}
                 className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                  'px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200',
                   mode === 'basic' 
-                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? 'border-primary bg-primary/10 text-white' 
+                    : 'border-white/20 text-white/60 hover:border-white/30 hover:text-white'
                 )}
               >
                 Basic
@@ -340,10 +340,10 @@ const HookGenerator = () => {
                 type="button"
                 onClick={() => setMode('advanced')}
                 className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                  'px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200',
                   mode === 'advanced' 
-                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? 'border-primary bg-primary/10 text-white' 
+                    : 'border-white/20 text-white/60 hover:border-white/30 hover:text-white'
                 )}
               >
                 Advanced
