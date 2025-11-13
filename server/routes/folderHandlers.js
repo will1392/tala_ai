@@ -67,7 +67,11 @@ export function createFolderHandlers({
       return res.status(404).json({ error: 'Folder not found' });
     }
 
-    if (folder.userId !== userId) {
+    // Allow deletion if user owns the folder OR user is admin/owner
+    const isOwner = folder.userId === userId;
+    const isAdmin = req.userRole === 'admin' || req.userRole === 'owner' || req.isAdmin === true;
+    
+    if (!isOwner && !isAdmin) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -80,7 +84,7 @@ export function createFolderHandlers({
       updatePrimaryFolderCounts();
     }
 
-    console.log(`📁 Deleted folder: ${folder.name} (ID: ${folderId})`);
+    console.log(`📁 Deleted folder: ${folder.name} (ID: ${folderId}) by ${req.userRole || 'user'} ${userId}`);
     return res.json({ success: true });
   };
 
