@@ -67,11 +67,16 @@ const buildBasicRequest = (data: BasicFormData): HookRequest => {
     marketingChannels: [],
     tone: 'Conversational and empathetic',
     campaignGoal: 'Generate interest',
-    additionalNotes: `Destination: ${destination}, Travel Type: ${travelType}`
+    additionalNotes: `Destination: ${destination}, Travel Type: ${travelType}`,
+    destination: destination,
+    travelType: travelType
   };
 };
 
 const buildAdvancedRequest = (data: AdvancedFormData): HookRequest => {
+  const destination = data.destination.trim() || '';
+  const travelType = data.travelType || '';
+  
   return {
     targetAudience: data.targetAudience.trim() || 'Luxury travelers',
     offering: data.offering.trim() || 'Full-service travel planning',
@@ -80,7 +85,9 @@ const buildAdvancedRequest = (data: AdvancedFormData): HookRequest => {
     marketingChannels: [],
     tone: data.tone || 'Conversational and empathetic',
     campaignGoal: 'Generate high-quality leads',
-    additionalNotes: data.additionalNotes.trim()
+    additionalNotes: data.additionalNotes.trim(),
+    destination: destination,
+    travelType: travelType
   };
 };
 
@@ -208,7 +215,8 @@ const HookGenerator = () => {
         const response = await fetch(buildApiUrl('hooks/generate'), {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-user-id': 'test-user'
           },
           body: JSON.stringify(request)
         });

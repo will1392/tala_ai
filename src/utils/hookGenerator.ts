@@ -7,6 +7,8 @@ export interface HookRequest {
   tone: string;
   campaignGoal: string;
   additionalNotes: string;
+  destination: string;
+  travelType: string;
 }
 
 export interface GeneratedHook {
@@ -47,6 +49,9 @@ interface HookContext {
   shortOutcome: string;
   offering: string;
   shortOffering: string;
+  destination: string;
+  travelType: string;
+  specificOffering: string;
 }
 
 const sanitize = (value: string) => value.trim();
@@ -62,6 +67,10 @@ const normalizePhrase = (value: string): string => {
   
   // Convert problematic phrases to concise nouns
   const phraseMap: Record<string, string> = {
+    'overwhelmed by planning': 'planning stress',
+    'too many options': 'choice overload',
+    'limited time to research': 'time constraints',
+    'fear of missing hidden gems': 'FOMO on experiences',
     'overwhelmed by research, fear of missing hidden gems': 'research overwhelm',
     'overwhelmed by research, fear of missing': 'research overwhelm',
     'overwhelmed by research, fear': 'research overwhelm',
@@ -74,10 +83,18 @@ const normalizePhrase = (value: string): string => {
     'losing sales due to stockouts': 'stockouts',
     'losing sales due to': 'lost sales',
     'wasting money on': 'wasted spend on',
-    'too many options': 'choice overload',
     'not enough time': 'time constraints',
     'scale marketing without hiring': 'marketing scale',
-    'optimized inventory levels and higher profits': 'optimized inventory'
+    'optimized inventory levels and higher profits': 'optimized inventory',
+    'river cruise experience in italy': 'Italy river cruises',
+    'river cruise experience in': 'river cruises',
+    'ocean cruise experience in italy': 'Italy ocean cruises',
+    'ocean cruise experience in': 'ocean cruises',
+    'land tour experience in italy': 'Italy land tours',
+    'land tour experience in': 'land tours',
+    'safari experience in': 'safaris',
+    'travel planning overwhelm': 'travel planning overwhelm',
+    'stress-free, perfectly planned trip': 'perfect trips'
   };
   
   // Try exact matches first
@@ -99,7 +116,7 @@ const normalizePhrase = (value: string): string => {
 
 const lowercaseFirst = (str: string): string => {
   if (!str) return str;
-  return str.charAt(0).toLowerCase() + str.slice(1);
+  return str.toLowerCase();
 };
 
 const capitalizeFirst = (str: string): string => {
@@ -186,15 +203,32 @@ const extractKeyPhrase = (value: string, maxWords = 3): string => {
 
 const deriveContext = (request: HookRequest): HookContext => {
   const audience = sanitize(request.targetAudience) || 'founders';
-  const pain = request.painPoints.find((point) => sanitize(point).length > 0) || 'losing time on repetitive work';
+  const rawPain = request.painPoints.find((point) => sanitize(point).length > 0) || 'losing time on repetitive work';
+  const pain = normalizePhrase(rawPain);
   const outcome = sanitize(request.desiredOutcome) || 'scale faster';
   const offering = sanitize(request.offering) || 'our system';
+  const destination = sanitize(request.destination) || '';
+  const travelType = sanitize(request.travelType) || '';
+
+  // Build destination-specific offering
+  let specificOffering = offering;
+  if (destination && travelType) {
+    const destCapitalized = destination.charAt(0).toUpperCase() + destination.slice(1);
+    const typeNormalized = travelType.toLowerCase().replace('_', ' ');
+    specificOffering = `${destCapitalized} ${typeNormalized}`;
+  } else if (destination) {
+    const destCapitalized = destination.charAt(0).toUpperCase() + destination.slice(1);
+    specificOffering = `${destCapitalized} travel`;
+  } else if (travelType) {
+    const typeNormalized = travelType.toLowerCase().replace('_', ' ');
+    specificOffering = typeNormalized;
+  }
 
   // Smart extraction: convert verbose inputs to concise phrases
   const shortAudience = extractKeyPhrase(audience, 2);
   const shortPain = shorten(pain, 'wasting time', 3);
   const shortOutcome = shorten(outcome, 'better results', 3);
-  const shortOffering = shorten(offering, 'our service', 2);
+  const shortOffering = destination || travelType ? specificOffering : shorten(offering, 'this service', 4);
 
   return {
     audience,
@@ -204,7 +238,10 @@ const deriveContext = (request: HookRequest): HookContext => {
     outcome,
     shortOutcome,
     offering,
-    shortOffering
+    shortOffering,
+    destination,
+    travelType,
+    specificOffering
   };
 };
 
@@ -360,7 +397,19 @@ const channelNoteFromRequest = (request: HookRequest): string => {
 export const buildSupportingInsights = (request: HookRequest): string[] => {
   const insights = new Set<string>();
   if (request.targetAudience) insights.add(`Audience: ${request.targetAudience}`);
-  if (request.offering) insights.add(`Offer: ${request.offering}`);
+  if (request.destination && request.travelType) {
+    const destCapitalized = request.destination.charAt(0).toUpperCase() + request.destination.slice(1);
+    const typeNormalized = request.travelType.toLowerCase().replace('_', ' ');
+    insights.add(`Offer: ${destCapitalized} ${typeNormalized}`);
+  } else if (request.destination) {
+    const destCapitalized = request.destination.charAt(0).toUpperCase() + request.destination.slice(1);
+    insights.add(`Destination: ${destCapitalized}`);
+  } else if (request.travelType) {
+    const typeNormalized = request.travelType.toLowerCase().replace('_', ' ');
+    insights.add(`Travel Type: ${typeNormalized}`);
+  } else if (request.offering) {
+    insights.add(`Offer: ${request.offering}`);
+  }
   if (request.desiredOutcome) insights.add(`Outcome: ${request.desiredOutcome}`);
   if (request.painPoints[0]) insights.add(`Pain: ${request.painPoints[0]}`);
   if (request.campaignGoal) insights.add(`Goal: ${request.campaignGoal}`);
