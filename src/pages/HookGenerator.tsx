@@ -2,7 +2,6 @@ import { FormEvent, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { Clipboard, ClipboardCheck, Loader2, RotateCcw, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import {
-  generateFallbackHooks,
   type GeneratedHook,
   type HookRequest,
   verifyHookSet
@@ -212,11 +211,14 @@ const HookGenerator = () => {
       });
 
       try {
+        // Generate a valid UUID for testing (in production, this should come from auth)
+        const testUserId = crypto.randomUUID();
+        
         const response = await fetch(buildApiUrl('hooks/generate'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-user-id': 'test-user'
+            'x-user-id': testUserId
           },
           body: JSON.stringify(request)
         });
@@ -251,22 +253,26 @@ const HookGenerator = () => {
       } catch (error) {
         console.error('Hook Agent error', error);
         setPipelineStatus({ hookAgent: 'error', verification: 'idle' });
-        toast.error('Hook Agent ran into an issue, generating hooks with Tala fallback.');
-        break;
+        
+        // Show proper error message - NO FALLBACK
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        toast.error(`Hook generation failed: ${errorMessage}. Please try again or contact support.`);
+        
+        setIsGenerating(false);
+        return; // Stop execution - no fallback
       }
     }
 
+    // If verification failed after max attempts, show error - NO FALLBACK
     if (!verificationPassed) {
-      const fallbackHooks = generateFallbackHooks(request);
-      hooks = fallbackHooks;
-      setPipelineStatus({ hookAgent: 'complete', verification: 'complete' });
-      if (lastIssues.length > 0) {
-        setReviewNotes((prev) => [...prev, 'Fallback applied: Tala generated structured hooks so you can ship right now.']);
-      } else {
-        setReviewNotes(['Fallback applied: Tala generated structured hooks so you can ship right now.']);
-      }
+      setPipelineStatus({ hookAgent: 'error', verification: 'error' });
+      toast.error('Hook generation did not meet quality standards after multiple attempts. Please try again or contact support.');
+      setReviewNotes((prev) => [...prev, 'Generation failed: Quality verification did not pass. No hooks generated.']);
+      setIsGenerating(false);
+      return; // Stop execution - no fallback
     }
 
+    // Only set results if verification passed
     setResults(hooks);
     setIsGenerating(false);
   };

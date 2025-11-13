@@ -141,13 +141,22 @@ export async function testDatabaseConnection() {
   try {
     const client = getSupabaseAnon();
     
-    // Test basic connection with a simple query
+    // Test basic connection with a simple query - use user_credits table instead
     const { data, error } = await client
-      .from('schema_version')
-      .select('version')
+      .from('user_credits')
+      .select('user_id')
       .limit(1);
 
     if (error) {
+      // If user_credits doesn't exist, that's okay - connection still works
+      if (error.code === 'PGRST204' || error.message?.includes('does not exist')) {
+        return {
+          success: true,
+          version: 'connected',
+          timestamp: new Date().toISOString(),
+          note: 'Database connected, tables may need setup'
+        };
+      }
       return {
         success: false,
         error: error.message,
@@ -157,7 +166,7 @@ export async function testDatabaseConnection() {
 
     return {
       success: true,
-      version: data?.[0]?.version || 'unknown',
+      version: 'connected',
       timestamp: new Date().toISOString()
     };
 

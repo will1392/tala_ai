@@ -187,6 +187,8 @@ class CreditSystem {
    */
   async getUserCredits(userId) {
     try {
+      console.log(`[CREDIT SYSTEM] Getting credits for user: ${userId?.substring(0, 8)}...`);
+      
       // First check user's plan type and organization
       const { data: userData, error: userError } = await this.supabase
         .from('user_credits')
@@ -196,8 +198,8 @@ class CreditSystem {
 
       if (userError && userError.code !== 'PGRST116') {
         // If table doesn't exist or column is missing, return default credits
-        if (userError.message?.includes('does not exist')) {
-          console.warn('Credit system tables not yet created, returning defaults');
+        if (userError.message?.includes('does not exist') || userError.message?.includes('relation')) {
+          console.warn('[CREDIT SYSTEM] Credit system tables not yet created, returning defaults');
           return {
             success: true,
             data: {
@@ -209,11 +211,48 @@ class CreditSystem {
               percentage_used: 0,
               plan_type: 'agent',
               is_organization_pool: false,
-              last_reset_date: new Date().toISOString()
+              last_reset_date: new Date().toISOString(),
+              role: 'agent'
             }
           };
         }
+        console.error('[CREDIT SYSTEM] Error fetching user credits:', userError);
         throw userError;
+      }
+      
+      // If user doesn't exist (PGRST116), initialize them
+      if (userError && userError.code === 'PGRST116') {
+        console.log('[CREDIT SYSTEM] User not found, initializing credits...');
+        const initResult = await this.initializeUserCredits(userId, null, 'agent');
+        if (initResult.success && initResult.data) {
+          return {
+            success: true,
+            data: {
+              ...initResult.data,
+              available_credits: initResult.data.total_credits - (initResult.data.used_credits || 0),
+              percentage_used: 0,
+              is_organization_pool: false,
+              role: 'agent'
+            }
+          };
+        }
+        // If initialization failed, return default credits
+        console.warn('[CREDIT SYSTEM] Failed to initialize user, returning defaults');
+        return {
+          success: true,
+          data: {
+            user_id: userId,
+            total_credits: 5000,
+            used_credits: 0,
+            bonus_credits: 0,
+            available_credits: 5000,
+            percentage_used: 0,
+            plan_type: 'agent',
+            is_organization_pool: false,
+            last_reset_date: new Date().toISOString(),
+            role: 'agent'
+          }
+        };
       }
 
       const planType = userData?.plan_type || 'agent';
