@@ -1185,7 +1185,7 @@ console.log('✅ Upload Batch Monitoring routes mounted at /api/upload-batches')
 
 // Create folder
 app.post('/api/folders', authenticate, asyncHandler(async (req, res) => {
-  const { name, description, userId, isAdmin, primaryFolderId } = req.body;
+  const { name, description, userId, isAdmin, primaryFolderId, parentId } = req.body;
   
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Folder name is required' });
@@ -1205,7 +1205,8 @@ app.post('/api/folders', authenticate, asyncHandler(async (req, res) => {
     documentCount: 0,
     userId: userId,
     isAdmin: isAdmin === true || isAdmin === 'true',
-    primaryFolderId: primaryFolderId || null
+    primaryFolderId: primaryFolderId || null,
+    parentId: parentId || null
   };
   
   // Save to Map
@@ -1217,7 +1218,7 @@ app.post('/api/folders', authenticate, asyncHandler(async (req, res) => {
     updatePrimaryFolderCounts();
   }
   
-  console.log(`📁 Created folder: ${name} (ID: ${folderId})`);
+  console.log(`📁 Created folder: ${name} (ID: ${folderId})${parentId ? ` under parent: ${parentId}` : ''}`);
   res.json(folder);
 }));
 

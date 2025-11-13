@@ -45,7 +45,7 @@ function NodeRow({
     >
       <div
         ref={buttonRef}
-        className={`flex items-center justify-between rounded-lg px-2 py-1 transition-colors ${
+        className={`group flex items-center justify-between rounded-lg px-2 py-1 transition-colors ${
           activeId === node.id 
             ? 'bg-primary/10 text-primary' 
             : 'hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -74,10 +74,11 @@ function NodeRow({
         <button
           aria-label={`Create subfolder in ${node.name}`}
           onClick={(e) => { e.stopPropagation(); onCreateSubfolder(node.id); }}
-          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+          className="p-1.5 rounded hover:bg-primary/10 dark:hover:bg-primary/20 opacity-100 transition-all hover:scale-110"
           tabIndex={-1}
+          title="Create subfolder"
         >
-          <FolderPlus size={14} aria-hidden="true" />
+          <FolderPlus size={16} className="text-primary" aria-hidden="true" />
         </button>
       </div>
 

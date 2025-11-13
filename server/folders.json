@@ -154,5 +154,38 @@
     "userId": "admin-1",
     "isAdmin": true,
     "primaryFolderId": "38698a32-7697-4577-8b00-cc0501eecad7"
+  },
+  {
+    "id": "e77fb08b-1866-4b5e-9653-9558c670a9e7",
+    "name": "Test Subfolder APITest",
+    "description": "Testing subfolder creation",
+    "createdAt": "2025-11-13T20:51:59.537Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8",
+    "parentId": null
+  },
+  {
+    "id": "2e8a76cd-75bc-4415-acab-38c2ac6d426a",
+    "name": "Nested Test Subfolder",
+    "description": "Testing NESTED subfolder creation (subfolder within subfolder)",
+    "createdAt": "2025-11-13T20:52:48.209Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8",
+    "parentId": "e77fb08b-1866-4b5e-9653-9558c670a9e7"
+  },
+  {
+    "id": "8676d627-c5c1-4c82-9bc6-005c4efeaa73",
+    "name": "Test Nested Subfolder 2",
+    "description": "Testing subfolder inside New Zealand",
+    "createdAt": "2025-11-13T21:07:56.374Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8",
+    "parentId": "1b52e63a-d729-4e12-a85c-6cee121c948b"
   }
 ]

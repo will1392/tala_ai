@@ -273,7 +273,7 @@ export const KnowledgeFinal = () => {
       tree.push(node);
     });
     
-    // Then, create nodes for all subfolders and attach to their primary folders
+    // Then, create nodes for all subfolders
     subfolders.forEach(sf => {
       // Skip folders without primaryFolderId  
       if (!sf.primaryFolderId) {
@@ -281,22 +281,35 @@ export const KnowledgeFinal = () => {
         return;
       }
       
+      // Determine the actual parent - could be a primary folder or another subfolder
+      const actualParentId = sf.parentId || sf.primaryFolderId;
+      
       const node: FolderNode = {
         id: sf.id,
         name: sf.name,
-        parentId: sf.primaryFolderId,
+        parentId: actualParentId,
         children: [],
         documentCount: sf.documentCount || 0
       };
       nodeMap.set(sf.id, node);
+    });
+    
+    // Now attach subfolders to their parents (could be primary folders or other subfolders)
+    subfolders.forEach(sf => {
+      if (!sf.primaryFolderId) return;
+      
+      const node = nodeMap.get(sf.id);
+      if (!node) return;
+      
+      const actualParentId = sf.parentId || sf.primaryFolderId;
       
       // Try to find parent - first by direct ID, then by mapped ID
-      let parent = nodeMap.get(sf.primaryFolderId);
-      if (!parent && oldToNewIdMap[sf.primaryFolderId]) {
-        parent = nodeMap.get(oldToNewIdMap[sf.primaryFolderId]);
+      let parent = nodeMap.get(actualParentId);
+      if (!parent && oldToNewIdMap[actualParentId]) {
+        parent = nodeMap.get(oldToNewIdMap[actualParentId]);
         if (parent) {
           // Update the node's parentId to the new ID
-          node.parentId = oldToNewIdMap[sf.primaryFolderId];
+          node.parentId = oldToNewIdMap[actualParentId];
         }
       }
       
