@@ -198,16 +198,5 @@
     "isAdmin": true,
     "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8",
     "parentId": null
-  },
-  {
-    "id": "610807cb-3399-4d38-aba4-4a6fb184f27a",
-    "name": "Brazil Frontend Test",
-    "description": "",
-    "createdAt": "2025-11-13T21:26:20.590Z",
-    "documentCount": 0,
-    "userId": "admin-1",
-    "isAdmin": true,
-    "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8",
-    "parentId": null
   }
 ]

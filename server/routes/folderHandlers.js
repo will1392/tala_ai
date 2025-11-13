@@ -67,11 +67,19 @@ export function createFolderHandlers({
       return res.status(404).json({ error: 'Folder not found' });
     }
 
-    // Allow deletion if user owns the folder OR user is admin/owner
+    // Allow deletion if:
+    // 1. User owns the folder
+    // 2. User has admin/owner role in request
+    // 3. Folder's userId matches and folder has isAdmin flag (legacy admin folders)
     const isOwner = folder.userId === userId;
-    const isAdmin = req.userRole === 'admin' || req.userRole === 'owner' || req.isAdmin === true;
+    const isRequestAdmin = req.userRole === 'admin' || req.userRole === 'owner' || req.isAdmin === true;
+    const isFolderAdmin = folder.isAdmin === true;
     
-    if (!isOwner && !isAdmin) {
+    // Super admins can delete any folder, regular users can only delete their own
+    const canDelete = isRequestAdmin || (isOwner && isFolderAdmin) || isOwner;
+    
+    if (!canDelete) {
+      console.log(`❌ Delete forbidden - userId: ${userId}, folderUserId: ${folder.userId}, userRole: ${req.userRole}, isAdmin: ${req.isAdmin}, folderIsAdmin: ${folder.isAdmin}`);
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
