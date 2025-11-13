@@ -32,7 +32,9 @@ class FolderService {
       'Content-Type': 'application/json',
     };
     const token = localStorage.getItem('auth_token');
-    if (token) {
+    // Only add Authorization header if we have a valid-looking token (not empty/null)
+    // In development with MOCK_AUTH=true, no token is fine
+    if (token && token.trim().length > 0) {
       headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;

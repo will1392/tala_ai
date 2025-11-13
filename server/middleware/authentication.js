@@ -382,6 +382,27 @@ export async function authenticate(req, res, next) {
       });
     }
     
+    // If MOCK_AUTH is enabled, bypass credential validation entirely
+    if (MOCK_AUTH_CONFIG.enabled) {
+      console.log('🔓 Mock authentication enabled - bypassing credential validation');
+      const mockData = await initializeMockAuth();
+      
+      if (mockData) {
+        req.user = mockData.user;
+        req.organization = mockData.organization;
+        req.isAuthenticated = true;
+        req.isMockAuth = true;
+        req.authType = 'mock';
+        req.userId = mockData.user.id;
+        req.organizationId = mockData.organization.id;
+        req.userRole = mockData.user.role;
+        req.userPermissions = mockData.user.permissions || [];
+        
+        console.log(`✅ Mock auth - User: ${mockData.user.display_name}, Org: ${mockData.organization.name}`);
+        return next();
+      }
+    }
+    
     if (!credentials.type && !MOCK_AUTH_CONFIG.enabled) {
       await auditLog('authentication_failed', 'authentication', null, req.ip, {
         reason: 'no_credentials',
