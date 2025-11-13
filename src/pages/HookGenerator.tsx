@@ -330,7 +330,7 @@ const HookGenerator = () => {
                 className={cn(
                   'px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200',
                   mode === 'basic' 
-                    ? 'border-primary bg-primary/10 text-white' 
+                    ? 'border-primary bg-white text-secondary-dark' 
                     : 'border-white/20 text-white/60 hover:border-white/30 hover:text-white'
                 )}
               >
@@ -342,7 +342,7 @@ const HookGenerator = () => {
                 className={cn(
                   'px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200',
                   mode === 'advanced' 
-                    ? 'border-primary bg-primary/10 text-white' 
+                    ? 'border-primary bg-white text-secondary-dark' 
                     : 'border-white/20 text-white/60 hover:border-white/30 hover:text-white'
                 )}
               >
