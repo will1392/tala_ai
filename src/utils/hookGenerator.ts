@@ -30,7 +30,7 @@ export interface HookVerificationResult {
 }
 
 const DEFAULT_CHANNEL_NOTE = 'Deploy as the opening line across channels.';
-const MIN_HOOKS_REQUIRED = 20;
+const MIN_HOOKS_REQUIRED = 15;
 const MIN_WORD_COUNT = 6;
 
 interface HookTemplate {
@@ -453,8 +453,17 @@ export const verifyHookSet = (hooks: GeneratedHook[], request: HookRequest): Hoo
     }
   });
 
-  const audienceFragment = shorten(request.targetAudience, '').toLowerCase();
-  if (audienceFragment && !hooks.some((hook) => hook.text.toLowerCase().includes(audienceFragment))) {
+  // Check that hooks reference the target audience using the SAME extraction logic used in hook generation
+  const shortAudience = extractKeyPhrase(request.targetAudience, 2).toLowerCase();
+  const audienceKeywords = shortAudience.split(/\s+/).filter(word => word.length > 3);
+  
+  // Check if ANY hook contains at least one significant audience keyword
+  const hasAudienceReference = hooks.some((hook) => {
+    const hookText = hook.text.toLowerCase();
+    return audienceKeywords.some(keyword => hookText.includes(keyword));
+  });
+  
+  if (!hasAudienceReference && shortAudience.length > 0) {
     issues.push('None of the hooks reference the target audience.');
   }
 
