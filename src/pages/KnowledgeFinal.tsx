@@ -499,14 +499,26 @@ export const KnowledgeFinal = () => {
 
   // Actually create the subfolder
   const createSubfolder = async (name: string) => {
-    if (!createFolderParentId || !name.trim()) return;
+    if (!createFolderParentId || !name.trim()) {
+      console.log('❌ Cannot create subfolder: missing parent ID or name', { createFolderParentId, name });
+      pushToast({
+        kind: 'error',
+        title: 'Cannot create subfolder',
+        message: 'Missing parent folder or folder name'
+      });
+      return;
+    }
     
     try {
+      console.log('📁 Creating subfolder:', { name, parentId: createFolderParentId });
+      
       // Check if parent is a primary folder or subfolder
       const isPrimary = primaryFolders.some(f => f.id === createFolderParentId);
+      console.log('🔍 Parent folder type:', isPrimary ? 'PRIMARY' : 'SUBFOLDER');
       
       if (isPrimary) {
         // Create subfolder under primary folder
+        console.log('📁 Creating under primary folder:', createFolderParentId);
         const newFolder = await folderService.createFolder('admin-1', {
           name: name.trim(),
           description: '',
@@ -515,30 +527,62 @@ export const KnowledgeFinal = () => {
           isAdmin: true
         });
         
+        console.log('✅ Subfolder created successfully:', newFolder);
+        
         // Update local state
         setSubfolders(prev => [...prev, newFolder]);
+        
+        pushToast({
+          kind: 'success',
+          title: 'Subfolder created',
+          message: `"${name}" has been created successfully`
+        });
       } else {
         // For nested subfolders, find the primary folder
         const parentSubfolder = subfolders.find(f => f.id === createFolderParentId);
+        console.log('🔍 Found parent subfolder:', parentSubfolder);
+        
         if (parentSubfolder) {
+          console.log('📁 Creating nested subfolder under:', parentSubfolder.name);
           const newFolder = await folderService.createFolder('admin-1', {
             name: name.trim(),
             description: '',
             primaryFolderId: parentSubfolder.primaryFolderId,
-            parentId: createFolderParentId, // Set parent for nesting
+            parentId: createFolderParentId,
             userId: 'admin-1',
             isAdmin: true
           });
           
+          console.log('✅ Nested subfolder created successfully:', newFolder);
+          
           setSubfolders(prev => [...prev, newFolder]);
+          
+          pushToast({
+            kind: 'success',
+            title: 'Subfolder created',
+            message: `"${name}" has been created successfully`
+          });
+        } else {
+          console.error('❌ Parent subfolder not found:', createFolderParentId);
+          pushToast({
+            kind: 'error',
+            title: 'Failed to create subfolder',
+            message: 'Parent folder not found'
+          });
         }
       }
       
       setShowCreateFolderModal(false);
       setCreateFolderParentId(null);
     } catch (error) {
-      console.error('Failed to create subfolder:', error);
-      alert('Failed to create subfolder');
+      console.error('❌ Failed to create subfolder:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      pushToast({
+        kind: 'error',
+        title: 'Failed to create subfolder',
+        message: errorMessage
+      });
     }
   };
 

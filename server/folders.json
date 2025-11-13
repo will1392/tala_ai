@@ -187,5 +187,16 @@
     "isAdmin": true,
     "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8",
     "parentId": "1b52e63a-d729-4e12-a85c-6cee121c948b"
+  },
+  {
+    "id": "335f44f9-bfc3-4ee2-ba81-09beee396965",
+    "name": "Brazil",
+    "description": "",
+    "createdAt": "2025-11-13T21:17:32.909Z",
+    "documentCount": 0,
+    "userId": "admin-1",
+    "isAdmin": true,
+    "primaryFolderId": "4395de5d-bb27-48c5-ac65-04260da085e8",
+    "parentId": null
   }
 ]
