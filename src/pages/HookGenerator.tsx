@@ -328,10 +328,10 @@ const HookGenerator = () => {
                 type="button"
                 onClick={() => setMode('basic')}
                 className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition',
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                   mode === 'basic' 
-                    ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 text-white' 
-                    : 'text-white/60 hover:text-white'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
                 )}
               >
                 Basic
@@ -340,10 +340,10 @@ const HookGenerator = () => {
                 type="button"
                 onClick={() => setMode('advanced')}
                 className={cn(
-                  'px-4 py-2 rounded-lg text-sm font-medium transition',
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                   mode === 'advanced' 
-                    ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 text-white' 
-                    : 'text-white/60 hover:text-white'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
                 )}
               >
                 Advanced
