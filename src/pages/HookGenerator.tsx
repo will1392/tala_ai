@@ -526,7 +526,7 @@ const HookGenerator = () => {
             <button
               type="submit"
               disabled={isGenerating}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 px-6 py-4 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary-light px-6 py-4 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition-all duration-200 hover:scale-[1.01] hover:shadow-glow disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isGenerating ? (
                 <>
