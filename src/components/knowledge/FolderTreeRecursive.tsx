@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronRight, FolderPlus, Folder as FolderIcon } from 'lucide-react';
+import { ChevronRight, FolderPlus, Folder as FolderIcon, Trash2 } from 'lucide-react';
 import type { FolderNode } from '../../types/knowledge';
 
 type Props = {
@@ -7,15 +7,19 @@ type Props = {
   activeId: string | null;               // currently selected folder
   onSelect: (id: string | null) => void;
   onCreateSubfolder: (parentId: string) => void;
+  onDeleteFolder?: (folderId: string) => void;
+  isAdmin?: boolean;
 };
 
 function NodeRow({
-  node, depth, activeId, onSelect, onCreateSubfolder,
+  node, depth, activeId, onSelect, onCreateSubfolder, onDeleteFolder, isAdmin,
 }: {
   node: FolderNode; depth: number;
   activeId: string | null;
   onSelect: (id: string) => void;
   onCreateSubfolder: (parentId: string) => void;
+  onDeleteFolder?: (folderId: string) => void;
+  isAdmin?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const hasChildren = !!node.children?.length;
@@ -71,15 +75,30 @@ function NodeRow({
           <span className="text-sm">{node.name}</span>
         </div>
 
-        <button
-          aria-label={`Create subfolder in ${node.name}`}
-          onClick={(e) => { e.stopPropagation(); onCreateSubfolder(node.id); }}
-          className="p-1.5 rounded hover:bg-primary/10 dark:hover:bg-primary/20 opacity-100 transition-all hover:scale-110"
-          tabIndex={-1}
-          title="Create subfolder"
-        >
-          <FolderPlus size={16} className="text-primary" aria-hidden="true" />
-        </button>
+        <div className="flex items-center gap-1">
+          {isAdmin && (
+            <button
+              aria-label={`Create subfolder in ${node.name}`}
+              onClick={(e) => { e.stopPropagation(); onCreateSubfolder(node.id); }}
+              className="p-1.5 rounded hover:bg-primary/10 dark:hover:bg-primary/20 opacity-100 transition-all hover:scale-110"
+              tabIndex={-1}
+              title="Create subfolder"
+            >
+              <FolderPlus size={16} className="text-primary" aria-hidden="true" />
+            </button>
+          )}
+          {isAdmin && onDeleteFolder && (
+            <button
+              aria-label={`Delete ${node.name} folder`}
+              onClick={(e) => { e.stopPropagation(); onDeleteFolder(node.id); }}
+              className="p-1.5 rounded hover:bg-red-500/10 dark:hover:bg-red-500/20 opacity-100 transition-all hover:scale-110"
+              tabIndex={-1}
+              title="Delete folder"
+            >
+              <Trash2 size={16} className="text-red-500" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
 
       {hasChildren && open && (
@@ -92,6 +111,8 @@ function NodeRow({
               activeId={activeId}
               onSelect={onSelect}
               onCreateSubfolder={onCreateSubfolder}
+              onDeleteFolder={onDeleteFolder}
+              isAdmin={isAdmin}
             />
           ))}
         </div>
@@ -100,7 +121,7 @@ function NodeRow({
   );
 }
 
-export default function FolderTreeRecursive({ root, activeId, onSelect, onCreateSubfolder }: Props) {
+export default function FolderTreeRecursive({ root, activeId, onSelect, onCreateSubfolder, onDeleteFolder, isAdmin }: Props) {
   const treeRef = useRef<HTMLElement>(null);
 
   // Keyboard navigation for the tree
@@ -174,6 +195,8 @@ export default function FolderTreeRecursive({ root, activeId, onSelect, onCreate
             activeId={activeId}
             onSelect={onSelect}
             onCreateSubfolder={onCreateSubfolder}
+            onDeleteFolder={onDeleteFolder}
+            isAdmin={isAdmin}
           />
         </div>
       ))}

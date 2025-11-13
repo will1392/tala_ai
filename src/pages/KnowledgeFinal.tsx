@@ -615,6 +615,47 @@ export const KnowledgeFinal = () => {
     }
   };
 
+  // Handle delete folder
+  const handleDeleteFolder = async (folderId: string) => {
+    const folder = subfolders.find(f => f.id === folderId);
+    const folderName = folder?.name || 'this folder';
+    
+    if (!confirm(`Are you sure you want to delete "${folderName}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      console.log('🗑️ Deleting folder:', folderId);
+      
+      await folderService.deleteFolder(folderId, 'admin-1');
+      
+      console.log('✅ Folder deleted successfully');
+      
+      // Update local state
+      setSubfolders(prev => prev.filter(f => f.id !== folderId));
+      
+      // If the deleted folder was active, reset to "All Documents"
+      if (activeFolderId === folderId) {
+        setActiveFolderId(null);
+      }
+      
+      pushToast({
+        kind: 'success',
+        title: 'Folder deleted',
+        message: `"${folderName}" has been deleted successfully`
+      });
+    } catch (error) {
+      console.error('❌ Failed to delete folder:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      pushToast({
+        kind: 'error',
+        title: 'Failed to delete folder',
+        message: errorMessage
+      });
+    }
+  };
+
   if (!isInitialized) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -711,6 +752,8 @@ export const KnowledgeFinal = () => {
                   activeId={activeFolderId}
                   onSelect={handleFolderSelect}
                   onCreateSubfolder={handleCreateSubfolder}
+                  onDeleteFolder={handleDeleteFolder}
+                  isAdmin={true}
                 />
               </div>
             )}
@@ -758,6 +801,8 @@ export const KnowledgeFinal = () => {
                       setShowSidebar(false);
                     }}
                     onCreateSubfolder={handleCreateSubfolder}
+                    onDeleteFolder={handleDeleteFolder}
+                    isAdmin={true}
                   />
                 )}
               </div>
