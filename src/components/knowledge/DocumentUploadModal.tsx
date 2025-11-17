@@ -14,6 +14,7 @@ import { Select } from '../ui/Select';
 import { Label } from '../ui/Label';
 import { Card, CardContent } from '../ui/Card';
 import { buildApiUrl } from '../../utils/api';
+import { GoogleDrivePicker } from './GoogleDrivePicker';
 
 interface DocumentUploadModalProps {
   isOpen: boolean;
@@ -709,6 +710,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             </p>
           </CardContent>
         </Card>
+
+        {/* Google Drive Import */}
+        {selectedPrimaryFolder && (
+          <div className="mb-6">
+            <GoogleDrivePicker
+              primaryFolderId={selectedPrimaryFolder}
+              folderId={selectedSubfolder}
+              onFileUploaded={onUploadComplete}
+            />
+          </div>
+        )}
 
         {/* File List */}
         {fileStatuses.length > 0 && (
