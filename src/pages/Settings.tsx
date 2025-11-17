@@ -2,14 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   User, 
-  Bell, 
   Shield, 
-  Palette, 
-  Globe, 
-  Database,
   CreditCard,
-  Users,
-  Key,
   Save,
   LogOut,
   Settings as SettingsIcon
@@ -18,7 +12,6 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription }
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Label } from '../components/ui/Label';
-import { Select } from '../components/ui/Select';
 import { cn } from '../utils/cn';
 import type { UserProfile } from '../components/onboarding/UserProfileOnboarding';
 import CreditsDashboard from '../components/credits/CreditsDashboard';
@@ -27,42 +20,17 @@ import { useNavigate } from 'react-router-dom';
 
 const settingsSections = [
   { id: 'profile', label: 'Profile', icon: User },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'security', label: 'Security', icon: Shield },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'language', label: 'Language', icon: Globe },
-  { id: 'data', label: 'Data & Storage', icon: Database },
   { id: 'billing', label: 'Billing', icon: CreditCard },
-  { id: 'team', label: 'Team', icon: Users },
-  { id: 'api', label: 'API Keys', icon: Key },
 ];
 
 export const Settings = () => {
   const [activeSection, setActiveSection] = useState('profile');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState({
-    // Profile
     userName: '',
     agencyName: '',
-    email: 'admin@wanderlust.com',
-    phone: '+1 (555) 123-4567',
-    timezone: 'America/New_York',
-    
-    // Notifications
-    emailNotifications: true,
-    pushNotifications: true,
-    smsNotifications: false,
-    reminderFrequency: 'daily',
-    
-    // Appearance
-    theme: 'dark',
-    primaryColor: '#0fc6c6',
-    compactMode: false,
-    
-    // Language
-    language: 'en',
-    dateFormat: 'MM/DD/YYYY',
-    currency: 'USD',
+    email: '',
   });
 
   // Load user profile on mount
@@ -72,7 +40,6 @@ export const Settings = () => {
 
   const loadUserProfile = async () => {
     try {
-      // In development, check localStorage
       if (process.env.NODE_ENV === 'development') {
         const storedProfile = localStorage.getItem('tala_user_profile');
         if (storedProfile) {
@@ -81,14 +48,14 @@ export const Settings = () => {
           setSettings(prev => ({
             ...prev,
             userName: profile.name || '',
-            agencyName: profile.companyName || ''
+            agencyName: profile.companyName || '',
+            email: profile.email || ''
           }));
         }
         return;
       }
 
-      // Production: load from API
-      const userId = 'test_user_123'; // This would come from auth context
+      const userId = 'test_user_123';
       const response = await fetch(`/api/user-profile/${userId}`);
       if (response.ok) {
         const profile = await response.json();
@@ -96,7 +63,8 @@ export const Settings = () => {
         setSettings(prev => ({
           ...prev,
           userName: profile.name || '',
-          agencyName: profile.companyName || ''
+          agencyName: profile.companyName || '',
+          email: profile.email || ''
         }));
       }
     } catch (error) {
@@ -108,22 +76,10 @@ export const Settings = () => {
     switch (activeSection) {
       case 'profile':
         return <ProfileSettings settings={settings} setSettings={setSettings} userProfile={userProfile} setUserProfile={setUserProfile} />;
-      case 'notifications':
-        return <NotificationSettings settings={settings} setSettings={setSettings} />;
-      case 'appearance':
-        return <AppearanceSettings settings={settings} setSettings={setSettings} />;
       case 'security':
         return <SecuritySettings />;
-      case 'team':
-        return <TeamSettings />;
-      case 'api':
-        return <APISettings />;
       case 'billing':
         return <CreditsDashboard />;
-      case 'data':
-        return <DataSettings />;
-      case 'language':
-        return <LanguageSettings />;
       default:
         return <div>Section under construction</div>;
     }
@@ -178,34 +134,25 @@ const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }:
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
-  const timezoneOptions = [
-    { value: 'America/New_York', label: 'Eastern Time' },
-    { value: 'America/Chicago', label: 'Central Time' },
-    { value: 'America/Denver', label: 'Mountain Time' },
-    { value: 'America/Los_Angeles', label: 'Pacific Time' },
-  ];
-
   const saveProfile = async () => {
     setIsSaving(true);
     setSaveMessage('');
 
     try {
-      // Update user profile if name or agency changed
-      if (userProfile && (settings.userName !== userProfile.name || settings.agencyName !== userProfile.companyName)) {
+      if (userProfile && (settings.userName !== userProfile.name || settings.agencyName !== userProfile.companyName || settings.email !== userProfile.email)) {
         const updatedProfile = {
           ...userProfile,
           name: settings.userName,
-          companyName: settings.agencyName
+          companyName: settings.agencyName,
+          email: settings.email
         };
 
-        // In development, save to localStorage
         if (process.env.NODE_ENV === 'development') {
           localStorage.setItem('tala_user_profile', JSON.stringify(updatedProfile));
           setUserProfile(updatedProfile);
           setSaveMessage('Profile saved successfully!');
         } else {
-          // Production: save to API
-          const userId = 'test_user_123'; // This would come from auth context
+          const userId = 'test_user_123';
           const response = await fetch('/api/user-profile/create', {
             method: 'POST',
             headers: {
@@ -224,15 +171,11 @@ const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }:
           }
         }
       }
-
-      // Save other settings (email, phone, etc.) - would go to a separate endpoint
-      setSaveMessage('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving profile:', error);
       setSaveMessage('Error saving profile');
     } finally {
       setIsSaving(false);
-      // Clear message after 3 seconds
       setTimeout(() => setSaveMessage(''), 3000);
     }
   };
@@ -241,7 +184,8 @@ const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }:
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
+          <CardTitle>Profile Information</CardTitle>
+          <CardDescription>These settings are automatically updated from your onboarding</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -266,16 +210,7 @@ const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }:
               />
               <p className="text-xs text-[var(--muted)] mt-1">Your business name</p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Contact Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="email">Email</Label>
               <Input 
@@ -283,26 +218,7 @@ const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }:
                 type="email"
                 value={settings.email}
                 onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input 
-                id="phone"
-                type="tel"
-                value={settings.phone}
-                onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="timezone">Timezone</Label>
-              <Select
-                id="timezone"
-                value={settings.timezone}
-                onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
-                options={timezoneOptions}
+                placeholder="Enter your email"
               />
             </div>
           </div>
@@ -326,25 +242,6 @@ const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }:
             {isSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </CardFooter>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Agency Logo</CardTitle>
-          <CardDescription>Upload your agency logo. Recommended size: 400x400px</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-6">
-            <div className="w-24 h-24 bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 rounded-xl flex items-center justify-center">
-              <span className="text-3xl font-bold text-white">WT</span>
-            </div>
-            
-            <div className="flex gap-3">
-              <Button variant="primary" size="sm">Upload New Logo</Button>
-              <Button variant="secondary" size="sm">Remove</Button>
-            </div>
-          </div>
-        </CardContent>
       </Card>
 
       <Card variant="bordered">
@@ -399,164 +296,6 @@ const ProfileSettings = ({ settings, setSettings, userProfile, setUserProfile }:
   );
 };
 
-// Notification Settings Component
-const NotificationSettings = ({ settings, setSettings }: any) => {
-  const reminderOptions = [
-    { value: 'hourly', label: 'Every Hour' },
-    { value: 'daily', label: 'Daily' },
-    { value: 'weekly', label: 'Weekly' },
-    { value: 'custom', label: 'Custom' },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Notification Preferences</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <ToggleOption
-              label="Email Notifications"
-              description="Receive updates and alerts via email"
-              checked={settings.emailNotifications}
-              onChange={(checked: boolean) => setSettings({ ...settings, emailNotifications: checked })}
-            />
-            
-            <ToggleOption
-              label="Push Notifications"
-              description="Get instant notifications in your browser"
-              checked={settings.pushNotifications}
-              onChange={(checked: boolean) => setSettings({ ...settings, pushNotifications: checked })}
-            />
-            
-            <ToggleOption
-              label="SMS Notifications"
-              description="Receive critical alerts via text message"
-              checked={settings.smsNotifications}
-              onChange={(checked: boolean) => setSettings({ ...settings, smsNotifications: checked })}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Reminder Settings</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div>
-            <Label htmlFor="reminderFrequency">Task Reminder Frequency</Label>
-            <Select
-              id="reminderFrequency"
-              value={settings.reminderFrequency}
-              onChange={(e) => setSettings({ ...settings, reminderFrequency: e.target.value })}
-              options={reminderOptions}
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-// Appearance Settings Component
-const AppearanceSettings = ({ settings, setSettings }: any) => {
-  const colors = [
-    '#0fc6c6', // Current primary
-    '#3b82f6', // Blue
-    '#8b5cf6', // Purple
-    '#ec4899', // Pink
-    '#f59e0b', // Amber
-    '#10b981', // Emerald
-  ];
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Theme</CardTitle>
-          <CardDescription>Choose your preferred color scheme</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => setSettings({ ...settings, theme: 'light' })}
-              className={cn(
-                'border border-[var(--border)] rounded-xl p-4 text-left transition-all',
-                settings.theme === 'light' ? 'ring-2 ring-[var(--primary)]' : 'hover:bg-[var(--muted)]'
-              )}
-            >
-              <div className="w-full h-20 bg-white rounded-lg mb-3" />
-              <p className="font-medium">Light Theme</p>
-              <p className="text-sm text-[var(--muted)]">Clean and bright</p>
-            </button>
-            
-            <button
-              onClick={() => setSettings({ ...settings, theme: 'dark' })}
-              className={cn(
-                'border border-[var(--border)] rounded-xl p-4 text-left transition-all',
-                settings.theme === 'dark' ? 'ring-2 ring-[var(--primary)]' : 'hover:bg-[var(--muted)]'
-              )}
-            >
-              <div className="w-full h-20 bg-gray-900 rounded-lg mb-3" />
-              <p className="font-medium">Dark Theme</p>
-              <p className="text-sm text-[var(--muted)]">Easy on the eyes</p>
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Primary Color</CardTitle>
-          <CardDescription>Select your accent color</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-6 gap-3">
-            {colors.map((color) => (
-              <button
-                key={color}
-                onClick={() => setSettings({ ...settings, primaryColor: color })}
-                className={cn(
-                  'w-full aspect-square rounded-xl transition-all',
-                  settings.primaryColor === color ? 'ring-4 ring-[var(--ring)] scale-110' : 'hover:scale-105'
-                )}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-// Toggle Option Component
-const ToggleOption = ({ label, description, checked, onChange }: any) => {
-  return (
-    <div className="flex items-center justify-between p-4 border border-[var(--border)] rounded-xl">
-      <div>
-        <p className="font-medium">{label}</p>
-        <p className="text-sm text-[var(--muted)]">{description}</p>
-      </div>
-      <button
-        onClick={() => onChange(!checked)}
-        className={cn(
-          'relative w-12 h-6 rounded-full transition-colors',
-          checked ? 'bg-[var(--primary)]' : 'bg-[var(--muted)]'
-        )}
-      >
-        <div className={cn(
-          'absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform',
-          checked ? 'translate-x-6' : 'translate-x-0.5'
-        )} />
-      </button>
-    </div>
-  );
-};
-
-// Placeholder components for other sections
 const SecuritySettings = () => {
   const { logout, user } = useAuthStore();
   const navigate = useNavigate();
@@ -633,50 +372,3 @@ const SecuritySettings = () => {
   );
 };
 
-const DataSettings = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Data & Storage</CardTitle>
-      <CardDescription>Manage your data and storage preferences</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p className="text-[var(--muted)]">Data & Storage settings coming soon...</p>
-    </CardContent>
-  </Card>
-);
-
-const LanguageSettings = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Language Settings</CardTitle>
-      <CardDescription>Set your language and regional preferences</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p className="text-[var(--muted)]">Language settings coming soon...</p>
-    </CardContent>
-  </Card>
-);
-
-const TeamSettings = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Team Settings</CardTitle>
-      <CardDescription>Manage your team members and permissions</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p className="text-[var(--muted)]">Team settings coming soon...</p>
-    </CardContent>
-  </Card>
-);
-
-const APISettings = () => (
-  <Card>
-    <CardHeader>
-      <CardTitle>API Keys</CardTitle>
-      <CardDescription>Manage your API keys and integrations</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p className="text-[var(--muted)]">API settings coming soon...</p>
-    </CardContent>
-  </Card>
-);
