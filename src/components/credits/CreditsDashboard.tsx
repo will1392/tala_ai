@@ -120,23 +120,24 @@ export default function CreditsDashboard() {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.data) {
-          // Transform balance API response to match expected format
+          const monthlyAllocation = data.data.monthly_allocation || data.data.total_credits || 0;
+          const availableCredits = data.data.available_credits || 0;
           setCreditStatus({
             credits: {
               user_id: userId,
-              balance: data.data.available_credits || 0,
-              monthly_allocation: data.data.monthly_allocation || 5000,
+              balance: availableCredits,
+              monthly_allocation: monthlyAllocation,
               tier: data.data.plan_type || 'agent',
               daily_usage: 0,
               daily_limit: 100,
-              monthly_usage: (data.data.monthly_allocation || 5000) - (data.data.available_credits || 0),
-              last_reset: data.data.next_reset_date || new Date().toISOString(),
+              monthly_usage: monthlyAllocation - availableCredits,
+              last_reset: data.data.next_reset_date || data.data.last_reset_date || new Date().toISOString(),
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             },
             usage: {
               totalOperations: 0,
-              totalCreditsUsed: (data.data.monthly_allocation || 5000) - (data.data.available_credits || 0),
+              totalCreditsUsed: monthlyAllocation - availableCredits,
               periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
               periodEnd: new Date().toISOString(),
               byOperation: {},
